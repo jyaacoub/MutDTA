@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 data/P-L_refined_set_all.xlsx
 data/prot_seq.csv
+data/P-L_refined_set_all.csv
