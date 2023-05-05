@@ -2,6 +2,7 @@ from typing import List
 import requests as r
 import pandas as pd
 import os
+from tqdm import tqdm
 
 def sdf_to_SMILE():
     """
@@ -30,7 +31,7 @@ def excel_to_csv(xlsx_path='data/P-L_refined_set_all.xlsx'):
     df.to_csv(''.join(xlsx_path.split('.')[:-1])+'.csv')
 #TODO: fetch organism info (to filter for only human proteins)?
 
-def prep_data(csv_path='data/P-L_refined_set_all.csv'):
+def prep_data(csv_path='data/P-L_refined_set_all.csv', prot_seq_csv='data/prot_seq.csv'):
     """
     This file prepares X and Y data files for the model to learn from
     X data will contain cols:
@@ -44,10 +45,20 @@ def prep_data(csv_path='data/P-L_refined_set_all.csv'):
     
     # filter out complexes with 2+ proteins or none at all
     df = df_raw[lambda x: x['protID'].fillna('').str.split().apply(lambda x: len(x)==1)]
+
+    # getting protein sequences and saving them 
+    if not os.path.exists(prot_seq_csv):
+        seq = get_prot_seq(df['protID'])
+        # default save path in 'data/prot_seq.csv'
+        save_prot_seq(seq, save_path=prot_seq_csv)
+        seq = pd.Series(seq, name='prot_seq')
+        seq.index.name = 'protID'
+        seq = pd.DataFrame(seq)
+    else: 
+        seq = pd.read_csv(prot_seq_csv)
+        
+    # Unify affinity metrics to be same units
     
-    
-    #TODO: unify affinity metrics to be same units
-    #TODO: filter out protein complexes with multiple protein structures
     pass
 
 def get_prot_seq(protIDs: List[str], 
@@ -60,7 +71,7 @@ def get_prot_seq(protIDs: List[str],
         e.g. for uniprot: lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta'    
     """
     prot_seq = {}
-    for protID in protIDs:
+    for protID in tqdm(protIDs, 'Downloading protein sequences'):
         if protID in prot_seq: continue
         FASTA = r.get(url(protID)).text
         prot_seq[protID] = ''.join(FASTA.split('\n')[1:])
