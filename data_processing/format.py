@@ -29,6 +29,16 @@ def excel_to_csv(xlsx_path='data/P-L_refined_set_all.xlsx'):
                         'Canonical SMILES': 'SMILE'}, inplace=True)
     
     df.to_csv(''.join(xlsx_path.split('.')[:-1])+'.csv')
+    
+def prep_data_for_mdl(data_path='data/'):
+    """
+    Preps data for model training
+
+    Args:
+        data_path (str, optional): The path to the X and Y csv files. 
+                    Defaults to 'data/'.
+    """
+    pass
 
 def prep_save_data(csv_path='data/raw/P-L_refined_set_all.csv', 
                    prot_seq_csv='data/prot_seq.csv', 
