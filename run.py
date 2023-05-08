@@ -4,63 +4,50 @@ from data_processing.format import get_prot_seq, save_prot_seq, excel_to_csv, pr
 import pandas as pd
 import os, re
 
-# %% xlsx file to csv
-# excel_to_csv()
-
-# %% protID -> seq
-# protID = "P55055"
-# url = lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta'
-# d = get_prot_seq([protID])
-# print(d)
-# save_prot_seq(d, overwrite=True)
-csv_path='data/raw/P-L_refined_set_all.csv'
-prot_seq_csv='data/prot_seq.csv'
-
-X, Y = prep_save_data(csv_path, prot_seq_csv, save_path='data/')
-
-# %%
+# %% TEST for Ki vs Kd:
+csv_path='data/PDBbind/raw/P-L_refined_set_all.csv'
 df_raw = pd.read_csv(csv_path)
+df = df_raw[lambda x: x['protID'].fillna('').str.split().apply(lambda x: len(x)==1)]
+df_a = df.affinity
 
-# # filter out complexes with 2+ proteins or none at all
-# df = df_raw[lambda x: x['protID'].fillna('').str.split().apply(lambda x: len(x)==1)]
+conv = {
+    'mM': 1000,
+    'uM': 1,
+    'nM': 1e-3,
+    'pM': 1e-6,
+    'fM': 1e-9,
+}
+const = {
+    'Ki':[],
+    'Kd':[]
+}
 
-# #%% getting protein sequences
-# if not os.path.exists(prot_seq_csv):
-#     seq = get_prot_seq(df['protID'])
-#     # default save path in 'data/prot_seq.csv'
-#     save_prot_seq(seq, save_path=prot_seq_csv)
-#     seq = pd.Series(seq, name='prot_seq')
-#     seq.index.name = 'protID'
-#     seq = pd.DataFrame(seq)
-# else: 
-#     seq = pd.read_csv(prot_seq_csv)
+for a in df_a:
+    k, v = re.split(r'=|<=|>=', a)
+    v = float(v[:-2]) * conv[v[-2:]]
+    if 'Ki' in a:
+        const['Ki'].append(v)
+    elif 'Kd' in a:
+        const['Kd'].append(v)
+    else:
+        print(a)
 
-# # merge protein sequences with df on protID
-# df = df.merge(seq, on='protID')
+# removing outliers (Ki or Kd > 1e-3)
+for k in const:
+    const[k] = [x for x in const[k] if x < 1e-3]
 
-# pd.DataFrame(seq)
-# # %% Unify affinity metrics to be same units (uM)
-# conv = {
-#     'mM': 1000,
-#     'uM': 1,
-#     'nM': 1e-3,
-#     'pM': 1e-6,
-#     'fM': 1e-9,
-# }
-# def convert_affinity(a):
-#     if a[-2:] not in conv:
-#         raise ValueError(f'Unknown affinity unit: {a[-2:]} in {a}')
-#     else:
-#         k, v = re.split(r'=|<=|>=', a)
-#         v = float(v[:-2]) * conv[v[-2:]]
-#         return v
-    
-# df.affinity = df.affinity.apply(convert_affinity)
+import matplotlib.pyplot as plt
 
-# # %% Save PDBCode,prot_seq,SMILE to X and PDBCode,affinity to Y
-# X = df[['PDBCode', 'prot_seq', 'SMILE']]
-# Y = df[['PDBCode', 'affinity']]
-# .save('data/X.csv')
+plt.hist(const['Ki'], bins=10, alpha=0.8, color='r')
+plt.hist(const['Kd'], bins=10, alpha=0.8, color='g')
+
+plt.legend(['Ki', 'Kd'])
+print('Ki:',len(const['Ki']), 'Kd:', len(const['Kd']))
 
 
-# %%
+from scipy.stats import ranksums
+listl = const['Ki']
+list2 = const['Kd']
+u_stat, p_val = ranksums(listl, list2)
+print('p-value:', p_val)
+print('u-stat:', u_stat)
