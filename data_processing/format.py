@@ -1,7 +1,7 @@
 from typing import List
 import requests as r
 import pandas as pd
-import os
+import os, re
 from tqdm import tqdm
 
 def sdf_to_SMILE():
@@ -29,16 +29,29 @@ def excel_to_csv(xlsx_path='data/P-L_refined_set_all.xlsx'):
                         'Canonical SMILES': 'SMILE'}, inplace=True)
     
     df.to_csv(''.join(xlsx_path.split('.')[:-1])+'.csv')
-#TODO: fetch organism info (to filter for only human proteins)?
 
-def prep_data(csv_path='data/P-L_refined_set_all.csv', prot_seq_csv='data/prot_seq.csv'):
+def prep_save_data(csv_path='data/raw/P-L_refined_set_all.csv', 
+                   prot_seq_csv='data/prot_seq.csv', 
+                   save_path='data/') -> tuple[pd.DataFrame]:
     """
-    This file prepares X and Y data files for the model to learn from
+    This file prepares and saves X and Y csv files for the model to learn from
     X data will contain cols:
     PDBCode,prot_seq,SMILE
     
     Y file will contain cols:
-    PDBCode,affinity
+    PDBCode,affinity (in uM)
+
+    Args:
+        csv_path (str, optional): Path to unfiltered csv. Defaults to 
+                                    'data/raw/P-L_refined_set_all.csv'.
+        prot_seq_csv (str, optional): Path to csv containing pdbID and 
+                                        corresponding sequences. Defaults 
+                                        to 'data/prot_seq.csv'.
+        save_path (str, optional): Path to save X and Y csv files. Defaults 
+                                    to 'data/'.
+    
+    returns:
+        tuple(pd.DataFrame, pd.DataFrame): X and Y dataframes
     """
     
     df_raw = pd.read_csv(csv_path)
@@ -56,10 +69,34 @@ def prep_data(csv_path='data/P-L_refined_set_all.csv', prot_seq_csv='data/prot_s
         seq = pd.DataFrame(seq)
     else: 
         seq = pd.read_csv(prot_seq_csv)
-        
-    # Unify affinity metrics to be same units
     
-    pass
+    # merge protein sequences with df on protID
+    df = df.merge(seq, on='protID') # inner join and left join are the same here
+        
+    # Unify affinity metrics to be same units (uM)
+    conv = {
+        'mM': 1000,
+        'uM': 1,
+        'nM': 1e-3,
+        'pM': 1e-6,
+        'fM': 1e-9,
+    }
+    def convert_affinity(a):
+        if a[-2:] not in conv:
+            raise ValueError(f'Unknown affinity unit: {a[-2:]} in {a}')
+        else:
+            k, v = re.split(r'=|<=|>=', a)
+            v = float(v[:-2]) * conv[v[-2:]]
+            return v
+        
+    df.affinity = df.affinity.apply(convert_affinity)
+    
+    # Saving to csv without index
+    x = df[['PDBCode', 'prot_seq', 'SMILE']]
+    x.to_csv(save_path+'X.csv', index=False)
+    y = df[['PDBCode', 'affinity']]
+    y.to_csv(save_path+'Y.csv', index=False)
+    return x, y
 
 def get_prot_seq(protIDs: List[str], 
                   url=lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta') -> dict:
