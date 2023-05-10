@@ -114,6 +114,7 @@ if __name__ == '__main__':
     df = df_raw[lambda x: x['protID'].fillna('').str.split().apply(lambda x: len(x)==1)]
     df_a = df.affinity
 
+    # unify affinity metrics to be same units (uM)
     conv = {
         'mM': 1000,
         'uM': 1,
@@ -134,21 +135,21 @@ if __name__ == '__main__':
         elif 'Kd' in a:
             const['Kd'].append(v)
         else:
-            print(a)
+            raise ValueError(f'Unknown affinity metric: {a}')
 
     # removing outliers (Ki or Kd > 1e-3)
     for k in const:
         const[k] = [x for x in const[k] if x < 1e-3]
 
+    # plotting distribution of Ki and Kd values
     import matplotlib.pyplot as plt
-
     plt.hist(const['Ki'], bins=10, alpha=0.8, color='r')
     plt.hist(const['Kd'], bins=10, alpha=0.8, color='g')
 
     plt.legend(['Ki', 'Kd'])
     print('Ki:',len(const['Ki']), 'Kd:', len(const['Kd']))
 
-
+    # statistical test to see if Ki and Kd are from the same distribution
     from scipy.stats import ranksums
     listl = const['Ki']
     list2 = const['Kd']
