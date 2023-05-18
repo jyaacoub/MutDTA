@@ -35,9 +35,9 @@ def prep_data_for_mdl(data_path='data/'):
     """
     pass
 
-def prep_save_data(csv_path='data/raw/P-L_refined_set_all.csv', 
+def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv', 
                    prot_seq_csv='data/prot_seq.csv', 
-                   save_path='data/', Kd_only=False) -> tuple[pd.DataFrame]:
+                   save_path='data/PDBbind/kd_only', Kd_only=True) -> tuple[pd.DataFrame]:
     """
     This file prepares and saves X and Y csv files for the model to learn from
     X data will contain cols:
@@ -102,12 +102,16 @@ def prep_save_data(csv_path='data/raw/P-L_refined_set_all.csv',
     
     # Saving to csv without index
     x = df[['PDBCode', 'prot_seq', 'SMILE']]
-    x.to_csv(save_path+'X.csv', index=False)
+    x.to_csv(save_path+'/X.csv', index=False)
     y = df[['PDBCode', 'affinity']]
-    y.to_csv(save_path+'Y.csv', index=False)
+    y.to_csv(save_path+'/Y.csv', index=False)
     return x, y
 
 if __name__ == '__main__':
+    # prep data from raw
+    prep_save_data()
+    
+    exit()
     # Exploring the data
     csv_path='data/PDBbind/raw/P-L_refined_set_all.csv'
     df_raw = pd.read_csv(csv_path)
