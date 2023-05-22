@@ -162,7 +162,7 @@ def plot_together(dfL,dfP):
     """plotting ligand and protein in 3D space"""
     fig = px.scatter_3d(dfP, x='x', y='y', z='z', color='res_num')
     fig.add_scatter3d(x=dfL['x'], y=dfL['y'], z=dfL['z'], line={"color":'#000000'}, 
-                      marker={"color":'#000000'})
+                      marker={"color":'#000000'}, name='ligand')
     fig.show()
 
 
