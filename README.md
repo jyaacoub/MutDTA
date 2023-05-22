@@ -1,4 +1,6 @@
-See `.bashrc` for relevant aliases for molecule prep scripts like `prepare_ligand4.py`:
+# Requirements
+* AutoDock Tools script and pythonsh from MGL
+* `.bashrc` with relevant aliases for molecule prep scripts like `prepare_ligand4.py`:
 
 ```bash
 export PATH=~/mgltools_x86_64Linux2_1.5.7/bin:$PATH #
