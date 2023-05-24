@@ -35,12 +35,11 @@ Run the following to test if it works:
 ```bash
 ./autodock_vina_1_1_2_linux_x86/bin/vina --help
 ```
-
-## 2. Prepare Receptor and Ligand
+***
+## 2. Installing AutoDock Tools (ADT)
 
 For preparing the receptor and ligand we will use AutoDock Tools (ADT) from MGL. ADT is a GUI for preparing the receptor and ligand, however it comes with python scripts that we can run from the cmd line. Also it includes a prebuilt Python 2.0 interpreter called `pythonsh` that we can use to run the scripts.
 
-### **2.1 Installing ADT**
 Download ADT from http://mgltools.scripps.edu/downloads/ and unzip. 
 ```bash
 wget https://ccsb.scripps.edu/mgltools/download/491/mgltools_x86_64Linux2_1.5.7p1.tar.gz
@@ -72,13 +71,13 @@ To test if ADT is working add `pythonsh` to your `.bashrc` as an alias and run t
 ```bash
 pythonsh mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py --help
 ```
-
-### **2.2 Preparing receptor and ligand PDBQT files**
+***
+## 3. Preparing receptor and ligand PDBQT files
 The receptor must be cleaned of water molecules and other non-residue molecules. The receptor must also be converted to a pdbqt file that includes charge (Q) and atom type (T) information. This can be done using the `prepare_receptor4.py` script from ADT.
 
 There are two ways to prepare the receptor depending on the PDB file you have:
 
-#### *2.2.A Receptor + ligand as PDB complex*
+### *2.2.A Receptor + ligand as PDB complex*
 If the receptor and ligand already exist as a complex in a single PDB file, then run `prep_pdb.sh` with the following arguments. It will clean the file and split it into ligand and receptor pqbqt files.
 ```bash
 prep_pdb.sh <path> <pdbcode> <ADT_path>
@@ -92,12 +91,14 @@ prep/<pdbcode>-split-<num_atoms>_ligand.pdbqt
 prep/<pdbcode>-split-<num_atoms>.pdbqt
 ```
 
-#### *2.2.B Receptor on its own*
+### *2.2.B Receptor on its own*
 If the receptor is on its own in a PDB file, then run `prep_receptor.sh` with the following arguments. It will clean the file and convert it to a pdbqt file.
 ```bash
 prep_receptor.sh <path> <pdbcode> l <ADT_path>
 ```
 
-Then for the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools... #TODO
+Then for the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools... 
+>***TODO***
 
 ### **2.3 Preparing Grid files**
+>***TODO***
