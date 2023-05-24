@@ -148,3 +148,12 @@ To create a config file with the search space provided, run the following:
 ```bash
 python prep_conf.py -r <prep_path>
 ```
+***
+## 4. Running AutoDock Vina
+
+Now that we have the prepared receptor, ligand, and `conf.txt` file set up, we can run AutoDock Vina.
+
+To do so run the following:
+```bash
+vina --config conf.txt
+```

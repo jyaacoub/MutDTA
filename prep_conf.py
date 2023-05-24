@@ -8,6 +8,8 @@ parser.add_argument('-r', metavar='--receptor', type=str,
                     help='Path to pdbqt file containing sole protein.', required=False)
 parser.add_argument('-l', metavar='--ligand', type=str, 
                     help='Path to pdbqt file containing sole ligand.', required=False)
+parser.add_argument('-o', metavar='--output', type=str,
+                    help='Output config file path. Default is in same dir as receptor as "conf.txt"', required=False)
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -59,6 +61,9 @@ if __name__ == '__main__':
 
 
     # saving config file
-    with open('conf.txt', 'w') as f:
+    if args.o is None:
+        args.o = '/'.join(conf["receptor"].split('/')[:-1]) + '/conf.txt'
+        
+    with open(args.o, 'w') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')

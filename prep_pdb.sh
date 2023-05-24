@@ -10,6 +10,11 @@ if [ $# -lt 3 ] || [ $# -gt 4 ]; then
     exit 1
 fi
 
+# e.g.:
+# ADT_path="/home/jyaacoub/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/"
+# path="test_prep/"
+# pdbcode="1a1e"
+
 # Assign the arguments to variables
 path=$1
 pdbcode=$2
@@ -22,9 +27,6 @@ if [ $# -eq 4 ]; then
 else
     complex="m"
 fi
-# ADT_path="/home/jyaacoub/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/"
-# path="test_prep/"
-# pdbcode="1a1e"
 
 pdb_path="${path}/${pdbcode}.pdb"
 prep_path="${path}/prep/${pdbcode}"
@@ -78,6 +80,7 @@ elif [[ "${complex}" == "l" ]]; then
   python split_pdb.py -r "${prep_path}".pdbqt -s largest
 else
   python split_pdb.py -r "${prep_path}".pdbqt -s mains
+fi
 
 # Checking the return code of split_pdb.py
 if [[ $? -ne 0 ]]; then
@@ -86,8 +89,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 ### Running prep_conf.py
-# This will create config file for AutoDock Vina it will also get 
+# This will create config file for AutoDock Vina it will also get
 # binding site coordinates if PDB file contains ligand.
-echo -e "Running prep_conf.py\n"
-
-python prep_conf.py -r "${prep_path}".pdbqt -l "${prep_path}"_ligand.pdbqt
+echo -e "Running prep_conf.py -p ${path}/prep \n"
+python prep_conf.py -p "${path}"/prep
