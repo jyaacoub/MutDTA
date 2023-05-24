@@ -1,5 +1,6 @@
 #!/bin/bash
 
+echo -e "\n*** Starting ***\n"
 # Check if the required arguments are provided
 if [ $# -lt 3 ] || [ $# -gt 4 ]; then
     echo "Usage: $0 <path> <pdbcode> [<complex>] <ADT_path>"
@@ -72,7 +73,7 @@ fi
 
 ### Splitting PDB structures into separate files
 # Splitting PDB structures into separate files
-echo -e "Splitting PDB structures into separate files\n"
+echo -e "\nSplitting PDB structures into separate files\n"
 
 if [[ "${complex}" == "a" ]]; then
   python split_pdb.py -r "${prep_path}".pdbqt -s all
@@ -91,5 +92,7 @@ fi
 ### Running prep_conf.py
 # This will create config file for AutoDock Vina it will also get
 # binding site coordinates if PDB file contains ligand.
-echo -e "Running prep_conf.py -p ${path}/prep \n"
+echo -e "\nRunning prep_conf.py -p ${path}/prep \n"
 python prep_conf.py -p "${path}"/prep
+
+echo -e "\n*** Done ***\n"

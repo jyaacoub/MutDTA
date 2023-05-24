@@ -155,5 +155,12 @@ Now that we have the prepared receptor, ligand, and `conf.txt` file set up, we c
 
 To do so run the following:
 ```bash
-vina --config conf.txt
+vina --config <path>conf.txt
 ```
+
+# Errors
+In the `test` directory there are some files that can be used to test if everything is working correctly. They are what comes out of the `prep_pdb.sh` script. To make sure that you have set up everything correctly, you can run the following to test and compare the results to the `test` directory:
+```bash
+prep_pdb.sh ./test 1a1e <PATH>/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/
+```
+Make sure to replace `<PATH>` with the path to your mgltools directory.
