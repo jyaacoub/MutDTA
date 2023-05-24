@@ -1,0 +1,11 @@
+receptor = ./test/prep/1a1e-split-1031_receptor.pdbqt
+ligand = ./test/prep/1a1e-split-41_ligand.pdbqt
+energy_range = 3
+exhaustiveness = 8
+num_modes = 9
+center_x = 41.113925
+center_y = 8.260349999999999
+center_z = 21.245175
+size_x = 39.2445
+size_y = 34.7155
+size_z = 39.7505

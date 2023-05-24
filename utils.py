@@ -30,7 +30,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     """
     assert save in ['all', 'mains', 'largest'], f'Invalid save option: {save}'
     extens = file_path.split('.')[-1]
-    print(extens)
+    print('extracting structures from:', file_path)
     
     with open(file_path, 'r') as f:
         lines = f.readlines()
@@ -50,7 +50,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
         saved_files = {}
         for structure in structures:
             # Making sure no files are overwritten by adding postfix number count
-            fp = f'{file_path.split(".")[0]}-split-{len(structure)}'
+            fp = f'{file_path.split(".pdb")[0]}-split-{len(structure)}'
             postfix = f'-{len(structure)}_{saved_files.get(len(structure), 0)}.{extens}'
             
             with open(fp + postfix, 'w') as f:
@@ -60,7 +60,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     elif save.lower() == 'mains':
         # saving main protein structure to new file
         lrgst=max(structures, key=len)
-        fp = f'{file_path.split(".")[0]}-split-{len(lrgst)}_receptor.{extens}'
+        fp = f'{file_path.split(".pdb")[0]}-split-{len(lrgst)}_receptor.{extens}'
         with open(fp, 'w') as f:
             f.writelines(lrgst)
         print('wrote main receptor file: ', fp)
@@ -84,7 +84,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
                     lig_dist = new_dist
                     lig_structure = structure
                 
-            fp = f'{file_path.split(".")[0]}-split-{len(structure)}_ligand.{extens}'
+            fp = f'{file_path.split(".pdb")[0]}-split-{len(structure)}_ligand.{extens}'
             with open(fp, 'w') as f:
                 f.writelines(lig_structure)
 
@@ -94,7 +94,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     elif save.lower() == 'largest':
         lrgst=max(structures, key=len)
         # saving largest structure to new file
-        fp = f'{file_path.split(".")[0]}-split-{len(structure)}.{extens}'
+        fp = f'{file_path.split(".pdb")[0]}-split-{len(structure)}.{extens}'
         with open(fp, 'w') as f:
             f.writelines(lrgst)
     

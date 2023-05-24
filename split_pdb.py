@@ -14,11 +14,11 @@ parser.add_argument('-s', metavar='--save', type=str,
 if __name__ == '__main__':
     args = parser.parse_args()
 
-
     if args.s.lower() not in ['all', 'mains', 'largest']:
         parser.error(f'Invalid save option: {parser.parse_args().s}')
 
     r_path = '/'.join(args.r.split('/')[:-1])
+    print("RECEPTOR PATH:",r_path)
 
     # making sure save path exists
     os.makedirs(r_path, exist_ok=True)

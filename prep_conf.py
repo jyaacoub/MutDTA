@@ -40,25 +40,28 @@ if __name__ == '__main__':
     }
 
     lig = get_df(open(args.l,'r').readlines())
-    prot = get_df(open(args.r,'r').readlines())
+    prot = get_df(open(args.r,'r').readlines())[['x', 'y', 'z']]
 
     # Getting ligand center
     # note PDB units are in angstroms (see: https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
     lig_center = lig[['x', 'y', 'z']].mean().values # center of mass
 
     # Making sure it is inside the protein
-    assert prot[['x', 'y', 'z']].min().values < lig_center.all() < prot[['x', 'y', 'z']].max().values, "Ligand center is not inside protein."
+    pxmin, pxmax = prot['x'].min(), prot['x'].max()
+    pymin, pymax = prot['y'].min(), prot['y'].max()
+    pzmin, pzmax = prot['z'].min(), prot['z'].max()
+    assert (pxmin < lig_center[0] < pxmax and
+            pymin < lig_center[1] < pymax and
+            pzmin < lig_center[2] < pzmax), "Ligand center is not inside protein."
 
     conf["center_x"] = lig_center[0]
     conf["center_y"] = lig_center[1]
     conf["center_z"] = lig_center[2]
 
-
     # Getting box size and padding by 20A
     conf["size_x"] = (prot['x'].max() - prot['x'].min())/2 + 20
     conf["size_y"] = (prot['y'].max() - prot['y'].min())/2 + 20
     conf["size_z"] = (prot['z'].max() - prot['z'].min())/2 + 20
-
 
     # saving config file
     if args.o is None:
@@ -67,3 +70,4 @@ if __name__ == '__main__':
     with open(args.o, 'w') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')
+#%%
