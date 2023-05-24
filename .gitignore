@@ -1,3 +1,30 @@
 __pycache__/
 
+
 *.pyc
+
+
+
+
+### MGL TOOLS ###
+lib/mgltools_x86_64Linux2_1.5.7/*
+
+# Keeping pythonsh, but not the rest of the bin directory
+!lib/mgltools_x86_64Linux2_1.5.7/bin/
+lib/mgltools_x86_64Linux2_1.5.7/bin/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/bin/pythonsh
+
+# Keeping prepare_* files in Utilities24, but not the rest of the Utilities24 directory
+# and all other files in higher directories.
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/
+lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/
+lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/
+lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_*4.py
+### END MGL TOOLS ###
