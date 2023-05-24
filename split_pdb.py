@@ -1,29 +1,29 @@
-#%%
 import os, re, argparse
 from utils import split_structure, get_df, plot_together
-#%%
+    
 parser = argparse.ArgumentParser(description='Split pdbqt file into protein and ligand')
 parser.add_argument('-r', metavar='--receptor', type=str, help='path to pdbqt file', 
                     required=True)
-parser.add_argument('-a', help='To extract all structures',
-                    required=False, default=False, action='store_true')
-parser.add_argument('-l', help='To extract largest structure only',
-                    required=False, default=False, action='store_true')
 parser.add_argument('-v', help='To validate and view protein and ligand',
                     required=False, default=False, action='store_true')
 
-# -a and -l are mutually exclusive
-if parser.parse_args().a and parser.parse_args().l:
-    parser.error('-a and -l are mutually exclusive')
-    exit(1)
-
+parser.add_argument('-s', metavar='--save', type=str, 
+                    help='What structures to save ("all", "mains", or "largest")',
+                    required=False, default='mains')
 args = parser.parse_args()
-#%%
+
+
+if args.s.lower() not in ['all', 'mains', 'largest']:
+    parser.error(f'Invalid save option: {parser.parse_args().s}')
+
 r_path = '/'.join(args.r.split('/')[:-1])
 
+# making sure save path exists
 os.makedirs(r_path, exist_ok=True)
-split_structure(file_path=args.r, save='all' if args.a else 'mains')
+# splitting pdbqt file
+split_structure(file_path=args.r, save=args.s.lower())
 
+# viewing protein and ligand if requested
 if args.v == 'y':
     dfP, dfL = None, None
     for f_name in os.listdir(r_path):
@@ -38,4 +38,3 @@ if args.v == 'y':
     else:
         print('Split failed, missing protein or ligand file')
         exit(1)
-# %%

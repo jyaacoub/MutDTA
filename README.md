@@ -81,10 +81,23 @@ There are two ways to prepare the receptor depending on the PDB file you have:
 #### *2.2.A Receptor + ligand as PDB complex*
 If the receptor and ligand already exist as a complex in a single PDB file, then run `prep_pdb.sh` with the following arguments. It will clean the file and split it into ligand and receptor pqbqt files.
 ```bash
-prep_pdb.sh <pdb_file> <receptor_name>
+prep_pdb.sh <path> <pdbcode> <ADT_path>
 ```
+>To get help message run `prep_pdb.sh` with no arguments.
+
+The `<path>` directory should now contain the following files:
+```bash
+<pdbcode>.pdb
+prep/<pdbcode>-split-<num_atoms>_ligand.pdbqt
+prep/<pdbcode>-split-<num_atoms>.pdbqt
 ```
 
 #### *2.2.B Receptor on its own*
+If the receptor is on its own in a PDB file, then run `prep_receptor.sh` with the following arguments. It will clean the file and convert it to a pdbqt file.
+```bash
+prep_receptor.sh <path> <pdbcode> l <ADT_path>
+```
 
-### Receptor
+Then for the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools... #TODO
+
+### **2.3 Preparing Grid files**
