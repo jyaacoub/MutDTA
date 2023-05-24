@@ -49,7 +49,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     if save.lower() == 'all':
         saved_files = {}
         for structure in structures:
-            # making sure no files are overwritten
+            # Making sure no files are overwritten by adding postfix number count
             fp = f'{file_path.split(".")[0]}-split-{len(structure)}'
             postfix = f'-{len(structure)}_{saved_files.get(len(structure), 0)}.{extens}'
             
@@ -60,10 +60,10 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     elif save.lower() == 'mains':
         # saving main protein structure to new file
         lrgst=max(structures, key=len)
-        fp = f'{file_path.split(".")[0]}-split-{len(lrgst)}.{extens}'
+        fp = f'{file_path.split(".")[0]}-split-{len(lrgst)}_receptor.{extens}'
         with open(fp, 'w') as f:
             f.writelines(lrgst)
-        print('wrote main file: ', fp)
+        print('wrote main receptor file: ', fp)
             
         prot_df = get_df(lrgst)
         protein_center = prot_df[['x', 'y', 'z']].mean().values
@@ -89,14 +89,14 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
                 f.writelines(lig_structure)
 
             print('wrote ligand file: ', fp)
-                
         
     
     elif save.lower() == 'largest':
+        lrgst=max(structures, key=len)
         # saving largest structure to new file
         fp = f'{file_path.split(".")[0]}-split-{len(structure)}.{extens}'
         with open(fp, 'w') as f:
-            f.writelines(max(structures, key=len))
+            f.writelines(lrgst)
     
     return structures
 
@@ -122,13 +122,6 @@ def get_df(lines:List[str]) -> pd.DataFrame:
                      usecols=cols, engine='python')
     df.dropna(inplace=True)
     return df
-
-def get_ligand(file_path='sample_data/1a1e.pdbqt'):
-    """
-    Using proDy tool this will seperate the protein and ligand structures from the
-    PDB file (before running prepare_receptor4.py).
-    """
-    pass
 
 def plot_atoms(df, bounding_box=True):
     """plots atoms in 3D space using plotly"""

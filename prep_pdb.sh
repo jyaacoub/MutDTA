@@ -84,3 +84,10 @@ if [[ $? -ne 0 ]]; then
   echo "split_pdb.py failed to run successfully"
   exit 1
 fi
+
+### Running prep_conf.py
+# This will create config file for AutoDock Vina it will also get 
+# binding site coordinates if PDB file contains ligand.
+echo -e "Running prep_conf.py\n"
+
+python prep_conf.py -r "${prep_path}".pdbqt -l "${prep_path}"_ligand.pdbqt
