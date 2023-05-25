@@ -31,3 +31,6 @@ lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/*
 
 !lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_*4.py
 ### END MGL TOOLS ###
+
+# too large to commit tar file
+lib/mgltools_x86_64Linux2_1.5.7p1.tar.gz

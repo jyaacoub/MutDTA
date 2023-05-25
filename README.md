@@ -49,7 +49,7 @@ tar -xvzf mgltools_x86_64Linux2_1.5.7p1.tar.gz
 ```
 Run install script
 ```bash
-mgltools_x86_64Linux2_1.5.7/install.sh
+cd mgltools_x86_64Linux2_1.5.7 ; ./install.sh
 ```
 >NOTE if you get the following error:
 >```bash

@@ -6,6 +6,29 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import StringIO
 
+import os
+from tqdm import tqdm
+import requests as r
+
+def download_PDBs(PDBCodes: List[str], save_path='./',
+                  url=lambda x: f'http://www.pdbbind.org.cn/v2007/{x}/{x}_complex.pdb') -> dict:
+    """
+    Fetches pdb files from given url and returns set of successfully downloaded PDBs.
+    
+    URL is passed in as a callable function which accepts a string (the protID) and returns a url 
+    to download that file.
+        e.g. for uniprot: lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta'    
+    """
+    pdb_codes = {}
+    for PDBcode in tqdm(PDBCodes, 'Downloading PDB complex'):
+        if PDBcode in pdb_codes: continue
+        os.makedirs(f'{save_path}/{PDBcode}/')
+        with open(f'{save_path}/{PDBcode}/{PDBcode}.pdb', 'w') as f:
+            f.write(r.get(url(PDBcode)).text)
+        pdb_codes.add(PDBcode)
+        
+    return pdb_codes
+
 def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]:
     """
     Splits a pdbqt file if duplicate protein structures are present and saves the 
