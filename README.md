@@ -77,7 +77,9 @@ The receptor must be cleaned of water molecules and other non-residue molecules.
 
 There are two ways to prepare the receptor depending on the PDB file you have:
 
-### *2.2.A Receptor + ligand as PDB complex*
+### *3.2.A Receptor + ligand as PDB complex*
+> For PDBbind we can download structures using wget as with `wget http://www.pdbbind.org.cn/v2007/10gs/10gs_complex.pdb` where `10gs` is the PDB ID
+
 If the receptor and ligand already exist as a complex in a single PDB file, then run `prep_pdb.sh` with the following arguments. It will clean the file and split it into ligand and receptor pqbqt files.
 ```bash
 prep_pdb.sh <path> <pdbcode> <ADT_path>
@@ -91,7 +93,7 @@ prep/<pdbcode>-split-<num_atoms>_ligand.pdbqt
 prep/<pdbcode>-split-<num_atoms>_receptor.pdbqt
 ```
 
-### *2.2.B Receptor on its own*
+### *3.2.B Receptor on its own*
 If the receptor is on its own in a PDB file, then run `prep_receptor.sh` with the following arguments. It will clean the file and convert it to a pdbqt file.
 ```bash
 prep_receptor.sh <path> <pdbcode> l <ADT_path>
@@ -100,7 +102,7 @@ prep_receptor.sh <path> <pdbcode> l <ADT_path>
 Then for the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools... 
 >***TODO***
 
-### **2.3 Preparing Grid files**
+### **3.3 Preparing Grid files**
 For AutoDock Vina grid files and AutoGrid are not needed (see "AutoDock Tools Compatibility": https://vina.scripps.edu/manual/).
 
 From Vina help message we can see how to input the search space:
