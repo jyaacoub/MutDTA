@@ -1,3 +1,6 @@
 pandas
 numpy
 plotly
+tqdm
+ipykernel
+requests

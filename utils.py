@@ -11,21 +11,31 @@ from tqdm import tqdm
 import requests as r
 
 def download_PDBs(PDBCodes: List[str], save_path='./',
-                  url=lambda x: f'http://www.pdbbind.org.cn/v2007/{x}/{x}_complex.pdb') -> dict:
+                  url=lambda x: f'https://files.rcsb.org/download/{x}.pdb') -> dict:
     """
     Fetches pdb files from given url and returns set of successfully downloaded PDBs.
     
     URL is passed in as a callable function which accepts a string (the protID) and returns a url 
     to download that file.
-        e.g. for uniprot: lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta'    
+    For pdbbind:
+        lambda x: f'http://www.pdbbind.org.cn/v2007/{x}/{x}_complex.pdb'
+    For pdb:
+        lambda x: f'https://files.rcsb.org/download/{x}.pdb'
+        
     """
     pdb_codes = {}
     for PDBcode in tqdm(PDBCodes, 'Downloading PDB complex'):
         if PDBcode in pdb_codes: continue
+        fp = f'{save_path}/{PDBcode}/{PDBcode}.pdb'
+        # checking to make sure that we didnt already download file
+        if os.path.isfile(fp): 
+            pdb_codes[PDBcode] = 'already downloaded'
+            continue
+            
         os.makedirs(f'{save_path}/{PDBcode}/')
-        with open(f'{save_path}/{PDBcode}/{PDBcode}.pdb', 'w') as f:
+        with open(fp, 'w') as f:
             f.write(r.get(url(PDBcode)).text)
-        pdb_codes.add(PDBcode)
+        pdb_codes[PDBcode] = 'downloaded'
         
     return pdb_codes
 

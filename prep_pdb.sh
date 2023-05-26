@@ -95,4 +95,10 @@ fi
 echo -e "\nRunning prep_conf.py -p ${path}/prep \n"
 python prep_conf.py -p "${path}"/prep
 
+# Checking the return code of prep_conf.py
+if [[ $? -ne 0 ]]; then
+  echo "prep_conf.py failed to run successfully"
+  exit 1
+fi
+
 echo -e "\n*** Done ***\n"
