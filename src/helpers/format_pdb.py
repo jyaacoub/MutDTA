@@ -1,43 +1,8 @@
-# %%
 from typing import List
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 from io import StringIO
 
-import os
-from tqdm import tqdm
-import requests as r
-
-def download_PDBs(PDBCodes: List[str], save_path='./',
-                  url=lambda x: f'https://files.rcsb.org/download/{x}.pdb') -> dict:
-    """
-    Fetches pdb files from given url and returns set of successfully downloaded PDBs.
-    
-    URL is passed in as a callable function which accepts a string (the protID) and returns a url 
-    to download that file.
-    For pdbbind:
-        lambda x: f'http://www.pdbbind.org.cn/v2007/{x}/{x}_complex.pdb'
-    For pdb:
-        lambda x: f'https://files.rcsb.org/download/{x}.pdb'
-        
-    """
-    pdb_codes = {}
-    for PDBcode in tqdm(PDBCodes, 'Downloading PDB complex'):
-        if PDBcode in pdb_codes: continue
-        fp = f'{save_path}/{PDBcode}/{PDBcode}.pdb'
-        # checking to make sure that we didnt already download file
-        if os.path.isfile(fp): 
-            pdb_codes[PDBcode] = 'already downloaded'
-            continue
-            
-        os.makedirs(f'{save_path}/{PDBcode}/')
-        with open(fp, 'w') as f:
-            f.write(r.get(url(PDBcode)).text)
-        pdb_codes[PDBcode] = 'downloaded'
-        
-    return pdb_codes
+import pandas as pd
+import numpy as np
 
 def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]:
     """
@@ -122,6 +87,8 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
                 f.writelines(lig_structure)
 
             print('wrote ligand file: ', fp)
+            
+        #TODO: Save binding info into a conf.txt file! See `prep_conf.py`
         
     
     elif save.lower() == 'largest':
@@ -132,6 +99,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
             f.writelines(lrgst)
     
     return structures
+
 
 def get_df(lines:List[str]) -> pd.DataFrame:
     """
@@ -155,47 +123,3 @@ def get_df(lines:List[str]) -> pd.DataFrame:
                      usecols=cols, engine='python')
     df.dropna(inplace=True)
     return df
-
-def plot_atoms(df, bounding_box=True):
-    """plots atoms in 3D space using plotly"""
-    fig = px.scatter_3d(df, x='x', y='y', z='z', color='res_num')
-    
-    # adding bounding box
-    if bounding_box:
-        max_x, max_y, max_z = df[['x', 'y', 'z']].max()
-        min_x, min_y, min_z = df[['x', 'y', 'z']].min()
-        
-        # creating bounding box (8 corners/points)
-        corners = [[min_x, min_y, min_z], [min_x, min_y, max_z], 
-                   [min_x, max_y, max_z], [min_x, max_y, min_z], 
-                   
-                   [max_x, max_y, min_z], [max_x, max_y, max_z],
-                   [max_x, min_y, max_z], [max_x, min_y, min_z],
-                   
-                   # connecting corners
-                   [max_x, max_y, min_z], [max_x, max_y, max_z],
-                   [min_x, max_y, max_z], [min_x, max_y, min_z],
-                   [min_x, min_y, min_z], [max_x, min_y, min_z],
-                   [max_x, min_y, max_z], [min_x, min_y, max_z]]
-        
-        fig.add_trace(go.Scatter3d(x=[c[0] for c in corners],
-                                   y=[c[1] for c in corners],
-                                   z=[c[2] for c in corners]))
-        
-    fig.show()
-
-def plot_together(dfL,dfP):
-    """plotting ligand and protein in 3D space"""
-    fig = px.scatter_3d(dfP, x='x', y='y', z='z', color='res_num')
-    fig.add_scatter3d(x=dfL['x'], y=dfL['y'], z=dfL['z'], line={"color":'#000000'}, 
-                      marker={"color":'#000000'}, name='ligand')
-    fig.show()
-
-
-# %%
-if __name__ == '__main__':
-    # split_structure(file_path='sample_data/1a1e_n-e.pdb', save='mains')
-    dfP = get_df(open('sample_data/1a1e_n-e-split-1031.pdbqt','r').readlines())
-    dfL = get_df(open('sample_data/1a1e_n-e-split-41_ligand.pdbqt','r').readlines())
-    
-    plot_together(dfL,dfP)

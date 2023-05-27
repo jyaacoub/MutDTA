@@ -1,5 +1,6 @@
 import os, re, argparse
-from utils import split_structure, get_df, plot_together
+from src.helpers.format_pdb import split_structure, get_df
+from src.helpers.display import plot_together
 
 parser = argparse.ArgumentParser(description='Split pdbqt file into protein and ligand')
 parser.add_argument('-r', metavar='--receptor', type=str, help='path to pdbqt file', 

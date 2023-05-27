@@ -1,5 +1,14 @@
+"""
+This creates the configuration file with a focus on the binding site.
+
+Using ligand position to identify where the binding region is.
+
+# TODO: fix this so that binding info is provided during split_pdb step instead
+# this way we dont have to keep ligand pdb since it is not good for docking.
+"""
+
 import argparse, os
-from utils import get_df
+from src.helpers.format_pdb import get_df
 
 parser = argparse.ArgumentParser(description='Prepares config file for AutoDock Vina.')
 parser.add_argument('-p', metavar='--prep_path', type=str,
@@ -70,4 +79,3 @@ if __name__ == '__main__':
     with open(args.o, 'w') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')
-#%%

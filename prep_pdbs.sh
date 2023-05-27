@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#TODO: combine this sh script with prep_pdb.sh instead of having them be seperate files
 echo -e "\n### Starting ###\n"
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
