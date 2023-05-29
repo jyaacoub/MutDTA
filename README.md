@@ -95,13 +95,15 @@ There are two ways to prepare the receptor depending on the PDB file you have:
 ### *3.2.A Receptor + ligand as PDB complex*
 > For PDBbind we can download structures using wget as with `wget http://www.pdbbind.org.cn/v2007/10gs/10gs_complex.pdb` where `10gs` is the PDB ID
 
-If the receptor and ligand already exist as a complex in a single PDB file, then run `prep_pdb.sh` with the following arguments. It will clean the file and split it into ligand and receptor pqbqt files.
+If the receptor and ligand already exist as a complex in a single PDB file we can automatically get the binding site information. For this, run `prep_pdbs.sh` with the following arguments. It will clean the files and split it into ligand (not usable) and receptor (usable) pqbqt files.
+
 ```bash
-prep_pdb.sh <path> <pdbcode> <ADT_path>
+prep_pdbs.sh <path> <ADT_path>
 ```
+>Make sure the PDB file has the following path format: `<path>/<pdbcode>/<pdbcode>.pdb`
 >To get help message run `prep_pdb.sh` with no arguments.
 
-The `<path>` directory should now contain the following files:
+The `<path>/<pdbcode>` directory should now contain the following files:
 ```bash
 <pdbcode>.pdb
 prep/<pdbcode>-split-<num_atoms>_ligand.pdbqt
@@ -109,15 +111,45 @@ prep/<pdbcode>-split-<num_atoms>_receptor.pdbqt
 ```
 
 ### *3.2.B Receptor on its own*
-If the receptor is on its own in a PDB file, then run `prep_receptor.sh` with the following arguments. It will clean the file and convert it to a pdbqt file.
+If the receptor is on its own in a PDB file we need to manually get the binding site information. We can still run `prep_pdbs.sh` but with `l` argument so that it only extracts the receptor.
 ```bash
-prep_receptor.sh <path> <pdbcode> l <ADT_path>
+prep_pdbs.sh <path> l <ADT_path>
 ```
 
-Then for the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools... 
->***TODO***
+### **3.3 Preparing Ligand PDBQT file**
+For the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools...
+If you have the ligand name you can download it from PDB using the following address: `https://files.rcsb.org/ligands/download/{x}_ideal.sdf`
 
-### **3.3 Preparing Grid files**
+***
+>### Installing OpenBabel:
+>Needs to be compiled from source (see: https://open-babel.readthedocs.io/en/latest/Installation/install.html#basic-build-procedure)
+>```bash
+>wget https://gigenet.dl.sourceforge.net/project/openbabel/openbabel/2.4.0/openbabel-openbabel-2-4-0.tar.gz
+>```
+>```bash
+>tar -xvzf openbabel-openbabel-2-4-0.tar.gz
+>```
+>Now we can compile and install it:
+>```bash
+>cd openbabel-openbabel-2-4-0
+>mkdir build
+>cd build
+>cmake ..
+>make # or make -j4 to use 4 cores
+>sudo make install
+>```
+>Or for a local build run `cmake .. -DCMAKE_INSTALL_PREFIX=<LOCAL_PATH>` instead (make sure to add to path by including `export PATH=~/lib/obabel-install/bin/:$PATH` in `.bashrc`).
+>
+>Verify installation by running:
+>```bash
+>obabel -H
+>```
+> Note `*/mgltools/mgltools_x86_64Linux2_1.5.7/bin/obabel` might interfere with this so remove it from path if present in `.bashrc`
+
+
+***
+
+### **3.4 Preparing Grid files**
 For AutoDock Vina grid files and AutoGrid are not needed (see "AutoDock Tools Compatibility": https://vina.scripps.edu/manual/).
 
 From Vina help message we can see how to input the search space:
