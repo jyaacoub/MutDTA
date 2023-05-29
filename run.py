@@ -6,7 +6,11 @@ import os, re
 
 
 # %%
-prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
-               prot_seq_csv='data/prot_seq.csv',
-               save_path='data/PDBbind/kd_only', Kd_only=True)
+# prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
+#                prot_seq_csv='data/prot_seq.csv',
+#                save_path='data/PDBbind/kd_only', Kd_only=True)
 # %%
+from src.docking_helpers.utils import download_PDBs, download_SDFs
+
+# %% ex:
+download_SDFs(['VMW'], save_path='data/structures/ligands/')
