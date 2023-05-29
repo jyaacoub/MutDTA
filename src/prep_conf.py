@@ -18,7 +18,7 @@ parser.add_argument('-r', metavar='--receptor', type=str,
 parser.add_argument('-l', metavar='--ligand', type=str, 
                     help='Path to pdbqt file containing sole ligand.', required=False)
 parser.add_argument('-o', metavar='--output', type=str,
-                    help='Output config file path. Default is in same dir as receptor as "conf.txt"', required=False)
+                    help='Output config file path. Default is to save it in the same location as the receptor as "conf.txt"', required=False)
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -68,14 +68,14 @@ if __name__ == '__main__':
     conf["center_z"] = lig_center[2]
 
     # Getting box size and padding by 20A
-    conf["size_x"] = (prot['x'].max() - prot['x'].min())/2 + 20
-    conf["size_y"] = (prot['y'].max() - prot['y'].min())/2 + 20
-    conf["size_z"] = (prot['z'].max() - prot['z'].min())/2 + 20
+    conf["size_x"] = (lig['x'].max() - lig['x'].min())/2 + 20
+    conf["size_y"] = (lig['y'].max() - lig['y'].min())/2 + 20
+    conf["size_z"] = (lig['z'].max() - lig['z'].min())/2 + 20
 
     # saving config file
     if args.o is None:
         args.o = '/'.join(conf["receptor"].split('/')[:-1]) + '/conf.txt'
         
-    with open(args.o, 'w') as f:
+    with open(args.o, 'a') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')

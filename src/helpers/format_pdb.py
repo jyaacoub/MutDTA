@@ -71,16 +71,18 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
         if len(structures) > 1:
             # finding closest ligand structure to protein center
             lig_structure = None
+            lig_df = None
             lig_dist = np.inf
             for structure in structures:
                 if structure == lrgst: continue
-                lig_df = get_df(structure)
-                lig_center = lig_df[['x', 'y', 'z']].mean().values
+                curr_lig_df = get_df(structure)
+                curr_lig_center = curr_lig_df[['x', 'y', 'z']].mean().values
                 
-                new_dist = np.linalg.norm(protein_center - lig_center)
-                if new_dist < lig_dist:
-                    lig_dist = new_dist
+                curr_dist = np.linalg.norm(protein_center - curr_lig_center)
+                if curr_dist < lig_dist:
+                    lig_dist = curr_dist
                     lig_structure = structure
+                    lig_df = curr_lig_df
                 
             fp = f'{file_path.split(".pdb")[0]}-split-{len(structure)}_ligand.{extens}'
             with open(fp, 'w') as f:
@@ -88,8 +90,17 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
 
             print('wrote ligand file: ', fp)
             
-        #TODO: Save binding info into a conf.txt file! See `prep_conf.py`
-        
+            # Saving binding pocket info in conf.txt file
+            with open('/'.join(file_path.split('/')[:-1]) + '/conf.txt', 'w') as f:
+                f.write(f"""center_x = {protein_center[0]}\n
+                        center_y = {protein_center[1]}\n
+                        center_z = {protein_center[2]}\n
+                        
+                        size_x = {(lig_df['x'].max() - lig_df['x'].min())/2 + 20}
+                        size_y = {(lig_df['y'].max() - lig_df['y'].min())/2 + 20}
+                        size_z = {(lig_df['z'].max() - lig_df['z'].min())/2 + 20}
+                        """)
+                
     
     elif save.lower() == 'largest':
         lrgst=max(structures, key=len)
