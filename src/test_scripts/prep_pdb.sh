@@ -92,7 +92,7 @@ fi
 ### Running prep_conf.py
 # This will create config file for AutoDock Vina it will also get
 # binding site coordinates if PDB file contains ligand.
-#TODO: here as well
+#TODO: update here as well
 echo -e "\nRunning prep_conf.py -p ${path}/prep \n"
 python prep_conf.py -p "${path}"/prep
 
