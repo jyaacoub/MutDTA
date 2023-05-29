@@ -8,7 +8,7 @@ Improving the precision oncology pipeline by providing binding affinity purtubat
   - [ ] KIBA and Davis - Kinase proteins are not super relevant but could be useful for pretraining since datasets are limited.
   - [ ] GENIE - This will require some physical docking methods since we have no binding affinity data for this.
 - [ ] Docking baseline
-  - [ ] Set up Docking on cluster
+  - [x] Set up Docking on cluster
   - [ ] Build scripts to automate ligand and protein prep (including grid for binding site).
 - [ ] Model training
 - [ ] Model evaluation

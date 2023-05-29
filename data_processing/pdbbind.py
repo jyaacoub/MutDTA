@@ -4,7 +4,7 @@ import pandas as pd
 import os, re
 from tqdm import tqdm
 from urllib.parse import quote
-from general import get_prot_seq, save_prot_seq
+from data_processing.general import get_prot_seq, save_prot_seq
 
 def excel_to_csv(xlsx_path='data/P-L_refined_set_all.xlsx'):
     """
@@ -39,12 +39,15 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
                    prot_seq_csv='data/prot_seq.csv', 
                    save_path='data/PDBbind/kd_only', Kd_only=True) -> tuple[pd.DataFrame]:
     """
-    This file prepares and saves X and Y csv files for the model to learn from
+    This file prepares and saves X, Y, and info csv files for the model to learn from
     X data will contain cols:
     PDBCode,prot_seq,SMILE
     
     Y file will contain cols:
     PDBCode,affinity (in uM)
+    
+    info file will contain cols:
+    PDBCode,protID,lig_name
 
     Args:
         csv_path (str, optional): Path to unfiltered csv. Defaults to 
@@ -105,6 +108,10 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
     x.to_csv(save_path+'/X.csv', index=False)
     y = df[['PDBCode', 'affinity']]
     y.to_csv(save_path+'/Y.csv', index=False)
+    
+    info = df[['PDBCode', 'protID', 'lig_name']]
+    info.to_csv(save_path+'/info.csv', index=False)
+    
     return x, y
 
 if __name__ == '__main__':
