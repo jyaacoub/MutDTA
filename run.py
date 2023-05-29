@@ -13,4 +13,5 @@ import os, re
 from src.docking_helpers.utils import download_PDBs, download_SDFs
 
 # %% ex:
-download_SDFs(['VMW'], save_path='data/structures/ligands/')
+download_SDFs(['VWW'], save_path='data/structures/ligands/')
+# %%

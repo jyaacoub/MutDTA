@@ -134,20 +134,27 @@ If you have the ligand name you can download it from PDB using the following add
 >cd openbabel-openbabel-2-4-0
 >mkdir build
 >cd build
->cmake ..
+>cmake .. -DPYTHON_BINDINGS=ON -DCMAKE_INSTALL_PREFIX=<LOCAL_PATH>
 >make # or make -j4 to use 4 cores
 >sudo make install
 >```
->Or for a local build run `cmake .. -DCMAKE_INSTALL_PREFIX=<LOCAL_PATH>` instead (make sure to add to path by including `export PATH=~/lib/obabel-install/bin/:$PATH` in `.bashrc`).
+> Make sure to add to path by including `export PATH=<LOCAL_PATH>/bin/:$PATH` in `.bashrc`. Also add `export PYTHONPATH=<LOCAL_PATH>:$PYTHONPATH` so that it can be imported in python.
 >
 >Verify installation by running:
 >```bash
 >obabel -H
 >```
-> Note `*/mgltools/mgltools_x86_64Linux2_1.5.7/bin/obabel` might interfere with this so remove it from path if present in `.bashrc`
-
-
+> Note `*/mgltools/mgltools_x86_64Linux2_1.5.7/bin/obabel` might interfere with this so remove it from path if present in `.bashrc`.
 ***
+
+We can start from the SDF file and convert it to a PDBQT file using OpenBabel. To do so run the following:
+```bash
+obabel -isdf <path>/<ligand_name>_ideal.sdf -opdbqt -O <path>/<ligand_name>.pdbqt
+```
+or we can use the SMILES string to convert it to a PDBQT file using OpenBabel. To do so run the following:
+```bash
+obabel -:"<SMILES>" -opdbqt -O <path>/<ligand_name>.pdbqt
+```
 
 ### **3.4 Preparing Grid files**
 For AutoDock Vina grid files and AutoGrid are not needed (see "AutoDock Tools Compatibility": https://vina.scripps.edu/manual/).
@@ -208,8 +215,4 @@ vina --config <path>conf.txt
 ```
 
 # Errors
-In the `test` directory there are some files that can be used to test if everything is working correctly. They are what comes out of the `prep_pdb.sh` script. To make sure that you have set up everything correctly, you can run the following to test and compare the results to the `test` directory:
-```bash
-prep_pdb.sh ./test 1a1e <PATH>/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/
-```
-Make sure to replace `<PATH>` with the path to your mgltools directory.
+
