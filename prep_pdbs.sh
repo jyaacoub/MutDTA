@@ -88,13 +88,13 @@ for dir in $directories; do
 
         #** Splitting PDB structures into separate files
         echo -e "\nSplitting PDB structures into separate files\n"
-        #TODO: Update path to **python** files so that they match new system
+        #NOTE: Update path to **python** files so that they match new system
         if [[ "${complex}" == "a" ]]; then
-        python split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
+        python src/split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
         elif [[ "${complex}" == "l" ]]; then
-        python split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s largest
+        python src/split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s largest
         else
-        python split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s mains
+        python src/split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s mains
         fi
 
         # Checking the return code of split_pdb.py
@@ -106,9 +106,9 @@ for dir in $directories; do
         #** Running prep_conf.py
         # This will create config file for AutoDock Vina it will also get
         # binding site coordinates if PDB file contains ligand.
-        #TODO: update here as well
+        #NOTE: update here as well
         echo -e "\nRunning prep_conf.py -p ${prep_path} \n"
-        python prep_conf.py -p "${prep_path}"
+        python src/prep_conf.py -p "${prep_path}"
 
         # Checking the return code of prep_conf.py
         if [[ $? -ne 0 ]]; then
