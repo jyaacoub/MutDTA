@@ -138,11 +138,14 @@ If you have the ligand name you can download it from PDB using the following add
 >make # or make -j4 to use 4 cores
 >sudo make install
 >```
-> Make sure to add to path by including `export PATH=<LOCAL_PATH>/bin/:$PATH` in `.bashrc`. Also add `export PYTHONPATH=<LOCAL_PATH>:$PYTHONPATH` so that it can be imported in python.
->
+> Make sure to add to path by including `export PATH=<LOCAL_PATH>/bin/:$PATH` in `.bashrc`. 
+>***
+> For python bindings, we need to `wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz`, uzip, then add `-DEIGEN2_INCLUDE_DIR=<EIGEN_PATH>` to cmake command. 
+> also add `export PYTHONPATH=<LOCAL_PATH>:$PYTHONPATH` so that it can be imported in python.
+>***
 >Verify installation by running:
 >```bash
->obabel -H
+> obabel -H
 >```
 > Note `*/mgltools/mgltools_x86_64Linux2_1.5.7/bin/obabel` might interfere with this so remove it from path if present in `.bashrc`.
 ***

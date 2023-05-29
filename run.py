@@ -6,9 +6,14 @@ import os, re
 
 
 # %%
-# prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
-#                prot_seq_csv='data/prot_seq.csv',
-#                save_path='data/PDBbind/kd_only', Kd_only=True)
+import openbabel as ob
+
+conv = ob.OBConversion()
+conv.SetInAndOutFormats("smi", "pdbqt")
+conv.AddOption("gen3D", conv.GENOPTIONS)
+
+mol = ob.OBMol()
+conv.ReadString(mol, "C1=CC=CS1")
 # %%
 from src.docking_helpers.utils import download_PDBs, download_SDFs
 
