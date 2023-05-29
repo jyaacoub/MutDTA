@@ -4,7 +4,7 @@ import pandas as pd
 import os, re
 from tqdm import tqdm
 from urllib.parse import quote
-from data_processing.general import get_prot_seq, save_prot_seq
+from src.data_processing.general import get_prot_seq, save_prot_seq
 
 def excel_to_csv(xlsx_path='data/P-L_refined_set_all.xlsx'):
     """
