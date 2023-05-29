@@ -3,22 +3,23 @@ This creates the configuration file with a focus on the binding site.
 
 Using ligand position to identify where the binding region is.
 
-# TODO: fix this so that binding info is provided during split_pdb step instead
+# NOTE: Binding info is provided during split_pdb step instead 
 # this way we dont have to keep ligand pdb since it is not good for docking.
 """
 
 import argparse, os
-from src.helpers.format_pdb import get_df
 
 parser = argparse.ArgumentParser(description='Prepares config file for AutoDock Vina.')
 parser.add_argument('-p', metavar='--prep_path', type=str,
-                    help='Prep directory for split ligand and protein.', required=False)
+                    help="Directory containing prepared ligand and protein. \
+                    With file names ending in 'ligand.pdqt' or 'receptor.pdqt'.", required=False)
 parser.add_argument('-r', metavar='--receptor', type=str, 
                     help='Path to pdbqt file containing sole protein.', required=False)
 parser.add_argument('-l', metavar='--ligand', type=str, 
                     help='Path to pdbqt file containing sole ligand.', required=False)
 parser.add_argument('-o', metavar='--output', type=str,
-                    help='Output config file path. Default is to save it in the same location as the receptor as "conf.txt"', required=False)
+                    help='Output config file path. Default is to save it \
+                    in the same location as the receptor as "conf.txt"', required=False)
 
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -39,38 +40,14 @@ if __name__ == '__main__':
                 args.l = f'{args.p}/{file}'
         
     
-    conf = { # These are default values set by AutoDock Vina
+    conf = { # These are default values set by AutoDock Vina (see: https://vina.scripps.edu/manual/#config)
         "receptor": args.r,
         "ligand": args.l,
         "energy_range": 3,   # maximum energy difference between the best binding mode and the worst one (kcal/mol)
         "exhaustiveness": 8, # exhaustiveness of the global search (roughly proportional to time)
         "num_modes": 9,      # maximum number of binding modes to generate
-        #"cpu": 1,           # Automatic detection. Default is 1.
+        #"cpu": 1,           # num cpus to use. Default is to automatically detect.
     }
-
-    lig = get_df(open(args.l,'r').readlines())
-    prot = get_df(open(args.r,'r').readlines())[['x', 'y', 'z']]
-
-    # Getting ligand center
-    # note PDB units are in angstroms (see: https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
-    lig_center = lig[['x', 'y', 'z']].mean().values # center of mass
-
-    # Making sure it is inside the protein
-    pxmin, pxmax = prot['x'].min(), prot['x'].max()
-    pymin, pymax = prot['y'].min(), prot['y'].max()
-    pzmin, pzmax = prot['z'].min(), prot['z'].max()
-    assert (pxmin < lig_center[0] < pxmax and
-            pymin < lig_center[1] < pymax and
-            pzmin < lig_center[2] < pzmax), "Ligand center is not inside protein."
-
-    conf["center_x"] = lig_center[0]
-    conf["center_y"] = lig_center[1]
-    conf["center_z"] = lig_center[2]
-
-    # Getting box size and padding by 20A
-    conf["size_x"] = (lig['x'].max() - lig['x'].min())/2 + 20
-    conf["size_y"] = (lig['y'].max() - lig['y'].min())/2 + 20
-    conf["size_z"] = (lig['z'].max() - lig['z'].min())/2 + 20
 
     # saving config file
     if args.o is None:
