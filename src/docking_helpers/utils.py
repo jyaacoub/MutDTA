@@ -33,7 +33,7 @@ def download_PDBs(PDBCodes: List[str], save_path='./',
     return pdb_codes
 
 
-def download_SDFs(ligand_names: List[str], save_path='./',
+def download_SDFs(ligand_names: List[str], save_path='./data/structures/ligands',
                   url=lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf') -> dict:
     """
     Fetches SDF files from PDB site and returns a dict of the successfully downloaded SDFs.
@@ -48,7 +48,7 @@ def download_SDFs(ligand_names: List[str], save_path='./',
     lig_names = {}
     for name in tqdm(ligand_names, 'Downloading PDB complex'):
         if name in lig_names: continue
-        fp = f'{save_path}/{name}.sdf'
+        fp = f'{save_path}/{name}/{name}.sdf'
         # checking to make sure that we didnt already download file
         if os.path.isfile(fp): 
             lig_names[name] = 'already downloaded'
