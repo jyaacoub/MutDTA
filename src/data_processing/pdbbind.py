@@ -39,15 +39,15 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
                    prot_seq_csv='data/prot_seq.csv', 
                    save_path='data/PDBbind/kd_only', Kd_only=True) -> tuple[pd.DataFrame]:
     """
-    This file prepares and saves X, Y, and info csv files for the model to learn from
+    This file prepares and saves X, Y, and unique_lig csv files for the model to learn from
     X data will contain cols:
     PDBCode,prot_seq,SMILE
     
     Y file will contain cols:
     PDBCode,affinity (in uM)
     
-    info file will contain cols:
-    PDBCode,protID,lig_name
+    unique_lig file will contain cols (this will be used for docking prep).
+    lig_name,SMILE
 
     Args:
         csv_path (str, optional): Path to unfiltered csv. Defaults to 
@@ -60,7 +60,7 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
         Kd_only (bool, optional): Whether to only use Kd values. Defaults to False.
     
     returns:
-        tuple(pd.DataFrame, pd.DataFrame): X and Y dataframes
+        tuple(pd.DataFrame, pd.DataFrame): main dataframe 
     """
     
     df_raw = pd.read_csv(csv_path)
@@ -104,15 +104,16 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
     df.affinity = df.affinity.apply(convert_affinity)
     
     # Saving to csv without index
-    x = df[['PDBCode', 'prot_seq', 'SMILE']]
+    x = df[['PDBCode', 'protID', 'lig_name','prot_seq', 'SMILE']]
     x.to_csv(save_path+'/X.csv', index=False)
     y = df[['PDBCode', 'affinity']]
     y.to_csv(save_path+'/Y.csv', index=False)
     
-    info = df[['PDBCode', 'protID', 'lig_name']]
-    info.to_csv(save_path+'/info.csv', index=False)
+    # unique lig_names + SMILE
+    lig_names = df[['lig_name', 'SMILE']].drop_duplicates('lig_name')
+    lig_names.to_csv(save_path+'/unique_lig.csv', index=False)
     
-    return x, y
+    return df
 
 if __name__ == '__main__':
     # prep data from raw

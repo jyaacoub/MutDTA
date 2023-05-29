@@ -161,8 +161,7 @@ cython_debug/
 
 # Data files
 data/raw/P-L_refined_set_all.xlsx
-data/raw/P-L_refined_set_all.csv
-data/prot_seq.csv
+
 *DONT_PUSH*
 
 __pycache__/

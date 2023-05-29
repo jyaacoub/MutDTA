@@ -154,7 +154,7 @@ obabel -isdf <path>/<ligand_name>_ideal.sdf -opdbqt -O <path>/<ligand_name>.pdbq
 ```
 or we can use the SMILES string to convert it to a PDBQT file using OpenBabel. To do so run the following:
 ```bash
-obabel -:"<SMILES>" -opdbqt -O <path>/<ligand_name>.pdbqt
+obabel -:"<SMILES>" --gen3d -opdbqt -O <path>/<ligand_name>.pdbqt
 ```
 
 ### **3.4 Preparing Grid files**

@@ -4,16 +4,11 @@ from src.data_processing.pdbbind import get_prot_seq, save_prot_seq, excel_to_cs
 import pandas as pd
 import os, re
 
+#%%
+df = prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
+               prot_seq_csv='data/prot_seq.csv',
+               save_path='data/PDBbind/kd_only', Kd_only=True)
 
-# %%
-import openbabel as ob
-
-conv = ob.OBConversion()
-conv.SetInAndOutFormats("smi", "pdbqt")
-conv.AddOption("gen3D", conv.GENOPTIONS)
-
-mol = ob.OBMol()
-conv.ReadString(mol, "C1=CC=CS1")
 # %%
 from src.docking_helpers.utils import download_PDBs, download_SDFs
 
