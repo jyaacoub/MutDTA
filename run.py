@@ -8,5 +8,5 @@ import os, re
 # %%
 prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
                prot_seq_csv='data/prot_seq.csv',
-               save_path='data/PDBbind/kd_ki', Kd_only=False)
+               save_path='data/PDBbind/kd_only', Kd_only=True)
 # %%
