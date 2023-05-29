@@ -6,7 +6,7 @@ if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     echo "Usage: $0 <path> [<complex>] <ADT_path>"
     echo -e "\t path - path to the directory containing the pdb files in directories '<pdbcode>/<pdbcode>.pdb'"
     echo -e "\t complex - (optional) 'a' if you want all structures extracted, 'l' if you only want the largest structure (receptor). Default is 'm', to extract only receptor (largest structure) and its ligand (closest structure to receptor)."
-    echo -e "\t ADT_path - path to MGLToolsPckgs/AutoDockTools/Utilities24/"
+    echo -e "\t ADT_path - path to MGL root  (e.g.: '/home/jyaacoub/mgltools_x86_64Linux2_1.5.7/')"
     exit 1
 fi
 
@@ -28,6 +28,9 @@ if [ $# -eq 4 ]; then
 else
     complex="m"
 fi
+
+# adding 'MGLToolsPckgs/AutoDockTools/Utilities24/' to ADT_path for convenience
+ADT_path="${ADT_path}/MGLToolsPckgs/AutoDockTools/Utilities24/"
 
 # Delete exisiting prep files
 # rm -rf ./data/structures/*/prep
@@ -88,7 +91,7 @@ for dir in $directories; do
 
         #** Splitting PDB structures into separate files
         echo -e "\nSplitting PDB structures into separate files\n"
-        #NOTE: Update path to **python** files so that they match new system
+        #NOTE: remember to update path to **python** files so that they match any future changes
         if [[ "${complex}" == "a" ]]; then
         python src/split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
         elif [[ "${complex}" == "l" ]]; then

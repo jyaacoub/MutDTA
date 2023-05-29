@@ -92,14 +92,12 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
             
             # Saving binding pocket info in conf.txt file
             with open('/'.join(file_path.split('/')[:-1]) + '/conf.txt', 'w') as f:
-                f.write(f"""center_x = {protein_center[0]}\n
-                        center_y = {protein_center[1]}\n
-                        center_z = {protein_center[2]}\n
-                        
-                        size_x = {(lig_df['x'].max() - lig_df['x'].min())/2 + 20}
-                        size_y = {(lig_df['y'].max() - lig_df['y'].min())/2 + 20}
-                        size_z = {(lig_df['z'].max() - lig_df['z'].min())/2 + 20}
-                        """)
+                f.write(f"center_x = {protein_center[0]}\n"\
+                        f"center_y = {protein_center[1]}\n"\
+                        f"center_z = {protein_center[2]}\n"\
+                        f"size_x = {(lig_df['x'].max() - lig_df['x'].min())/2 + 20}\n"\
+                        f"size_y = {(lig_df['y'].max() - lig_df['y'].min())/2 + 20}\n"\
+                        f"size_z = {(lig_df['z'].max() - lig_df['z'].min())/2 + 20}\n")
                 
     
     elif save.lower() == 'largest':
