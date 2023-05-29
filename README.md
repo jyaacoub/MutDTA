@@ -131,16 +131,14 @@ If you have the ligand name you can download it from PDB using the following add
 >```
 >Now we can compile and install it:
 >```bash
->cd openbabel-openbabel-2-4-0
->mkdir build
->cd build
+>cd openbabel-openbabel-2-4-0; mkdir build; cd build
 >cmake .. -DPYTHON_BINDINGS=ON -DCMAKE_INSTALL_PREFIX=<LOCAL_PATH>
 >make # or make -j4 to use 4 cores
 >sudo make install
 >```
 > Make sure to add to path by including `export PATH=<LOCAL_PATH>/bin/:$PATH` in `.bashrc`. 
 >***
-> For python bindings, we need to `wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz`, uzip, then add `-DEIGEN2_INCLUDE_DIR=<EIGEN_PATH>` to cmake command. 
+> For python bindings, we need to `sudo apt-get install libeigen3-dev` before running cmake.
 > also add `export PYTHONPATH=<LOCAL_PATH>:$PYTHONPATH` so that it can be imported in python.
 >***
 >Verify installation by running:
