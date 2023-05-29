@@ -165,3 +165,40 @@ data/raw/P-L_refined_set_all.csv
 data/prot_seq.csv
 *DONT_PUSH*
 
+__pycache__/
+
+
+*.pyc
+venv/
+data/structures/
+
+data/
+
+
+
+
+### MGL TOOLS ###
+lib/mgltools_x86_64Linux2_1.5.7/*
+
+# Keeping pythonsh, but not the rest of the bin directory
+!lib/mgltools_x86_64Linux2_1.5.7/bin/
+lib/mgltools_x86_64Linux2_1.5.7/bin/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/bin/pythonsh
+
+# Keeping prepare_* files in Utilities24, but not the rest of the Utilities24 directory
+# and all other files in higher directories.
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/
+lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/
+lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/
+lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/*
+
+!lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_*4.py
+### END MGL TOOLS ###
+
+# too large to commit tar file
+lib/mgltools_x86_64Linux2_1.5.7p1.tar.gz
