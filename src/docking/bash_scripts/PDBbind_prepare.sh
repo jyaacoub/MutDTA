@@ -45,9 +45,9 @@ if [[ ! -f "${ADT_path}/prepare_receptor4.py" ]]; then
   exit 1
 fi
 
-# Check to see if ../prep_conf.py file exists
-if [[ ! -f "../../prep_conf.py" ]]; then
-  echo "../../prep_conf.py does not exist, make sure to run this script from the src/docking/bash_scripts/PDBbind dir."
+# NOTE: change this if you run from a diff dir Check to see if ../prep_conf.py file exists
+if [[ ! -f "../prep_conf.py" ]]; then
+  echo "../prep_conf.py does not exist, make sure to run this script from the src/docking/bash_scripts/PDBbind dir."
   exit 1
 fi
 
@@ -91,7 +91,7 @@ for dir in $dirs; do
     ligand="${dir}/${code}_ligand.pdbqt"
 
     # preparing config file with binding site info
-    python ../../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
+    python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
 
     #checking error code
     if [ $? -ne 0 ]; then

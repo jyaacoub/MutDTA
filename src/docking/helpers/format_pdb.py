@@ -131,4 +131,7 @@ def get_df(lines:List[str]) -> pd.DataFrame:
     df = pd.read_csv(strIO, sep=r'[ ]+', header=None, names=cols, 
                      usecols=cols, engine='python')
     df.dropna(inplace=True)
-    return df
+    # removing lines that are not atoms
+    clean_df = df[(df['atom_name'] == 'ATOM') | (df['atom_name'] == 'HETATM')]
+    # converting to float
+    return clean_df.astype({'x':float, 'y':float, 'z':float})
