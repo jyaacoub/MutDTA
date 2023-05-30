@@ -6,12 +6,12 @@ from tqdm import tqdm
 from urllib.parse import quote
 from src.data_processing.general import get_prot_seq, save_prot_seq
 
-def excel_to_csv(xlsx_path='data/P-L_refined_set_all.xlsx'):
+def excel_to_csv(xlsx_path='data/PDBbind/raw/P-L_refined_set_all.xlsx'):
     """
     Converts the PDBbind Xls file into a CSV file with the following cols:
     ID,PDBCode,affinity,year,prot_name,lig_name,protID,SMILE
     """
-    df = pd.read_excel(xlsx_path, header=1, index_col=0)
+    df = pd.read_excel(xlsx_path, header=1, index_col=0, dtype=str)
     df = df[['PDB code', 'Affinity Data', 'Release Year',
         'Protein Name', 'Ligand Name', 
         'UniProt AC', 'Canonical SMILES']]
@@ -63,7 +63,7 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
         tuple(pd.DataFrame, pd.DataFrame): main dataframe 
     """
     
-    df_raw = pd.read_csv(csv_path)
+    df_raw = pd.read_csv(csv_path, dtype=str)
     
     # filter out complexes with 2+ proteins or none at all
     df = df_raw[lambda x: x['protID'].fillna('').str.split().apply(lambda x: len(x)==1)]
@@ -77,7 +77,7 @@ def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
         seq.index.name = 'protID'
         seq = pd.DataFrame(seq)
     else: 
-        seq = pd.read_csv(prot_seq_csv)
+        seq = pd.read_csv(prot_seq_csv, dtype=str)
     
     # merge protein sequences with df on protID
     df = df.merge(seq, on='protID') # inner join and left join are the same here
