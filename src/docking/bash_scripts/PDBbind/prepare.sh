@@ -63,7 +63,7 @@ count=0
 for dir in $dirs; do
     code=$(basename "$dir")
     ligand="${dir}/${code}_ligand.sdf"
-    protein="${dir}/${code}_protein.pdb"
+    protein="${dir}/${code}_protein.pdbqt"
     pocket="${dir}/${code}_pocket.pdb"
 
     echo -e "Processing $code \t: $((++count)) / $total"
@@ -85,6 +85,10 @@ for dir in $dirs; do
         echo "prepare_receptor4.py failed to convert protein to pdbqt for $code"
         exit 1
     fi
+
+    # new protien and lig files
+    protein="${dir}/${code}_protein.pdbqt"
+    ligand="${dir}/${code}_ligand.pdbqt"
 
     # preparing config file with binding site info
     python ../../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"

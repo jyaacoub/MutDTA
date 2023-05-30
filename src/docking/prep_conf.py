@@ -63,7 +63,7 @@ if __name__ == '__main__':
     
     # saving binding site info if path provided
     if args.pp is not None:
-        pocket_df = get_df(args.pp)
+        pocket_df = get_df(args.pp).dropna()
         conf["center_x"] = pocket_df["x"].mean()
         conf["center_y"] = pocket_df["y"].mean()
         conf["center_z"] = pocket_df["z"].mean()
