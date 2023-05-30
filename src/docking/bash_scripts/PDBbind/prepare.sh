@@ -34,7 +34,7 @@ if ! command -v obabel >/dev/null 2>&1; then
 fi
 
 # Checking if pythonsh command is available (part of MGLTools)
-if ! command -v pythonsh >/dev/null 2>&1; then
+if [[ ! -f "${2}/bin/pythonsh" ]]; then
   echo "pythonsh is not installed or not in the system PATH"
   exit 1
 fi
@@ -42,6 +42,12 @@ fi
 # Checking if prepare_receptor4.py exists (part of MGLTools)
 if [[ ! -f "${ADT_path}/prepare_receptor4.py" ]]; then
   echo "prepare_receptor4.py does not exist in the specified location: ${ADT_path}"
+  exit 1
+fi
+
+# Check to see if ../prep_conf.py file exists
+if [[ ! -f "../../prep_conf.py" ]]; then
+  echo "../../prep_conf.py does not exist, make sure to run this script from the src/docking/bash_scripts/PDBbind dir."
   exit 1
 fi
 
@@ -72,7 +78,7 @@ for dir in $dirs; do
     fi
 
     # running prepare_receptor4.py to convert protein to pdbqt
-    pythonsh "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
+    "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
 
     #checking error code
     if [ $? -ne 0 ]; then
@@ -81,7 +87,7 @@ for dir in $dirs; do
     fi
 
     # preparing config file with binding site info
-    python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
+    python ../../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
 
     #checking error code
     if [ $? -ne 0 ]; then
