@@ -1,1 +1,0 @@
-# to prep PDBbind receptors (PDB to PDBQT)

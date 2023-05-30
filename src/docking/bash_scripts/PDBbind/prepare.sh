@@ -48,12 +48,19 @@ fi
 # looping through all the pdbcodes in the PDBbind dir select everything except index and readme dir
 dirs=$(find "$PDBbind_dir" -mindepth 1 -maxdepth 1 -type d -not -name "index" -not -name "readme")
 
+# getting count of dirs
+total=$(echo "$dirs" | wc -l)
+
+count=0
+
 # loop through each pdbcodes
 for dir in $dirs; do
     code=$(basename "$dir")
     ligand="${dir}/${code}_ligand.sdf"
     protein="${dir}/${code}_protein.pdb"
     pocket="${dir}/${code}_pocket.pdb"
+
+    echo -e "Processing $code \t: $((++count)) / $total"
 
     # running obabel to convert ligand to pdbqt
     obabel -isdf $ligand --title $code -opdbqt -O "${dir}/${code}_ligand.pdbqt"
