@@ -25,6 +25,3 @@ fi
 tail "$csv_file" | while IFS=',' read -r lig_name smile; do
     obabel -:"$smile" --gen3d --title $lig_name -opdbqt -O "$output"/"$lig_name".pdbqt
 done
-
-# END GOAL IS TO LOOP THROUGH 
-# obabel -:"<SMILES>" --gen3d -opdbqt -O <path>/<ligand_name>.pdbqt

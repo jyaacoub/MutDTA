@@ -10,7 +10,7 @@ df = prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv',
                save_path='data/PDBbind/kd_ki', Kd_only=False)
 
 # %%
-from src.docking_helpers.utils import download_PDBs, download_SDFs
+from src.docking.helpers.utils import download_PDBs, download_SDFs
 
 # %% ex:
 # download_SDFs(['VWW'], save_path='data/structures/ligands/')
