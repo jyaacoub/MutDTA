@@ -1,12 +1,12 @@
 # this assumes you have already set up openbabel
-echo -e "\n### Starting ###\n"
 # Check if the required arguments are provided
 if [ $# -lt 1 ] || [ $# -gt 1 ]; then
-    echo "Usage: $0 <path> [<complex>] <ADT_path>"
+    echo "Usage: $0 <path>"
     echo -e "\t path - path to PDBbind dir containing pdbcodes with sdf files for ligands to convert to pdbqt"
     exit 1
 fi
 
+echo -e "\n### Starting ###\n"
 # e.g. use: prep_lig.sh data/PDBbind/raw/refined-set
 
 

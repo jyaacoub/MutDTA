@@ -1,13 +1,13 @@
-# this assumes you have already set up openbabel
-echo -e "\n### Starting ###\n"
+
 # Check if the required arguments are provided
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-    echo "Usage: $0 <path> [<complex>] <ADT_path>"
+    echo "Usage: $0 <path> <output>"
     echo -e "\t path - path to csv file containing ligand_name and SMILE string you want to convert to pdbqt"
     echo -e "\t output (optional) - path to output directory to place pdbqt files. Default is same directory as csv file."
     exit 1
 fi
-
+# this assumes you have already set up openbabel
+echo -e "\n### Starting ###\n"
 # e.g. use: prep_lig.sh data/PDBbind/kd_ki/unique_lig.csv data/structures/ligands/
 
 

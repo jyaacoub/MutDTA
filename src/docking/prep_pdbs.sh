@@ -1,6 +1,5 @@
 #!/bin/bash
 
-echo -e "\n### Starting ###\n"
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     echo "Usage: $0 <path> [<complex>] <ADT_path>"
@@ -9,6 +8,7 @@ if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     echo -e "\t ADT_path - path to MGL root  (e.g.: '/home/jyaacoub/mgltools_x86_64Linux2_1.5.7/')"
     exit 1
 fi
+echo -e "\n### Starting ###\n"
 
 force=1 # 1 for true
 
