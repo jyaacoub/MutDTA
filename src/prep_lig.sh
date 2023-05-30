@@ -22,7 +22,7 @@ fi
 # Skip the first line (header) and process each subsequent line
 # "-n +2" -> start at line 2
 # 
-tail "$csv_file" | while IFS=',' read -r lig_name smile; done
+tail "$csv_file" | while IFS=',' read -r lig_name smile; do
     obabel -:"$smile" --gen3d -opdbqt -O "$output"/"$lig_name".pdbqt
 done
 
