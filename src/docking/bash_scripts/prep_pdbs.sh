@@ -93,11 +93,11 @@ for dir in $directories; do
         echo -e "\nSplitting PDB structures into separate files\n"
         #NOTE: remember to update path to **python** files so that they match any future changes
         if [[ "${complex}" == "a" ]]; then
-        python split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
+        python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
         elif [[ "${complex}" == "l" ]]; then
-        python split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s largest
+        python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s largest
         else
-        python split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s mains
+        python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s mains
         fi
 
         # Checking the return code of split_pdb.py
@@ -111,7 +111,7 @@ for dir in $directories; do
         # binding site coordinates if PDB file contains ligand.
         #NOTE: update here as well
         echo -e "\nRunning prep_conf.py -p ${prep_path} \n"
-        python prep_conf.py -p "${prep_path}"
+        python ../prep_conf.py -p "${prep_path}"
 
         # Checking the return code of prep_conf.py
         if [[ $? -ne 0 ]]; then
