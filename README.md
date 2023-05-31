@@ -43,8 +43,9 @@ Run the following to test if it works:
 ./autodock_vina_1_1_2_linux_x86/bin/vina --help
 ```
 ***
-## 2. Installing AutoDock Tools (ADT)
+## 2. Installing Docking Tools (ADT and OpenBabel)
 
+### **2.1 Install AutoDock Tools (ADT)**
 For preparing the receptor and ligand we will use AutoDock Tools (ADT) from MGL. ADT is a GUI for preparing the receptor and ligand, however it comes with python scripts that we can run from the cmd line. Also it includes a prebuilt Python 2.0 interpreter called `pythonsh` that we can use to run the scripts.
 
 Download ADT from http://mgltools.scripps.edu/downloads/ and unzip. 
@@ -78,14 +79,63 @@ To test if ADT is working add `pythonsh` to your `.bashrc` as an alias and run t
 ```bash
 pythonsh mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py --help
 ```
+### **2.1 Install OpenBabel**
+Needs to be compiled from source (see: https://open-babel.readthedocs.io/en/latest/Installation/install.html#basic-build-procedure)
+```bash
+wget https://gigenet.dl.sourceforge.net/project/openbabel/openbabel/2.4.0/openbabel-openbabel-2-4-0.tar.gz
+```
+```bash
+tar -xvzf openbabel-openbabel-2-4-0.tar.gz
+```
+Now we can compile and install it:
+```bash
+cd openbabel-openbabel-2-4-0; mkdir build; cd build
+cmake .. -DPYTHON_BINDINGS=ON -DCMAKE_INSTALL_PREFIX=<LOCAL_PATH>
+make # or make -j4 to use 4 cores
+sudo make install
+```
+ Make sure to add to path by including `export PATH=<LOCAL_PATH>/bin/:$PATH` in `.bashrc`. 
+>Note: For python bindings, we need to `sudo apt-get install libeigen3-dev` before running cmake.
+>
+>Also add `export PYTHONPATH=<LOCAL_PATH>:$PYTHONPATH` so that it can be imported in python.
+
+Verify installation by running:
+```bash
+ obabel -H
+```
+>Note: `*/mgltools/mgltools_x86_64Linux2_1.5.7/bin/obabel` might interfere with this so remove it from path if present in `.bashrc`.
+
 ***
 ## 3. Preparing receptor and ligand PDBQT files
 The receptor must be cleaned of water molecules and other non-residue molecules. The receptor must also be converted to a pdbqt file that includes charge (Q) and atom type (T) information. This can be done using the `prepare_receptor4.py` script from ADT.
 
-There are two ways to prepare the receptor depending on the PDB file you have:
+## 3.1 Working with *PDBbind* dataset
+There are many ways to prepare the receptor depending on the PDB file you have. For now we will focus on using the PDBbind dataset's layout to our advantage in prep.
+
+Run the following to download PDBbind:
+```bash
+wget https://pdbbind.oss-cn-hangzhou.aliyuncs.com/download/PDBbind_v2020_refined.tar.gz
+```
+unzip without -v to avoid verbose output (takes a while):
+```bash
+tar -xzf PDBbind_v2020_refined.tar.gz
+```
+
+To prepare receptor and ligand we need to run `PDBbind_prepare.sh` with the following arguments:
+```bash
+PDBbind_prepare.sh <path> <ADT_path> [<shortlist>]
+```
+Where `<path>` is the path to the PDBbind dataset and `<ADT_path>` is the path to the ADT directory. Optionally we can also pass in `<shortlist>` the path to a csv file containing the PDB codes we want to prepare. This is useful if we want to prepare a subset of the PDBbind dataset.
+
+Thats it! The script will automatically prepare the receptor and ligand and save them in the same location as the original ligand (sdf file) and receptor (pdb) files.
+
+
+### **3.2**
+The following are general instructions for preparing the receptor and ligand PDBQT files. This is useful if you have a PDB file that is not from PDBbind.
+>#TODO: THIS IS NOT COMPLETE YET
 
 ### *3.2.A Receptor + ligand as PDB complex*
-> For PDBbind we can download structures using wget as with `wget http://www.pdbbind.org.cn/v2007/10gs/10gs_complex.pdb` where `10gs` is the PDB ID
+> For PDBbind we can download individual structures using wget as with `wget http://www.pdbbind.org.cn/v2007/10gs/10gs_complex.pdb` where `10gs` is the PDB ID
 
 If the receptor and ligand already exist as a complex in a single PDB file we can automatically get the binding site information. For this, run `prep_pdbs.sh` with the following arguments. It will clean the files and split it into ligand (not usable) and receptor (usable) pqbqt files.
 
@@ -111,34 +161,6 @@ prep_pdbs.sh <path> l <ADT_path>
 ### **3.3 Preparing Ligand PDBQT file**
 For the ligand you need to download its SDF file and prepare it using OpenBabel or similar tools...
 If you have the ligand name you can download it from PDB using the following address: `https://files.rcsb.org/ligands/download/{x}_ideal.sdf`
-
-***
->### Installing OpenBabel:
->Needs to be compiled from source (see: https://open-babel.readthedocs.io/en/latest/Installation/install.html#basic-build-procedure)
->```bash
->wget https://gigenet.dl.sourceforge.net/project/openbabel/openbabel/2.4.0/openbabel-openbabel-2-4-0.tar.gz
->```
->```bash
->tar -xvzf openbabel-openbabel-2-4-0.tar.gz
->```
->Now we can compile and install it:
->```bash
->cd openbabel-openbabel-2-4-0; mkdir build; cd build
->cmake .. -DPYTHON_BINDINGS=ON -DCMAKE_INSTALL_PREFIX=<LOCAL_PATH>
->make # or make -j4 to use 4 cores
->sudo make install
->```
-> Make sure to add to path by including `export PATH=<LOCAL_PATH>/bin/:$PATH` in `.bashrc`. 
->***
-> For python bindings, we need to `sudo apt-get install libeigen3-dev` before running cmake.
-> also add `export PYTHONPATH=<LOCAL_PATH>:$PYTHONPATH` so that it can be imported in python.
->***
->Verify installation by running:
->```bash
-> obabel -H
->```
-> Note `*/mgltools/mgltools_x86_64Linux2_1.5.7/bin/obabel` might interfere with this so remove it from path if present in `.bashrc`.
-***
 
 We can start from the SDF file and convert it to a PDBQT file using OpenBabel. To do so run the following:
 ```bash
@@ -207,5 +229,13 @@ To do so run the following:
 vina --config <path>conf.txt
 ```
 
-# Errors
+# 4.1 Running on PDBbind dataset
+To run on the PDBbind dataset we can use the `run_vina.sh` script with the following arguments:
+```bash
+run_vina.sh <path> [<shortlist>]
+```
+Where `<path>` is the path to the PDBbind dataset. Optionally we can also pass in `<shortlist>` the path to a csv file containing the PDB codes we want to run. This is useful if we want to only dock a subset of the PDBbind dataset.
 
+# Errors
+See issues for errors.
+Main issue rn is #1
