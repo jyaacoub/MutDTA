@@ -90,6 +90,7 @@ else # otherwise use all
 fi
 
 count=0
+errors=0
 
 # loop through each pdbcodes
 for dir in $dirs; do
@@ -97,7 +98,7 @@ for dir in $dirs; do
     ligand="${dir}/${code}_ligand.sdf"
     protein="${dir}/${code}_protein.pdb"
 
-    echo -e "Processing $code \t: $((++count)) / $total"
+    echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
     # running prepare_receptor4.py to convert protein to pdbqt
     "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
@@ -105,7 +106,11 @@ for dir in $dirs; do
     #checking error code
     if [ $? -ne 0 ]; then
         echo "prepare_receptor4.py failed to convert protein to pdbqt for $code"
-        exit 1
+        # saving code to error file
+        echo "$code" >> pdb_error.txt
+        ((errors++))
+        # skip this code
+        continue
     fi
 
     # running obabel to convert ligand to pdbqt
