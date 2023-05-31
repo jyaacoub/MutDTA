@@ -109,7 +109,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     
     return structures
 
-def get_coords(lines:List[str]) -> np.ndarray:
+def get_coords(lines:List[str]) -> pd.DataFrame:
     """
     Returns a numpy array of coordinates from a pdb file.
     See: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
@@ -138,14 +138,14 @@ def get_coords(lines:List[str]) -> np.ndarray:
         lines (List[str]): list of lines from pdb file.
         
     returns:
-        np.ndarray: numpy array of coordinates, shape=(n, 3) where n is the number of atoms.
+        pd.DataFrame: pandas DataFrame of pdb file.
     """
     coords = []
     for line in lines:
         if (line[:6].strip() == 'ATOM') or (line[:6].strip() == 'HETATM'):
             # coords           x                     y                   z
             coords.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
-    return np.array(coords)
+    return pd.DataFrame(coords, columns=['x', 'y', 'z'])
 
 def get_ATOM_df(lines:List[str]) -> pd.DataFrame:
     """
