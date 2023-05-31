@@ -76,7 +76,7 @@ if [[ ! -z "$shortlist" ]]; then
   dirs=""
   for code in $codes; do
     if [[ ! -d "${PDBbind_dir}/${code}" ]]; then
-      echo "PDBbind dir does not contain ${code} specified in shortlist file"
+      echo "PDBbind dir (${PDBbind_dir}) does not contain ${code} specified in shortlist file"
       exit 1
     fi
     dirs="${dirs} ${PDBbind_dir}/${code}"
@@ -96,6 +96,9 @@ errors=0
 for dir in $dirs; do
     code=$(basename "$dir")
     echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
+    
+    # skipping if already processed
+    if [ -f "${dir}/${code}_conf.txt" ]; then; continue; fi
 
     # running prepare_receptor4.py to convert protein to pdbqt
     protein="${dir}/${code}_protein.pdb"
