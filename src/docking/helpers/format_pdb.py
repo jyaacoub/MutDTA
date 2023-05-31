@@ -115,11 +115,15 @@ def get_df(lines:List[str]) -> pd.DataFrame:
     Returns a pandas DataFrame of pdb file.
     
     Columns (in order that they appear in the PDB format)
+    REF: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
         'atom_name', 'count', 'atom_type', 'res_name', 'chain_name', 'res_num', 'x', 'y', 'z'
     
     Example of a line from PDB:
         ATOM      1  N   ILE A 146      57.904  24.527  16.458  *1.00  39.85     0.626 N
         everything after * is ignored.
+        
+    Note HETATM lines are different and have the following format:
+        'atom_name', 'count', 'atom_type', 'res_name', 'chain_name', 'x', 'y', 'z'
     
     args:
         lines (List[str]): list of lines from pdb file.
