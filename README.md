@@ -230,12 +230,12 @@ To do so run the following:
 vina --config <path>conf.txt
 ```
 
-# 4.1 Running on PDBbind dataset
+### **4.1 Running on PDBbind dataset**
 To run on the PDBbind dataset we can use the `run_vina.sh` script with the following arguments:
 ```bash
 run_vina.sh <path> [<shortlist>]
 ```
-Where `<path>` is the path to the PDBbind dataset. Optionally we can also pass in `<shortlist>` the path to a csv file containing the PDB codes we want to run. This is useful if we want to only dock a subset of the PDBbind dataset.
+Where `<path>` is the path to the *PDBbind* dataset. Optionally we can also pass in `<shortlist>` the path to a csv file containing the PDB codes we want to run. This is useful if we want to only dock a subset of the PDBbind dataset.
 
 # Errors
 See issues for errors.
