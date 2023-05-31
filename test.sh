@@ -24,8 +24,8 @@
 #     raise AttributeError('member %s not found'%member)
 # AttributeError: member babel_type not found
 
-ADT_path=/home/jyaacoub/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/
-t=/home/jyaacoub/mgltools_x86_64Linux2_1.5.7/
+ADT_path=/home/jyaacoub/lib/mgltools_x86_64Linux2_1.5.7/MGLToolsPckgs/AutoDockTools/Utilities24/
+t=/home/jyaacoub/lib/mgltools_x86_64Linux2_1.5.7/
 protein=/home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set/3ao2/3ao2_protein.pdb
 
 "${t}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "./3ao2.pdbqt"  -A checkhydrogens -U nphs_lps_waters_nonstdres

@@ -22,7 +22,7 @@ if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
     exit 1
 fi
-# e.g. use: PDBbind_prepare.sh /home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set /home/jyaacoub/mgltools_x86_64Linux2_1.5.7/ /home/jyaacoub/projects/MutDTA/data/PDBbind/kd_ki/X.csv
+# e.g. use: PDBbind_prepare.sh /home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set /home/jyaacoub/lib/mgltools_x86_64Linux2_1.5.7/ /home/jyaacoub/projects/MutDTA/data/PDBbind/kd_ki/X.csv
 
 echo -e "\n### Starting ###\n"
 PDBbind_dir=$1
@@ -95,12 +95,10 @@ errors=0
 # loop through each pdbcodes
 for dir in $dirs; do
     code=$(basename "$dir")
-    ligand="${dir}/${code}_ligand.sdf"
-    protein="${dir}/${code}_protein.pdb"
-
     echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
     # running prepare_receptor4.py to convert protein to pdbqt
+    protein="${dir}/${code}_protein.pdb"
     "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
 
     #checking error code
@@ -114,6 +112,7 @@ for dir in $dirs; do
     fi
 
     # running obabel to convert ligand to pdbqt
+    ligand="${dir}/${code}_ligand.sdf"
     obabel -isdf $ligand --title $code -opdbqt -O "${dir}/${code}_ligand.pdbqt"
 
     #checking error code
@@ -125,9 +124,9 @@ for dir in $dirs; do
     # new protien and lig files
     protein="${dir}/${code}_protein.pdbqt"
     ligand="${dir}/${code}_ligand.pdbqt"
-    pocket="${dir}/${code}_pocket.pdb"
 
     # preparing config file with binding site info
+    pocket="${dir}/${code}_pocket.pdb"
     python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
 
     #checking error code
