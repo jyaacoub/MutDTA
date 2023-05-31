@@ -1,5 +1,5 @@
 import os, re, argparse
-from helpers.format_pdb import split_structure, get_df
+from helpers.format_pdb import split_structure, get_ATOM_df
 from helpers.display import plot_together
 
 parser = argparse.ArgumentParser(description='Split pdbqt file into protein and ligand')
@@ -34,9 +34,9 @@ if __name__ == '__main__':
         for f_name in os.listdir(r_path):
             if re.search(r'split[\w\-]*.pdbqt',f_name):
                 if re.search('ligand',f_name):
-                    dfL = get_df(open(f'{r_path}/{f_name}','r').readlines())
+                    dfL = get_ATOM_df(open(f'{r_path}/{f_name}','r').readlines())
                 else:
-                    dfP = get_df(open(f'{r_path}/{f_name}','r').readlines())
+                    dfP = get_ATOM_df(open(f'{r_path}/{f_name}','r').readlines())
                     
         if dfP is not None and dfL is not None:
             plot_together(dfL,dfP)

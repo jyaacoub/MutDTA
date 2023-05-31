@@ -63,7 +63,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
             f.writelines(lrgst)
         print('wrote main receptor file: ', fp)
             
-        prot_df = get_df(lrgst)
+        prot_df = get_coords(lrgst)
         protein_center = prot_df[['x', 'y', 'z']].mean().values
         
         
@@ -75,7 +75,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
             lig_dist = np.inf
             for structure in structures:
                 if structure == lrgst: continue
-                curr_lig_df = get_df(structure)
+                curr_lig_df = get_coords(structure)
                 curr_lig_center = curr_lig_df[['x', 'y', 'z']].mean().values
                 
                 curr_dist = np.linalg.norm(protein_center - curr_lig_center)
@@ -109,9 +109,79 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     
     return structures
 
+def get_coords(lines:List[str]) -> np.ndarray:
+    """
+    Returns a numpy array of coordinates from a pdb file.
+    See: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+    
+        ATOM Format:
+        COLUMNS        DATA  TYPE    FIELD        DEFINITION
+        -------------------------------------------------------------------------------------
+        1 -  6        Record name   "ATOM  "
+                        [...]
+        31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
+        39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
+        47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
+                        [...]
+        
+        HETATM Format:
+        COLUMNS       DATA  TYPE     FIELD         DEFINITION
+        -----------------------------------------------------------------------
+        1 - 6        Record name    "HETATM"
+                        [...]
+        31 - 38       Real(8.3)      x             Orthogonal coordinates for X.
+        39 - 46       Real(8.3)      y             Orthogonal coordinates for Y.
+        47 - 54       Real(8.3)      z             Orthogonal coordinates for Z.
+                        [...]
+    
+    args:
+        lines (List[str]): list of lines from pdb file.
+        
+    returns:
+        np.ndarray: numpy array of coordinates, shape=(n, 3) where n is the number of atoms.
+    """
+    coords = []
+    for line in lines:
+        if (line[:6].strip() == 'ATOM') or (line[:6].strip() == 'HETATM'):
+            # coords           x                     y                   z
+            coords.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
+    return np.array(coords)
+
+def get_ATOM_df(lines:List[str]) -> pd.DataFrame:
+    """
+    Returns a pandas DataFrame of pdb file of ONLY ATOM lines.
+    Columns (in order that they appear in the PDB format)
+    REF: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
+        'atom_name', 'count', 'atom_type', 'res_name', 'chain_name', 'res_num', 'x', 'y', 'z'
+    
+    Example of a line from PDB:
+        ATOM      1  N   ILE A 146      57.904  24.527  16.458  *1.00  39.85     0.626 N
+        
+    everything after * is ignored here.
+    
+    HETATM lines are different and are not used. This function is primarily for visualizing 
+    residues by their atom coordinates.
+    
+    args:
+        lines (List[str]): list of lines from pdb file.
+    
+    returns:
+        pd.DataFrame: pandas DataFrame of pdb file.    
+    """
+    # removing lines that are not atoms
+    clean_lines = [line for line in lines if (line[:6].strip() == 'ATOM')]
+    cols = ['atom_name', 'count', 'atom_type', 'res_name', 
+            'chain_name', 'res_num', 'x', 'y', 'z']
+    strIO = StringIO(''.join(clean_lines))
+    df = pd.read_csv(strIO, sep=r'[ ]+', header=None, names=cols, 
+                     usecols=cols, engine='python')
+    df.dropna(inplace=True)
+    return df
 
 def get_df(lines:List[str]) -> pd.DataFrame:
     """
+    ***DEPRECATED***: Use get_coords or get_ATOM_df instead.
+    
     Returns a pandas DataFrame of pdb file.
     
     Columns (in order that they appear in the PDB format)
@@ -128,6 +198,7 @@ def get_df(lines:List[str]) -> pd.DataFrame:
     args:
         lines (List[str]): list of lines from pdb file.
     """
+    print('\'get_df\' is DEPRECATED: Use \'get_coords\' or \'get_ATOM_df\' instead.')
     cols = ['atom_name', 'count', 'atom_type', 
             'res_name', 'chain_name', 'res_num', 
             'x', 'y', 'z']

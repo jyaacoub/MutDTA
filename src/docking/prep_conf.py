@@ -8,7 +8,7 @@ Using ligand position to identify where the binding region is.
 """
 
 import argparse, os
-from helpers.format_pdb import get_df
+from helpers.format_pdb import get_coords
 
 parser = argparse.ArgumentParser(description='Prepares config file for AutoDock Vina.')
 parser.add_argument('-p', metavar='--prep_path', type=str,
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     
     # saving binding site info if path provided
     if args.pp is not None:
-        pocket_df = get_df(open(args.pp, 'r').readlines())
+        pocket_df = get_coords(open(args.pp, 'r').readlines())
         conf["center_x"] = pocket_df["x"].mean()
         conf["center_y"] = pocket_df["y"].mean()
         conf["center_z"] = pocket_df["z"].mean()
