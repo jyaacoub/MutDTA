@@ -7,9 +7,10 @@ Improving the precision oncology pipeline by providing binding affinity purtubat
   - [x] PLATINUM - Working on getting mutated sequence data (done with mutalyzer)
   - [ ] KIBA and Davis - Kinase proteins are not super relevant but could be useful for pretraining since datasets are limited.
   - [ ] GENIE - This will require some physical docking methods since we have no binding affinity data for this.
-- [ ] Docking baseline
+- [x] Docking baseline
   - [x] Set up Docking on cluster
-  - [ ] Build scripts to automate ligand and protein prep (including grid for binding site).
+  - [x] Build scripts to automate ligand and protein prep (including grid for binding site).
+  - [x] Run docking on PDBbind dataset
 - [ ] Model training
 - [ ] Model evaluation
 
@@ -238,4 +239,4 @@ Where `<path>` is the path to the PDBbind dataset. Optionally we can also pass i
 
 # Errors
 See issues for errors.
-Main issue rn is #1
+Main issue rn is [#1](/../../issues/1)
