@@ -15,12 +15,12 @@
 
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-    echo "Usage: $0 <path> <ADT_path> <shortlist>"
-    echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt."
-    echo -e "\t ADT_path - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
-    echo -e "\t shortlist (optional) - path to csv file containing a list of pdbcodes to process."
-    echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
-    exit 1
+  echo "Usage: $0 <path> <ADT_path> <shortlist>"
+  echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt."
+  echo -e "\t ADT_path - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
+  echo -e "\t shortlist (optional) - path to csv file containing a list of pdbcodes to process."
+  echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
+  exit 1
 fi
 # e.g. use: PDBbind_prepare.sh /home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set /home/jyaacoub/lib/mgltools_x86_64Linux2_1.5.7/ /home/jyaacoub/projects/MutDTA/data/PDBbind/kd_ki/X.csv
 
@@ -29,9 +29,9 @@ PDBbind_dir=$1
 ADT_path="${2}/MGLToolsPckgs/AutoDockTools/Utilities24/"
 
 if [ $# -eq 3 ]; then
-    shortlist=$3
+  shortlist=$3
 else
-    shortlist=""
+  shortlist=""
 fi
 
 # pre-run checks:
@@ -94,50 +94,50 @@ errors=0
 
 # loop through each pdbcodes
 for dir in $dirs; do
-    code=$(basename "$dir")
-    echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
+  code=$(basename "$dir")
+  echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
-    # skipping if already processed
-    if [ -f "${dir}/${code}_conf.txt" ]; then
-	echo -e "\t Skipping...already processed"
-        continue
-    fi
+  # skipping if already processed
+  if [ -f "${dir}/${code}_conf.txt" ]; then
+    echo -e "\t Skipping...already processed"
+    continue
+  fi
 
-    # running prepare_receptor4.py to convert protein to pdbqt
-    protein="${dir}/${code}_protein.pdb"
-    "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
+  # running prepare_receptor4.py to convert protein to pdbqt
+  protein="${dir}/${code}_protein.pdb"
+  "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
 
-    #checking error code
-    if [ $? -ne 0 ]; then
-        echo "prepare_receptor4.py failed to convert protein to pdbqt for $code"
-        # saving code to error file
-        echo "$code" >> pdb_error.txt
-        ((errors++))
-        # skip this code
-        continue
-    fi
+  #checking error code
+  if [ $? -ne 0 ]; then
+    echo "prepare_receptor4.py failed to convert protein to pdbqt for $code"
+    # saving code to error file
+    echo "$code" >> pdb_error.txt
+    ((errors++))
+    # skip this code
+    continue
+  fi
 
-    # running obabel to convert ligand to pdbqt
-    ligand="${dir}/${code}_ligand.sdf"
-    obabel -isdf $ligand --title $code -opdbqt -O "${dir}/${code}_ligand.pdbqt"
+  # running obabel to convert ligand to pdbqt
+  ligand="${dir}/${code}_ligand.sdf"
+  obabel -isdf $ligand --title $code -opdbqt -O "${dir}/${code}_ligand.pdbqt"
 
-    #checking error code
-    if [ $? -ne 0 ]; then
-        echo "obabel failed to convert ligand to pdbqt for $code"
-        exit 1
-    fi
+  #checking error code
+  if [ $? -ne 0 ]; then
+    echo "obabel failed to convert ligand to pdbqt for $code"
+    exit 1
+  fi
 
-    # new protien and lig files
-    protein="${dir}/${code}_protein.pdbqt"
-    ligand="${dir}/${code}_ligand.pdbqt"
+  # new protien and lig files
+  protein="${dir}/${code}_protein.pdbqt"
+  ligand="${dir}/${code}_ligand.pdbqt"
 
-    # preparing config file with binding site info
-    pocket="${dir}/${code}_pocket.pdb"
-    python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
+  # preparing config file with binding site info
+  pocket="${dir}/${code}_pocket.pdb"
+  python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
 
-    #checking error code
-    if [ $? -ne 0 ]; then
-        echo "prep_conf.py failed to prepare config file for $code"
-        exit 1
-    fi
+  #checking error code
+  if [ $? -ne 0 ]; then
+    echo "prep_conf.py failed to prepare config file for $code"
+    exit 1
+  fi
 done
