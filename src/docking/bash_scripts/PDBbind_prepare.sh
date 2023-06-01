@@ -96,9 +96,12 @@ errors=0
 for dir in $dirs; do
     code=$(basename "$dir")
     echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
-    
+
     # skipping if already processed
-    if [ -f "${dir}/${code}_conf.txt" ]; then; continue; fi
+    if [ -f "${dir}/${code}_conf.txt" ]; then
+	echo -e "\t Skipping...already processed"
+        continue
+    fi
 
     # running prepare_receptor4.py to convert protein to pdbqt
     protein="${dir}/${code}_protein.pdb"
