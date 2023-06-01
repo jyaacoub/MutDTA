@@ -72,7 +72,7 @@ errors=0
 # reset error file
 echo "" > "./vina_error_pdbs.txt"
 
-for dir in $dir; do
+for dir in $dirs; do
     code=$(basename "$dir")
     conf="${dir}/${code}_conf.txt"
     echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
