@@ -91,6 +91,8 @@ fi
 
 count=0
 errors=0
+# reset pdb_error.txt
+echo "" > pdb_error.txt
 
 # loop through each pdbcodes
 for dir in $dirs; do

@@ -69,9 +69,28 @@ fi
 count=0
 errors=0
 
+# reset error file
+echo "" > "./vina_error_pdbs.txt"
+
 for dir in $dir; do
     code=$(basename "$dir")
     conf="${dir}/${code}_conf.txt"
+    echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
+
+    # Checking if conf file exists
+    if [[ ! -f "$conf" ]]; then
+        echo "Skipping...conf file does not exist: ${conf}"
+        errors=$((errors+1))
+        # output to error file
+        echo "$code" >> "./vina_error_pdbs.txt"
+        continue
+    fi
+
+    # checking to make sure the output file does not already exist
+    if [[ -f "${dir}/${code}_vina_out.pdbqt" ]]; then
+        echo "Skipping...output file already exists: ${dir}/${code}_vina_out.pdbqt"
+        continue
+    fi
 
     vina --config "$conf" --out "${dir}/${code}_vina_out.pdbqt" --log "${dir}/${code}_vina_log.txt"
 
