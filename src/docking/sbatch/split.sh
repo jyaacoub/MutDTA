@@ -43,8 +43,6 @@ echo "input_file: $input_file"
 echo "output_path: $output_path"
 echo "num_partitions: $num_partitions"
 
-exit 0
-
 # Check if the input file exists
 if [[ ! -f $input_file ]]; then
     echo "Input file '$input_file' does not exist."
