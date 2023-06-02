@@ -18,7 +18,7 @@
 
 # Check if the required arguments are provided
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-    echo "Usage: $0 <path> <vina_path> <shortlist>"
+    echo "Usage: $0 <path> <vina_path> [<shortlist>]"
     echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt."
     echo -e "\t shortlist (optional) - path to csv file containing a list of pdbcodes to process."
     echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
