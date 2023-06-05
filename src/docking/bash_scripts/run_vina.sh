@@ -79,7 +79,7 @@ for dir in $dirs; do
 
     # Checking if conf file exists
     if [[ ! -f "$conf" ]]; then
-        echo "Skipping...conf file does not exist: ${conf}"
+        echo -e "\tERROR: conf file does not exist: ${conf}"
         errors=$((errors+1))
         # output to error file
         echo "$code" >> "./vina_error_pdbs.txt"
@@ -88,7 +88,7 @@ for dir in $dirs; do
 
     # checking to make sure the output file does not already exist
     if [[ -f "${dir}/${code}_vina_out.pdbqt" ]]; then
-        echo "Skipping...output file already exists: ${dir}/${code}_vina_out.pdbqt"
+        echo -e "\tSkipping...output file already exists: ${dir}/${code}_vina_out.pdbqt"
         continue
     fi
 
