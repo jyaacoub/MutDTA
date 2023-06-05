@@ -25,7 +25,7 @@ T=273.15       # K
 RT = R*T
 
 with open(out_path, "w") as out_f:
-    out_f.write("PDBCode,deltaG(kcal/mol),kd(uM)\n")
+    out_f.write("PDBCode,vina_deltaG(kcal/mol),vina_kd(uM)\n")
 
     for code in tqdm(dirs, desc='Extracting affinity values'):
         dir_path = os.path.join(PDBbind_dir, code)

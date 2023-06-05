@@ -1,4 +1,4 @@
-PDBCode,deltaG(kcal/mol),kd(uM)
+PDBCode,vina_deltaG(kcal/mol),vina_kd(uM)
 4k7i,-3.8,910.9122748865717
 4cj4,-8.1,0.33028148939851953
 1a1e,-7.1,2.0845963989904144
