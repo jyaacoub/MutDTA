@@ -20,6 +20,11 @@ log_z = -np.log(z)
 
 #%% calculating Concordance Index
 def concordance_index(y_true, y_pred):
+    """
+    #TODO:make faster
+    loops through all possible pairs i,j where Y[i] > Y[j]
+    """
+    # sort y_true and y_pred by y_true
     Y = y_true
     P = y_pred
     sum = 0
@@ -27,7 +32,7 @@ def concordance_index(y_true, y_pred):
     
     # loop through all combinations of pairs
     for i in range(len(Y)):
-        for j in range(i + 1, len(Y)):            
+        for j in range(len(Y)):
             if(Y[i] > Y[j]):
                 num_pairs += 1
                 sum +=  1* (P[i] > P[j]) + 0.5 * (P[i] == P[j]) # step function 1 if x > 0, 0.5 if x == 0, 0 if x < 0
@@ -38,19 +43,17 @@ def concordance_index(y_true, y_pred):
     else:
         return 0
     
-def get_cindex(Y, P):
+def get_cindex(Y, P): 
+    # This came from DeepDTA and is wrong (https://github.com/hkmztrk/DeepDTA/blob/2c9cbafdfb383f2f03bcea4b231b90a072e65b15/source/emetrics.py#L25)
+    # https://github.com/hkmztrk/DeepDTA/issues/18
     summ = 0
     pair = 0
     
     for i in range(len(Y)):
         for j in range(i):
-            if i != j:
-                if(Y[i] > Y[j]):
-                    pair += 1
-                    summ +=  1* (P[i] > P[j]) + 0.5 * (P[i] == P[j])
-            else:
-                print('same')
-                break
+            if(Y[i] > Y[j]):
+                pair += 1
+                summ +=  1* (P[i] > P[j]) + 0.5 * (P[i] == P[j])
         
             
     if pair != 0:
