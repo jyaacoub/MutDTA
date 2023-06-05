@@ -4,3 +4,5 @@ plotly
 tqdm
 ipykernel
 requests
+scipy
+matplotlib
