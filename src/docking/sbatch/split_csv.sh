@@ -2,7 +2,7 @@
 # Argument help message
 display_help() {
     echo "Usage: ./split_csv.sh [-h] input_file output_dir num_partitions"
-    echo "Split a CSV file into multiple partitions."
+    echo "Split a CSV file into multiple partitions named <part#>.csv."
     echo
     echo "Arguments:"
     echo "  -i               Ignore the header row in the input file (optional)."

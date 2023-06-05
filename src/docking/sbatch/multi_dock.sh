@@ -7,6 +7,7 @@
 #SBATCH --cpus-per-task=2
 
 #SBATCH --array=0-4 # 5 total processes
+# takes ~1.5 days on 5 process nodes with 3,000 pdbs
 
 # adding needed libraries to path:
 
