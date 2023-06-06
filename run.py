@@ -21,51 +21,27 @@ log_z = -np.log(z)
 #%% calculating Concordance Index
 def concordance_index(y_true, y_pred):
     """
-    #TODO:make faster
-    loops through all possible pairs i,j where Y[i] > Y[j]
+    Calculates the concordance index (CI) between two arrays of affinity values.
     """
-    # sort y_true and y_pred by y_true
-    Y = y_true
-    P = y_pred
+    # sorting by y_true in ascending order and removing duplicates
+    sorted_indices = np.argsort(y_true)
+    y_true = y_true[sorted_indices]
+    y_pred = y_pred[sorted_indices]
+    
+    # calculating concordance index
     sum = 0
     num_pairs = 0
-    
-    # loop through all combinations of pairs
-    for i in range(len(Y)):
-        for j in range(len(Y)):
-            if(Y[i] > Y[j]):
+    for i in range(len(y_true)):
+        for j in range(i): # only need to loop through j < i
+            if (y_true[i] > y_true[j]): # y[i] > y[j] is implied
                 num_pairs += 1
-                sum +=  1* (P[i] > P[j]) + 0.5 * (P[i] == P[j]) # step function 1 if x > 0, 0.5 if x == 0, 0 if x < 0
-            
-    if num_pairs != 0:
-        print(f"\tnum_pairs: {num_pairs}")
-        return sum/num_pairs
-    else:
-        return 0
+                sum +=  1* (y_pred[i] > y_pred[j]) + 0.5 * (y_pred[i] == y_pred[j])
+    return sum/num_pairs if num_pairs > 0 else 0
     
-def get_cindex(Y, P): 
-    # This came from DeepDTA and is wrong (https://github.com/hkmztrk/DeepDTA/blob/2c9cbafdfb383f2f03bcea4b231b90a072e65b15/source/emetrics.py#L25)
-    # https://github.com/hkmztrk/DeepDTA/issues/18
-    summ = 0
-    pair = 0
-    
-    for i in range(len(Y)):
-        for j in range(i):
-            if(Y[i] > Y[j]):
-                pair += 1
-                summ +=  1* (P[i] > P[j]) + 0.5 * (P[i] == P[j])
-        
-            
-    if pair != 0:
-        print(f"\tnum_pairs: {pair}")
-        return summ/pair
-    else:
-        return 0
-    
-# concordance index (This will take a while O(n^2))
+#%% concordance index (This will take a while O(n^2))
 c_index = concordance_index(log_y, log_z)
 print(f"Concordance index: {c_index}")
-print(f'c index: {get_cindex(log_y, log_z)}')
+
 
 # %% Statistics
 
