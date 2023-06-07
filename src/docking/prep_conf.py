@@ -58,6 +58,9 @@ if __name__ == '__main__':
             "num_modes": 9,      # maximum number of binding modes to generate
             #"cpu": 1,           # num cpus to use. Default is to automatically detect.
         }
+    else:
+        conf = {}
+        
     conf["receptor"] = args.r
     conf["ligand"] = args.l
     
@@ -75,7 +78,7 @@ if __name__ == '__main__':
     if args.o is None:
         args.o = '/'.join(conf["receptor"].split('/')[:-1]) + '/conf.txt'
         
-    with open(args.o, 'a') as f:
+    with open(args.o, 'w') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')
         

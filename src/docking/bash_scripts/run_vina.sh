@@ -18,21 +18,23 @@
 
 # Check if the required arguments are provided
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-    echo "Usage: $0 <path> [<shortlist>]"
+    echo "Usage: $0 <path> <shortlist>"
     echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt."
-    echo -e "\t shortlist (optional) - path to csv file containing a list of pdbcodes to process."
+    echo -e "\t shortlist - path to csv file containing a list of pdbcodes to process."
     echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
+    echo -e "\t conf_dir (optional) - path to configuration dir for each pdb. Default is the same path as pdb file itself."
     exit 1
 fi
 # e.g. use: run_vina.sh /home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set /home/jyaacoub/projects/MutDTA/data/PDBbind/kd_ki/X.csv
 
 echo -e "\n### Starting ###\n"
 PDBbind_dir=$1
+shortlist=$2
 
-if [ $# -eq 2 ]; then
-    shortlist=$2
+if [ $# -eq 3 ]; then
+    conf_dir=$3
 else
-    shortlist=""
+    conf_dir=""
 fi
 
 # pre-run checks:
@@ -74,7 +76,12 @@ echo "" > "./vina_error_pdbs.txt"
 
 for dir in $dirs; do
     code=$(basename "$dir")
-    conf="${dir}/${code}_conf.txt"
+    if [[ ! -z  $conf_dir ]]; then
+      conf="${conf_dir}/${code}_conf.txt"
+    else
+      conf="${dir}/${code}_conf.txt"
+    fi
+    
     echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
     # Checking if conf file exists
