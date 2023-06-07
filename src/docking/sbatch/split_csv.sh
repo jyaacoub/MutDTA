@@ -49,24 +49,40 @@ if [[ ! -f $input_file ]]; then
     exit 1
 fi
 
+
+#####
 # Calculate the number of lines in the input file
-num_lines=$(wc -l < "$input_file")
+num_lines=$(grep -cve '^\s*$' "$input_file") # -v counts non blank lines
 
 # Calculate the number of lines per partition
 lines_per_partition=$((num_lines / num_partitions))
 
+echo "num_lines: $num_lines"
+echo "lines_per_partition: $lines_per_partition"
+
 # Create the output directory if it doesn't exist
-mkdir -p "$output_dir"
+# mkdir -p "$output_dir"
 
 # Split the input file into partitions
 split -l "$lines_per_partition" $input_file $output_path
 
+
+#####
 # Rename the partitions
+partition_index=0
+while [ $partition_index -lt $num_partitions ]
+do
+    # deletes existing file if present
+    if [[ -f "${output_path}/$((partition_index)).csv" ]]; then
+        rm -vf ${output_path}/$((partition_index)).csv
+    fi
+    partition_index=$((partition_index + 1))
+done
+
 partition_index=0
 for partition_file in ${output_path}/*
 do
-    echo -e "${partition_file} \t--> ${output_path}/$((partition_index++)).csv"
-    mv "$partition_file" "${output_path}/$((partition_index++)).csv"
+    mv -v "$partition_file" "${output_path}/$((partition_index++)).csv"
 done
 
 if $ignore_header; then
