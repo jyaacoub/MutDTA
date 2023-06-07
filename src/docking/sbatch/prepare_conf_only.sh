@@ -21,6 +21,7 @@
 #     1a28/
 #       ...
 #     ...
+echo $(pwd)
 
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 4 ]; then
