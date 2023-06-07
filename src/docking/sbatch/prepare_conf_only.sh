@@ -33,7 +33,8 @@ if [ $# -lt 2 ] || [ $# -gt 4 ]; then
   echo -e "\t conf_dir (optional) - path to store new configurations in. default is to store it with the protein as {PDBCode}_conf.txt"
   exit 1
 fi
-# e.g. use: PDBbind_prepare.sh /home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set /home/jyaacoub/lib/mgltools_x86_64Linux2_1.5.7/ /home/jyaacoub/projects/MutDTA/data/PDBbind/kd_ki/X.csv
+# e.g. use:
+# prepare_conf_only.sh /cluster/projects/kumargroup/jean/data/refined-set ./data/vina_conf/run4.conf ./data/shortlists/no_err_50/sample.csv ./data/vina_conf/run4/
 
 echo -e "\n### Starting ###\n"
 PDBbind_dir=$1
@@ -43,7 +44,7 @@ shortlist=$3
 pyconf_path="/cluster/home/t122995uhn/projects/MutDTA/src/docking/prep_conf.py"
 
 if [ $# -eq 4 ]; then
-  conf_dir=#4
+  conf_dir=$4
 else
   conf_dir=""
 fi
