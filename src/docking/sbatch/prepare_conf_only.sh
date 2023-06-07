@@ -1,4 +1,13 @@
 #!/bin/bash
+#SBATCH -t 180
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/%x-%j.out
+#SBATCH --job-name=prep_conf
+
+#SBATCH -p all
+#SBATCH --mem=8G
+#SBATCH --cpus-per-task=4
+#SBATCH --ntasks=1
+
 # Assumes we are working with PDBbind dataset (https://pdbbind.oss-cn-hangzhou.aliyuncs.com/download/PDBbind_v2020_refined.tar.gz") 
 # that has the following file structure:  
 #

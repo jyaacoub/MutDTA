@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 180
-#SBATCH -o slurm-outputs/docking/prep/%x-%j.out
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/%x-%j.out
 #SBATCH --job-name=docking_prep
 
 #SBATCH -p all
@@ -31,5 +31,7 @@ source ../../../.venv/bin/activate
 #         ADT_path - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')
 #         shortlist (optional) - path to csv file containing a list of pdbcodes to process.
 #                    Doesnt matter what the file is as long as the first column contains the pdbcodes.
+#
+# test protein prep with: pythonsh ${ADT}/prepare_receptor4.py -r ./data/refined-set/3ao2/3ao2_protein.pdb -o ./3ao2.pdbqt
 
 ./PDBbind_prepare.sh "/cluster/projects/kumargroup/jean/data/refined-set/" "/cluster/home/t122995uhn/lib/mgltools_x86_64Linux2_1.5.7/" "/cluster/home/t122995uhn/projects/MutDTA/data/PDBbind/kd_ki/X.csv"

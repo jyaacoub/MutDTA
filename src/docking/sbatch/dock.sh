@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 10
-#SBATCH -o slurm-outputs/docking/%x-%j.out
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/%x-%j.out
 #SBATCH --job-name=vina_dock
 
 #SBATCH --mem=12G
