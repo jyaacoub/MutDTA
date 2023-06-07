@@ -53,6 +53,7 @@ Download ADT from http://mgltools.scripps.edu/downloads/ and unzip.
 ```bash
 wget https://ccsb.scripps.edu/mgltools/download/491/mgltools_x86_64Linux2_1.5.7p1.tar.gz
 ```
+For v1.5.6 use https://ccsb.scripps.edu/mgltools/download/495/mgltools_x86_64Linux2_1.5.6p1.tar.gz
 ```bash
 tar -xvzf mgltools_x86_64Linux2_1.5.7p1.tar.gz
 ```
