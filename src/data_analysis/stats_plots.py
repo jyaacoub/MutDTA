@@ -4,10 +4,12 @@ from scipy.stats import pearsonr
 import pandas as pd
 import numpy as np
 
-run_num = 1
+run_num = 2
 
 y_path = 'data/PDBbind/kd_ki/Y.csv'
 vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
+
+import os; os.chdir('../../') # for if running from src/data_analysis/
 
 #%%
 vina_pred = pd.read_csv(vina_out)
@@ -64,19 +66,15 @@ print(f"MSE: {mse}")
 print(f"MAE: {mae}")
 print(f"RMSE: {rmse}")
 
-# saving results to csv file
+# %% saving results to csv file
 # replacing existing record if run_num already exists
-stats = pd.read_csv(f'results/PDBbind/media/vina_stats.csv')
-stats = stats[stats['run_num'] != run_num]
+stats = pd.read_csv(f'results/PDBbind/media/vina_stats.csv', index_col=0)
 
-# adding to pd dataframe
-stats.loc[len(stats)] = [run_num, c_index, p_corr[0], p_corr[1], mse, mae, rmse]
-stats.run_num = stats.run_num.astype(int)
+stats.loc[run_num] = [c_index, p_corr[0], p_corr[1], mse, mae, rmse]
+stats = stats.sort_index()  # sorting by index
 
-# sorting by run_num
-stats = stats.sort_values(by='run_num')
 # saving to csv
-stats.to_csv(f'results/PDBbind/media/vina_stats.csv', index=False)
+stats.to_csv(f'results/PDBbind/media/vina_stats.csv')
 
 # %% plotting histogram of affinity values
 plt.hist(log_y, bins=10, alpha=0.5)
