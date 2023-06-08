@@ -34,7 +34,8 @@ if [ $# -lt 2 ] || [ $# -gt 4 ]; then
   exit 1
 fi
 # e.g. use:
-# prepare_conf_only.sh /cluster/projects/kumargroup/jean/data/refined-set ./data/vina_conf/run4.conf ./data/shortlists/no_err_50/sample.csv ./data/vina_conf/run4/
+# prepare_conf_only.sh /cluster/projects/kumargroup/jean/data/refined-set ./data/vina_conf/run4.conf 
+#                       ./data/shortlists/no_err_50/sample.csv ./data/vina_conf/run4/
 
 echo -e "\n### Starting ###\n"
 PDBbind_dir=$1
