@@ -48,8 +48,12 @@ fi
 # if shortlist is provided we use it to get the list of pdbcodes to process
 if [[ ! -z "$shortlist" ]]; then
   echo "Using shortlist file: ${shortlist}"
-  # getting all the pdbcodes from the shortlist file
-  codes=$(awk -F',' 'NR>1 {print $1}' "$shortlist")
+  # getting all the pdbcodes from the shortlist file ignoring first row...
+  if [[ $(head -n 1 $shortlist) == "PDBCode"* ]]; then
+    codes=$(cut -d',' -f1 $shortlist | tail -n +2)
+  else
+    codes=$(cut -d',' -f1 $shortlist)
+  fi
 
   # Verifying that all pdbcodes in shortlist exist in PDBbind dir
   dirs=""
