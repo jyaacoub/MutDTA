@@ -6,3 +6,5 @@ ipykernel
 requests
 scipy
 matplotlib
+
+lifelines

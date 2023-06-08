@@ -4,12 +4,14 @@ from scipy.stats import pearsonr
 import pandas as pd
 import numpy as np
 
-run_num = 2
+run_num = 5
 
 y_path = 'data/PDBbind/kd_ki/Y.csv'
 vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
 
-import os; os.chdir('../../') # for if running from src/data_analysis/
+if os.path.basename(os.getcwd()) == 'data_analysis':
+    import os; os.chdir('../../') # for if running from src/data_analysis/
+print(os.getcwd())
 
 #%%
 vina_pred = pd.read_csv(vina_out)
