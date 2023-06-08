@@ -17,7 +17,7 @@
 # ** created by PDBbind_prepare.sh
 
 # Check if the required arguments are provided
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
     echo "Usage: $0 <path> <shortlist>"
     echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt."
     echo -e "\t shortlist - path to csv file containing a list of pdbcodes to process."
@@ -99,8 +99,8 @@ for dir in $dirs; do
         continue
     fi
 
-    # Using fixed random seed for reproducibility
-    vina --config "$conf" --out "${dir}/${code}_vina_out.pdbqt" --log "${dir}/${code}_vina_log.txt" --seed 904455071
+    # seed and all other default args are specified in prep_conf.py 
+    vina --config "$conf"
 
     # Checking error code
     if [ $? -ne 0 ]; then

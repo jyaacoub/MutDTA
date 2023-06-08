@@ -7,7 +7,8 @@ Using ligand position to identify where the binding region is.
 # this way we dont have to keep ligand pdb since it is not good for docking.
 """
 
-import argparse, os
+import argparse, os, re
+from os import path as op
 from helpers.format_pdb import get_coords
 
 parser = argparse.ArgumentParser(description='Prepares config file for AutoDock Vina.')
@@ -31,6 +32,10 @@ parser.add_argument('-c', metavar='--conf_path', type=str,
                         AutoDock Vina defaults (see: https://vina.scripps.edu/manual/#config).', 
                         required=False)
 
+parser.add_argument('-pdb', metavar='pdbcode', type=str, required=False,
+                    help='PDBcode to use for naming out and log files. Default is to extract \
+                        it from the receptor file name (assuming it is named as "<code>*.pdbqt")')
+
 if __name__ == '__main__':
     args = parser.parse_args()
 
@@ -45,24 +50,42 @@ if __name__ == '__main__':
         # should be named *_receptor.pdbqt and *_ligand.pdbqt if created by split_pdb.py
         for file in os.listdir(args.p):
             if file.endswith('receptor.pdbqt'):
-                args.r = f'{args.p}/{file}'
+                args.r = op.join(args.p, file)
             elif file.endswith('ligand.pdbqt'):
-                args.l = f'{args.p}/{file}'
-        
-    if args.c is None:
-        # These are the default values set by AutoDock Vina (see: https://vina.scripps.edu/manual/#config)
-        # placing them here for reference
-        conf = {
-            "energy_range": 3,   # maximum energy difference between the best binding mode and the worst one (kcal/mol)
-            "exhaustiveness": 8, # exhaustiveness of the global search (roughly proportional to time)
-            "num_modes": 9,      # maximum number of binding modes to generate
-            #"cpu": 1,           # num cpus to use. Default is to automatically detect.
-        }
+                args.l = op.join(args.p, file)
+                
+    if args.pdb is None:
+        # extracting from receptor file name
+        # these codes are always 4 char in length with the first being a numerical number 
+        # (see docs: https://proteopedia.org/wiki/index.php/PDB_code)
+        # pdbcode HAS to be the first part of the file name
+        # i.e.: grep translation - <PDBcode>*.pdbqt
+        p = r"([0-9]+[0-9A-Za-z]{3})[_A-z]*\.pdbqt$" 
+        PDBcode = re.search(p, op.basename(args.r), re.MULTILINE).group(1)
     else:
-        conf = {}
+        PDBcode = args.pdb
+    
+    conf = {
+        # These are the default values set by AutoDock Vina (see: https://vina.scripps.edu/manual/#config)
+        "energy_range": 3,   # maximum energy difference between the best binding mode and the worst one (kcal/mol)
+        "exhaustiveness": 8, # exhaustiveness of the global search (roughly proportional to time)
+        "num_modes": 9,      # maximum number of binding modes to generate
+        #"cpu": 1,           # num cpus to use. Default is to automatically detect.
         
-    conf["receptor"] = args.r
-    conf["ligand"] = args.l
+        # My defaults (output files are sent to same place as receptor pdbqt file)
+        'receptor': args.r,
+        'ligand': args.l,
+        "out": op.join(op.dirname(args.r), f'{PDBcode}_vina_out.pdbqt'),
+        "log": op.join(op.dirname(args.r), f'{PDBcode}_vina_log.txt'),
+        "seed": 904455071,
+    }
+    
+    if args.c is not None:
+        # Defaults are overwritten if provided in conf template
+        with open(args.c, 'r') as f:
+            for line in f.readlines():
+                k, v = line.split('=')
+                conf[k.strip()] = v.strip()
     
     # saving binding site info if path provided
     if args.pp is not None:
@@ -74,18 +97,11 @@ if __name__ == '__main__':
         conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min()
         conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min()    
 
-    # saving config file
+    # saving config file in same path as receptor
     if args.o is None:
-        args.o = '/'.join(conf["receptor"].split('/')[:-1]) + '/conf.txt'
+        args.o = op.join(op.dirname(args.r), f'/{PDBcode}_conf.txt')
         
     with open(args.o, 'w') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')
         
-        # adding custom config file if provided
-        if args.c is not None:
-            with open(args.c, 'r') as c:
-                for line in c:
-                    # making sure no duplicates are added
-                    if line.split(' = ')[0] not in conf.keys():
-                        f.write(line)
