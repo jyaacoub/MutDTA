@@ -75,8 +75,8 @@ if __name__ == '__main__':
         # My defaults (output files are sent to same place as receptor pdbqt file)
         'receptor': args.r,
         'ligand': args.l,
-        "out": op.join(op.dirname(args.r), f'{PDBcode}_vina_out.pdbqt'),
-        "log": op.join(op.dirname(args.r), f'{PDBcode}_vina_log.txt'),
+        "out": op.dirname(args.r),
+        "log": op.dirname(args.r),
         "seed": 904455071,
     }
     
@@ -86,6 +86,10 @@ if __name__ == '__main__':
             for line in f.readlines():
                 k, v = line.split('=')
                 conf[k.strip()] = v.strip()
+    
+    # adding file name to out paths
+    conf['out'] = op.join(conf['out'], f'{PDBcode}_vina_out.pdbqt')
+    conf['log'] = op.join(conf['log'], f'{PDBcode}_vina_log.txt')
     
     # saving binding site info if path provided
     if args.pp is not None:
