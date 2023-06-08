@@ -159,6 +159,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+
+#******************************************************************************************
+#******************************************************************************************
 # Data files
 data/raw/P-L_refined_set_all.xlsx
 
@@ -173,7 +176,7 @@ data/structures/
 
 data/
 
-
+results/PDBbind/vina_out/run?/*
 
 
 ### MGL TOOLS ###
