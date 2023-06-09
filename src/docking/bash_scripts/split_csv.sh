@@ -87,5 +87,5 @@ done
 
 if $ignore_header; then
     # Remove the header from first partition
-    tail -n +2 "${output_path}/0.csv" > "${output_path}/0.temp" && mv "${output_path}/0.tmp" "${output_path}/0.csv"
+    tail -n +2 "${output_path}/0.csv" > "${output_path}/0.tmp" && mv "${output_path}/0.tmp" "${output_path}/0.csv"
 fi
