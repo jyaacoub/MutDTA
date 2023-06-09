@@ -36,3 +36,12 @@ num_modes = 9
 out = /cluster/projects/kumargroup/jean/data/vina_out/run6
 log = /cluster/projects/kumargroup/jean/data/vina_out/run6
 ```
+## run7
+Same as 6 but for the entire kd_ki set + increase in energy range
+```conf
+energy_range = 10
+exhaustiveness = 20
+num_modes = 9
+out = /cluster/projects/kumargroup/jean/data/vina_out/run7
+log = /cluster/projects/kumargroup/jean/data/vina_out/run7
+```

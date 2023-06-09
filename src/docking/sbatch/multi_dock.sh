@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -t 5:00:00
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run6/%x-%A_%a.out
+#SBATCH -t 4-00:00:00 #days-hours:minutes:seconds
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run7/%x-%A_%a.out
 
-#SBATCH --job-name=r6_vina_dock
+#SBATCH --job-name=r7_vina_dock
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
@@ -16,7 +16,7 @@
 
 # Docking and tools
 export PATH=/cluster/home/t122995uhn/lib/AutoDock_Vina/bin/:$PATH
-run_num=6
+run_num=7
 echo which vina:     "$(which vina)"
 echo "run_num: $run_num" # specify ahead of time with run_num=4
 
