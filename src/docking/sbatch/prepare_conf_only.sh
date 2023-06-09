@@ -61,7 +61,7 @@ if [[ ! -z "$shortlist" ]]; then
   # if shortlist is provided, use it
   echo "Using shortlist file: ${shortlist}"
   # getting all the pdbcodes from the shortlist file
-  codes=$(awk -F',' 'NR>1 {print $1}' "$shortlist")
+  codes=$(awk -F',' 'NR>1 {print $1}' "$shortlist") #TODO: fix this! (see run_vina.sh)
 
   # Verifying that all pdbcodes in shortlist exist in PDBbind dir
   dirs=""

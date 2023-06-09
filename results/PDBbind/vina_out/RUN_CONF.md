@@ -28,3 +28,11 @@ energy_range = 5
 exhaustiveness = 12
 num_modes = 9
 ```
+## run6
+```conf
+energy_range = 5
+exhaustiveness = 20
+num_modes = 9
+out = /cluster/projects/kumargroup/jean/data/vina_out/run6
+log = /cluster/projects/kumargroup/jean/data/vina_out/run6
+```

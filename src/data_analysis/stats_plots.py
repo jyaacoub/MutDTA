@@ -31,15 +31,15 @@ except:
     pass
 
 # %%
-# run_num = 5
-for run_num in range(1,6):
-    y_path = 'data/PDBbind/kd_only/Y.csv'
+run_num = 2
+for run_num in range(1,7):
+    y_path = 'data/PDBbind/kd_ki/Y.csv'
     vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
-    save_path = 'results/PDBbind/media/kd_only'
+    save_path = 'results/PDBbind/media/kd_ki'
 
     if os.path.basename(os.getcwd()) == 'data_analysis':
         import os; os.chdir('../../') # for if running from src/data_analysis/
-    print(os.getcwd())
+    # print(os.getcwd())
 
     ##%%
     vina_pred = pd.read_csv(vina_out)
@@ -52,12 +52,10 @@ for run_num in range(1,6):
     log_y = -np.log(y)
     log_z = -np.log(z)
 
-    ##%% calc concordance index 
+    ##%% Statistics
+    # calc concordance index 
     c_index = concordance_index(log_y, log_z)
     print(f"Concordance index: {c_index}")
-
-
-    ##%% Statistics
 
     # pearson correlation
     p_corr = pearsonr(log_y, log_z)
@@ -101,6 +99,4 @@ for run_num in range(1,6):
 
     plt.savefig(f'{save_path}/vina_{run_num}_scatter.png')
     plt.show()
-
-    ##%%
 # %%

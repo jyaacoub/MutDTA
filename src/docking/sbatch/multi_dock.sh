@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -t 5:00:00
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run5/%x-%A_%a.out
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run6/%x-%A_%a.out
 
-#SBATCH --job-name=r5_vina_dock
+#SBATCH --job-name=r6_vina_dock
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
@@ -16,7 +16,7 @@
 
 # Docking and tools
 export PATH=/cluster/home/t122995uhn/lib/AutoDock_Vina/bin/:$PATH
-run_num=5
+run_num=6
 echo which vina:     "$(which vina)"
 echo "run_num: $run_num" # specify ahead of time with run_num=4
 
@@ -28,7 +28,6 @@ echo "run_num: $run_num" # specify ahead of time with run_num=4
 # 
 #NOTE: To test vina: run vina --config "$conf" --out "${dir}/${code}_vina_out.pdbqt" --log "${dir}/${code}_vina_log.txt" --seed 904455071
 # e.g.: vina --config /cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_conf.txt --seed 904455071
-
 # shortlist file is different for each job in the array
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${run_num}/"
 shortlist=/cluster/projects/kumargroup/jean/data/shortlists/no_err_50/${SLURM_ARRAY_TASK_ID}.csv

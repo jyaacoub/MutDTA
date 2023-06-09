@@ -5,6 +5,7 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser(description='Extracts vina results from out files. \
     (Example use: \
     python extract_vina_out.py ./data/refined-set/ data/vina_out/run3.csv -sl ./data/shortlists/no_err_50/sample.csv)')
+# or python extract_vina_out.py ./data/vina_out/run6 data/vina_out/run3.csv -sl ./data/shortlists/no_err_50/sample.csv -dm -fr
 parser.add_argument('path', type=str, 
                     help='Path to PDBbind dir containing pdb for protein to convert to pdbqt or simple dir containing just vina outs (see arg -fr).')
 parser.add_argument('out_csv', type=str, 
