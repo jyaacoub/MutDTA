@@ -241,3 +241,33 @@ Where `<path>` is the path to the *PDBbind* dataset. Optionally we can also pass
 # Errors
 See issues for errors.
 Main issue rn is [#1](/../../issues/1)
+
+
+# sbatch procedure
+
+Starting from a PDBbind directory format with protein pdb and ligand sdf files.
+
+## 1.A Prepare PDBQT and conf files
+Run the following script `src/docking/sbatch/prepare.sh`. This will also prepare configuration files in the same place for vina to run off of.
+
+## 1.B Prepare just conf files
+Assuming we have PDBQT files prepared we can just create conf files by running `src/docking/sbatch/prepare_conf_only.sh`.
+```
+Usage: prepare_conf_only.sh <path> <template> <shortlist>
+    path - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH).
+    template - path to conf template file
+    shortlist - path to csv file containing a list of pdbcodes to process.
+               Doesnt matter what the file is as long as the first column contains the pdbcodes.
+    conf_dir (optional) - path to store new configurations in. default is to store it with the protein as {PDBCode}_conf.txt
+```
+
+## 2. Run Vina
+
+### 2.1 Split csv
+Create a directory splitting the shortlist file into partitions to run docking over using `src/docking/bash_scripts/split_csv.sh`.
+
+### 2.2A run multidock
+Using `src/docking/sbatch/multi_dock.sh` we can run multiple docking runs at the same time to speed up the process. Make sure to adjust # of processes to match # of partitions.
+
+### 2.2B run multidock from conf
+Change `conf_dir` in `src/docking/sbatch/multi_dock.sh` to match output conf files.

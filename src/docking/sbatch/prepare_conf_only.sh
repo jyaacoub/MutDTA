@@ -25,7 +25,7 @@ echo $(pwd)
 
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 4 ]; then
-  echo "Usage: $0 <path> <template> <shortlist>"
+  echo "Usage: $0 <path> <template> <shortlist> [<conf_dir>]"
   echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
   echo -e "\t template - path to conf template file"
   echo -e "\t shortlist - path to csv file containing a list of pdbcodes to process."
