@@ -271,3 +271,27 @@ Using `src/docking/sbatch/multi_dock.sh` we can run multiple docking runs at the
 
 ### 2.2B run multidock from conf
 Change `conf_dir` in `src/docking/sbatch/multi_dock.sh` to match output conf files.
+
+
+# Receptor prep alternative (ADFRsuite)
+
+Download:
+```bash
+wget https://ccsb.scripps.edu/adfr/download/1038/ADFRsuite_x86_64Linux_1.0.tar.gz
+```
+
+Unpack
+```bash
+tar -zxvf ADFRsuite_x86_64Linux_1.0.tar.gz
+```
+Create install dir
+```bash
+mkdir ADFR-install
+```
+Install
+>-s destinationFolder specified where to install the ADFR1,0 software suite
+
+>-c specifies how to compile the pyhon files. use 0 for .pyc or 1 for .pyo
+```bash
+cd ADFRsuite_x86_64Linux_1.0; ./install.sh -d ../ADFR-install -c 0
+```

@@ -30,7 +30,7 @@ echo "run_num: $run_num" # specify ahead of time with run_num=4
 # e.g.: vina --config /cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_conf.txt --seed 904455071
 # shortlist file is different for each job in the array
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${run_num}/"
-shortlist=/cluster/projects/kumargroup/jean/data/shortlists/no_err_50/${SLURM_ARRAY_TASK_ID}.csv
+shortlist=/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv
 
 echo "shortlist: $shortlist"
 echo "conf_dir: $conf_dir"

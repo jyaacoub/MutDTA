@@ -147,66 +147,11 @@ def get_coords(lines:List[str]) -> pd.DataFrame:
             coords.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
     return pd.DataFrame(coords, columns=['x', 'y', 'z'])
 
-def get_ATOM_df(lines:List[str]) -> pd.DataFrame:
+def clean_pdb(file_p):
     """
-    Returns a pandas DataFrame of pdb file of ONLY ATOM lines.
-    Columns (in order that they appear in the PDB format)
-    REF: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
-        'atom_name', 'count', 'atom_type', 'res_name', 'chain_name', 'res_num', 'x', 'y', 'z'
+    This file will clean PDB of "waters, ligands, cofactors, ions deemed unnecessary for the docking".
+    According to https://autodock-vina.readthedocs.io/en/latest/docking_basic.html#preparing-the-receptor
     
-    Example of a line from PDB:
-        ATOM      1  N   ILE A 146      57.904  24.527  16.458  *1.00  39.85     0.626 N
-        
-    everything after * is ignored here.
-    
-    HETATM lines are different and are not used. This function is primarily for visualizing 
-    residues by their atom coordinates.
-    
-    args:
-        lines (List[str]): list of lines from pdb file.
-    
-    returns:
-        pd.DataFrame: pandas DataFrame of pdb file.    
+    Mainly removing HETATM lines.
     """
-    # removing lines that are not atoms
-    clean_lines = [line for line in lines if (line[:6].strip() == 'ATOM')]
-    cols = ['atom_name', 'count', 'atom_type', 'res_name', 
-            'chain_name', 'res_num', 'x', 'y', 'z']
-    strIO = StringIO(''.join(clean_lines))
-    df = pd.read_csv(strIO, sep=r'[ ]+', header=None, names=cols, 
-                     usecols=cols, engine='python')
-    df.dropna(inplace=True)
-    return df
-
-def get_df(lines:List[str]) -> pd.DataFrame:
-    """
-    ***DEPRECATED***: Use get_coords or get_ATOM_df instead.
-    
-    Returns a pandas DataFrame of pdb file.
-    
-    Columns (in order that they appear in the PDB format)
-    REF: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html#ATOM
-        'atom_name', 'count', 'atom_type', 'res_name', 'chain_name', 'res_num', 'x', 'y', 'z'
-    
-    Example of a line from PDB:
-        ATOM      1  N   ILE A 146      57.904  24.527  16.458  *1.00  39.85     0.626 N
-        everything after * is ignored.
-        
-    Note HETATM lines are different and have the following format:
-        'atom_name', 'count', 'atom_type', 'res_name', 'chain_name', 'x', 'y', 'z'
-    
-    args:
-        lines (List[str]): list of lines from pdb file.
-    """
-    print('\'get_df\' is DEPRECATED: Use \'get_coords\' or \'get_ATOM_df\' instead.')
-    cols = ['atom_name', 'count', 'atom_type', 
-            'res_name', 'chain_name', 'res_num', 
-            'x', 'y', 'z']
-    strIO = StringIO(''.join(lines))
-    df = pd.read_csv(strIO, sep=r'[ ]+', header=None, names=cols, 
-                     usecols=cols, engine='python')
-    df.dropna(inplace=True)
-    # removing lines that are not atoms
-    clean_df = df[(df['atom_name'] == 'ATOM') | (df['atom_name'] == 'HETATM')]
-    # converting to float
-    return clean_df.astype({'x':float, 'y':float, 'z':float})
+    pass
