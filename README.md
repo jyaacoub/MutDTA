@@ -272,6 +272,8 @@ Using `src/docking/sbatch/multi_dock.sh` we can run multiple docking runs at the
 ### 2.2B run multidock from conf
 Change `conf_dir` in `src/docking/sbatch/multi_dock.sh` to match output conf files.
 
+## 3. Data analysis
+To Extract binding affinity predictions made by vina run `extract_vina_out.py`.
 
 # Receptor prep alternative (ADFRsuite)
 

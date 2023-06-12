@@ -54,26 +54,26 @@ for dir in $directories; do
         ### Error checking
         # Checking to see that file exists
         if [[ ! -f "${pdb_path}" ]]; then
-        echo "File ${pdb_path} does not exist"
-        exit 1
+            echo "File ${pdb_path} does not exist"
+            exit 1
         fi
 
         # creating prep directory if it does not exist
         if [[ ! -d "${prep_path}" ]]; then
-        mkdir "${prep_path}"
+            mkdir "${prep_path}"
         fi
 
         #** running prepare_receptor4.py (from AutoDockTools) to clean up pdb file
         # Checking if pythonsh command is available
         if ! command -v pythonsh >/dev/null 2>&1; then
-        echo "pythonsh is not installed or not in the system PATH"
-        exit 1
+            echo "pythonsh is not installed or not in the system PATH"
+            exit 1
         fi
 
         # Checking if prepare_receptor4.py exists
         if [[ ! -f "${ADT_path}/prepare_receptor4.py" ]]; then
-        echo "prepare_receptor4.py does not exist in the specified location: ${ADT_path}"
-        exit 1
+            echo "prepare_receptor4.py does not exist in the specified location: ${ADT_path}"
+            exit 1
         fi
 
         #** Running prepare_receptor4.py
@@ -84,8 +84,8 @@ for dir in $directories; do
 
         # Checking the return code of prepare_receptor4.py
         if [[ $? -ne 0 ]]; then
-        echo "prepare_receptor4.py failed to run successfully"
-        exit 1
+            echo "prepare_receptor4.py failed to run successfully"
+            exit 1
         fi
 
 
@@ -93,17 +93,17 @@ for dir in $directories; do
         echo -e "\nSplitting PDB structures into separate files\n"
         #NOTE: remember to update path to **python** files so that they match any future changes
         if [[ "${complex}" == "a" ]]; then
-        python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
+            python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s all
         elif [[ "${complex}" == "l" ]]; then
-        python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s largest
+            python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s largest
         else
-        python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s mains
+            python ../split_pdb.py -r "${prep_path}/${pdbcode}".pdbqt -s mains
         fi
 
         # Checking the return code of split_pdb.py
         if [[ $? -ne 0 ]]; then
-        echo "split_pdb.py failed to run successfully"
-        exit 1
+            echo "split_pdb.py failed to run successfully"
+            exit 1
         fi
 
         #** Running prep_conf.py
@@ -115,8 +115,8 @@ for dir in $directories; do
 
         # Checking the return code of prep_conf.py
         if [[ $? -ne 0 ]]; then
-        echo "prep_conf.py failed to run successfully"
-        exit 1
+            echo "prep_conf.py failed to run successfully"
+            exit 1
         fi
 
         echo -e "\n*** Done ***\n"

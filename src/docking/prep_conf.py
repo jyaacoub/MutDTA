@@ -104,7 +104,12 @@ if __name__ == '__main__':
     # saving config file in same path as receptor
     if args.o is None:
         args.o = op.join(op.dirname(args.r), f'/{PDBcode}_conf.txt')
-        
+    
+    
+    # final check to ensure receptor and ligand pdbqts exist
+    assert os.path.isfile(conf['receptor']) and os.path.isfile(conf['ligand']), \
+        f"Missing pdbqt files for receptor ({conf['receptor']}) and/or ligand ({conf['ligand']})."
+    
     with open(args.o, 'w') as f:
         for key, value in conf.items():
             f.write(f'{key} = {value}\n')

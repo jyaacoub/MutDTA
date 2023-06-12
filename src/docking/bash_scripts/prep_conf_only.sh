@@ -84,11 +84,12 @@ else # otherwise use all
 fi
 
 count=0
+errors=0
 
 # loop through each pdbcodes
 for dir in $dirs; do
   code=$(basename "$dir")
-  echo -e "Processing $code \t: $((++count)) / $total"
+  echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
   # new protien and lig files
   protein="${dir}/${code}_protein.pdbqt"
@@ -96,6 +97,13 @@ for dir in $dirs; do
 
   # preparing config file with binding site info
   pocket="${dir}/${code}_pocket.pdb"
+
+  # Checking to make sure that the files exist
+  if [[ ! -f "$protein" || ! -f "$ligand" || ! -f "$pocket" ]]; then
+    echo "Error: One or more files not found for $code"
+    ((errors++))
+    continue
+  fi
 
   # getting out path for conf file
   if [[ ! -z  $conf_dir ]]; then  # if not empty arg
