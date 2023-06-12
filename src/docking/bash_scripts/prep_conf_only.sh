@@ -26,13 +26,13 @@ echo $(pwd)
 #>>>>>>>>>>>>>>>>> ARG PARSING >>>>>>>>>>>>>>>>>>>>>
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 4 ]; then
-  echo "Usage: $0 <path> <template> <shortlist> [<conf_dir>]"
+  echo "Usage: $0 <path> <template> <shortlist> [<config_dir>]"
   echo -e "\t path      - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
   echo -e "\t template  - path to conf template file (create empty file if you want vina defaults)."
   echo -e "\t shortlist - path to csv file containing a list of pdbcodes to process."
   echo -e "\t             Doesnt matter what the file is as long as the first column contains the pdbcodes."
   echo -e "Options:"
-  echo -e "\t conf_dir (optional) - path to store new configurations in. default is to store it with the protein as {PDBCode}_conf.txt"
+  echo -e "\t config_dir (optional) - path to store new configurations in. default is to store it with the protein as {PDBCode}_conf.txt"
   exit 1
 fi
 # e.g. use:
@@ -43,24 +43,24 @@ echo -e "\n### Starting ###\n"
 PDBbind_dir=$1
 template=$2
 shortlist=$3
-#NOTE: Hard coded path for pyconf 
+#NOTE: Hard coded path for pyconf
 pyconf_path="/cluster/home/t122995uhn/projects/MutDTA/src/docking/prep_conf.py"
 
 if [ $# -eq 4 ]; then
-  conf_dir=$4
+  config_dir=$4
 else
-  conf_dir=""
+  config_dir=""
 fi
+#<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
+#<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
 # Checking if shortlist file exists
 #   [not empty] and [not a file]
 if [[ ! -z "$shortlist" ]] && [[ ! -f "$shortlist" ]]; then
   echo "shortlist file does not exist: ${shortlist}"
   exit 1
 fi
-#<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
-#<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
 if [[ ! -z "$shortlist" ]]; then
   # if shortlist is provided, use it
   echo "Using shortlist file: ${shortlist}"
@@ -96,28 +96,35 @@ for dir in $dirs; do
   code=$(basename "$dir")
   echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
-  # new protien and lig files
+  # getting out path for conf file
+  if [[ ! -z  $config_dir ]]; then  # if not empty arg
+    conf_out="${config_dir}/${code}_conf.txt"
+  else
+    conf_out="${dir}/${code}_conf.txt"  
+  fi
+
+  # skipping if already processed
+  if [ -f $conf_out ]; then
+    echo -e "\t Skipping...already processed"
+    continue
+  fi
+
+
+  # new protein and lig files
   protein="${dir}/${code}_protein.pdbqt"
   ligand="${dir}/${code}_ligand.pdbqt"
 
   # preparing config file with binding site info
   pocket="${dir}/${code}_pocket.pdb"
-
+  
   # Checking to make sure that the files exist
   if [[ ! -f "$protein" || ! -f "$ligand" || ! -f "$pocket" ]]; then
-    echo "Error: One or more files not found for $code"
+    echo "Error: One or more prep files not found for $code"
     ((errors++))
     continue
   fi
 
-  # getting out path for conf file
-  if [[ ! -z  $conf_dir ]]; then  # if not empty arg
-    out_p="${conf_dir}/${code}_conf.txt"
-  else
-    out_p="${dir}/${code}_conf.txt"
-  fi
-
-  python $pyconf_path -r $protein -l $ligand -pp $pocket -o $out_p -c $template
+  python $pyconf_path -r $protein -l $ligand -pp $pocket -o $conf_out -c $template
 
   #checking error code
   if [ $? -ne 0 ]; then

@@ -90,6 +90,12 @@ if [[ ! -f "${ADT_path}/prepare_receptor4.py" ]]; then
   exit 1
 fi
 
+# NOTE: change this if you run from a diff dir Check to see if ../prep_conf.py file exists
+if [[ ! -f "../prep_conf.py" ]]; then
+  echo "../prep_conf.py does not exist, make sure to run this script from the src/docking/bash_scripts/PDBbind dir."
+  exit 1
+fi
+
 # Checking if shortlist file exists
 #   [not empty] and [not a file]
 if [[ ! -z "$shortlist" ]] && [[ ! -f "$shortlist" ]]; then
@@ -97,18 +103,15 @@ if [[ ! -z "$shortlist" ]] && [[ ! -f "$shortlist" ]]; then
   exit 1
 fi
 
-# NOTE: change this if you run from a diff dir Check to see if ../prep_conf.py file exists
-if [[ ! -f "../prep_conf.py" ]]; then
-  echo "../prep_conf.py does not exist, make sure to run this script from the src/docking/bash_scripts/PDBbind dir."
-  exit 1
-fi
-
 if [[ ! -z "$shortlist" ]]; then
   # if shortlist is provided, use it
   echo "Using shortlist file: ${shortlist}"
-  # getting all the pdbcodes from the shortlist file
-  codes=$(awk -F',' 'NR>1 {print $1}' "$shortlist")
-
+  # getting all the pdbcodes from the shortlist file ignoring first row...
+  if [[ $(head -n 1 $shortlist) == "PDBCode"* ]]; then
+    codes=$(cut -d',' -f1 $shortlist | tail -n +2)
+  else
+    codes=$(cut -d',' -f1 $shortlist)
+  fi
   # Verifying that all pdbcodes in shortlist exist in PDBbind dir
   dirs=""
   for code in $codes; do
@@ -127,36 +130,45 @@ else # otherwise use all
 fi
 #<<<<<<<<<<<<<<<<< PRE-RUN CHECKS <<<<<<<<<<<<<<<<<<
 
+
 #>>>>>>>>>>>>>>>>> MAIN LOOP >>>>>>>>>>>>>>>>>>>>>
 count=0
 errors=0
 # reset pdb_error.txt
-echo "" > pdb_error.txt
+echo "" > pdb_error_NEW.txt
 for dir in $dirs; do
   code=$(basename "$dir")
   echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
 
+  # getting out path for conf file
+  if [[ ! -z  $config_dir ]]; then  # if not empty arg
+    conf_out="${config_dir}/${code}_conf.txt"
+  else
+    conf_out="${dir}/${code}_conf.txt"
+  fi
+
   # skipping if already processed
-  if [ -f "${dir}/${code}_conf.txt" ]; then
+  if [ -f $conf_out ]; then
     echo -e "\t Skipping...already processed"
     continue
   fi
 
+  #TODO: Clean PDB from HETATMs
   # running prepare_receptor4.py to convert protein to pdbqt
   protein="${dir}/${code}_protein.pdb"
   "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
 
-  #checking error code
+  # Checking error code
   if [ $? -ne 0 ]; then
     echo "prepare_receptor4.py failed to convert protein to pdbqt for $code"
     # saving code to error file
-    echo "$code" >> pdb_error.txt
+    echo "$code" >> pdb_error_NEW.txt
     ((errors++))
     # skip this code
-    continue
+    exit 1
   fi
 
-  # running obabel to convert ligand to pdbqt
+  # running obabel to convert ligand sdf to pdbqt
   ligand="${dir}/${code}_ligand.sdf"
   obabel -isdf $ligand --title $code -opdbqt -O "${dir}/${code}_ligand.pdbqt"
 
@@ -166,13 +178,22 @@ for dir in $dirs; do
     exit 1
   fi
 
-  # new protien and lig files
+
+  # new protein and lig files
   protein="${dir}/${code}_protein.pdbqt"
   ligand="${dir}/${code}_ligand.pdbqt"
 
   # preparing config file with binding site info
   pocket="${dir}/${code}_pocket.pdb"
-  python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o "${dir}/${code}_conf.txt"
+
+  # Checking to make sure that the files exist
+  if [[ ! -f "$protein" || ! -f "$ligand" || ! -f "$pocket" ]]; then
+    echo "Error: One or more prep files not found for $code"
+    ((errors++))
+    exit 1
+  fi
+
+  python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o $conf_out
 
   #checking error code
   if [ $? -ne 0 ]; then
