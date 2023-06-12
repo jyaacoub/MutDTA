@@ -44,7 +44,7 @@ for run_num in [7]:
     vina_pred = pd.read_csv(vina_out)
     actual = pd.read_csv(y_path)
     
-    #TODO: making sure to use the same data:
+    #NOTE: making sure to use the same data:
     filter = pd.read_csv('results/PDBbind/vina_out/run1.csv')['PDBCode'] 
     vina_pred = vina_pred.merge(filter, on='PDBCode')
 

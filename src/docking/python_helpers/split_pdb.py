@@ -25,8 +25,6 @@ if __name__ == '__main__':
     # splitting pdbqt file
     split_structure(file_path=args.r, save=args.s.lower())
     
-    #TODO: Move conf file prep here for simplicity?
-    
 
     # viewing protein and ligand if requested
     if args.v == 'y':
