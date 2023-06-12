@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 4-00:00:00 #days-hours:minutes:seconds
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run7/%x-%A_%a.out
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run8/%x-%A_%a.out #NOTE: change run#
 
 #SBATCH --job-name=r7_vina_dock
 #SBATCH --mail-type=ALL
@@ -9,16 +9,16 @@
 #SBATCH --mem=8G
 #SBATCH --cpus-per-task=2
 
-#SBATCH --array=0-4 # 5 total processes
+#SBATCH --array=0-14 #NOTE: N total processes
 # takes ~1.5 days on 5 process nodes with 3,000 pdbs
 
 # adding needed libraries to path:
 
 # Docking and tools
 export PATH=/cluster/home/t122995uhn/lib/AutoDock_Vina/bin/:$PATH
-run_num=7
+run_num=8 #NOTE: change run#
 echo which vina:     "$(which vina)"
-echo "run_num: $run_num" # specify ahead of time with run_num=4
+echo "run_num: $run_num"
 
 # The following args are needed:
 # Usage: MutDTA/src/docking/bash_scripts/run_vina.sh <path> <vina_path> <shortlist>

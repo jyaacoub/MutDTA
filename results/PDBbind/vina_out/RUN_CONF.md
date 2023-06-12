@@ -45,3 +45,13 @@ num_modes = 9
 out = /cluster/projects/kumargroup/jean/data/vina_out/run7
 log = /cluster/projects/kumargroup/jean/data/vina_out/run7
 ```
+
+## run8
+Same configuration as https://pubs.acs.org/doi/full/10.1021/acs.jcim.6b00740:
+```conf
+energy_range = 10
+exhaustiveness = 50
+num_modes = 20
+out = /cluster/projects/kumargroup/jean/data/vina_out/run8
+log = /cluster/projects/kumargroup/jean/data/vina_out/run8
+```
