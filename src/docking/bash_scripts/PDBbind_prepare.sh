@@ -15,9 +15,9 @@
 #>>>>>>>>>>>>>>>>> ARG PARSING >>>>>>>>>>>>>>>>>>>>>
 # Function to display script usage
 function usage {
-  echo "Usage: $0 path ADT_path template [OPTIONS]"
+  echo "Usage: $0 path ADT template [OPTIONS]"
   echo "       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
-  echo "       ADT_path - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
+  echo "       ADT - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
   echo "       template - path to conf template file (create empty file if you want vina defaults)."
   echo "Options:"
   echo "       -sl --shortlist: path to csv file containing a list of pdbcodes to process."
@@ -32,12 +32,19 @@ if [[ $# -lt 3 ]]; then
   usage
 fi
 
+bash_scripts=$(dirname $(realpath "$0"))
+prep_confpy=${bash_scripts}/../python_helpers/prep_conf.py
+
+
 # Assign the arguments to variables
-path="$1"
-ADT_path="$2"
+PDBbind="$1"
+ADT="$2"
+prep_receptor="${ADT}/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
 template="$3"
 shortlist=""
 config_dir=""
+
+echo -e "\n\t PARSING OPTIONAL ARGS:"
 
 # Parse the options
 while [[ $# -gt 3 ]]; do
@@ -59,8 +66,8 @@ while [[ $# -gt 3 ]]; do
 done
 
 # Print the parsed arguments
-echo "Path: $path"
-echo "ADT Path: $ADT_path"
+echo "Path: $PDBbind"
+echo "ADT Path: $ADT"
 echo "Template: $template"
 if [[ -n "$shortlist" ]]; then
   echo "Shortlist: $shortlist"
@@ -68,7 +75,7 @@ fi
 if [[ -n "$config_dir" ]]; then
   echo "Config Dir: $config_dir"
 fi
-exit 0
+
 #<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
 #<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
@@ -79,20 +86,21 @@ if ! command -v obabel >/dev/null 2>&1; then
 fi
 
 # Checking if pythonsh command is available (part of MGLTools)
-if [[ ! -f "${2}/bin/pythonsh" ]]; then
+if [[ ! -f "${ADT}/bin/pythonsh" ]]; then
   echo "pythonsh is not installed or not in the system PATH"
+  echo -e "\t ${ADT}/bin/pythonsh"
   exit 1
 fi
 
 # Checking if prepare_receptor4.py exists (part of MGLTools)
-if [[ ! -f "${ADT_path}/prepare_receptor4.py" ]]; then
-  echo "prepare_receptor4.py does not exist in the specified location: ${ADT_path}"
+if [[ ! -f $prep_receptor ]]; then
+  echo "prepare_receptor4.py does not exist in the specified location: $prep_receptor"
   exit 1
 fi
 
 # NOTE: change this if you run from a diff dir Check to see if ../prep_conf.py file exists
-if [[ ! -f "../prep_conf.py" ]]; then
-  echo "../prep_conf.py does not exist, make sure to run this script from the src/docking/bash_scripts/PDBbind dir."
+if [[ ! -f $prep_confpy ]]; then
+  echo "prep_conf.py does not exist (${prep_confpy}). Make sure to run this at src/docking/bash_scripts/PDBbind. "
   exit 1
 fi
 
@@ -115,16 +123,16 @@ if [[ ! -z "$shortlist" ]]; then
   # Verifying that all pdbcodes in shortlist exist in PDBbind dir
   dirs=""
   for code in $codes; do
-    if [[ ! -d "${PDBbind_dir}/${code}" ]]; then
-      echo "PDBbind dir (${PDBbind_dir}) does not contain ${code} specified in shortlist file"
+    if [[ ! -d "${PDBbind}/${code}" ]]; then
+      echo "PDBbind dir (${PDBbind}) does not contain ${code} specified in shortlist file"
       exit 1
     fi
-    dirs="${dirs} ${PDBbind_dir}/${code}"
+    dirs="${dirs} ${PDBbind}/${code}"
   done
   total=$(echo "$dirs" | wc -w)
 else # otherwise use all
   # looping through all the pdbcodes in the PDBbind dir select everything except index and readme dir
-  dirs=$(find "$PDBbind_dir" -mindepth 1 -maxdepth 1 -type d -not -name "index" -not -name "readme")
+  dirs=$(find "$PDBbind" -mindepth 1 -maxdepth 1 -type d -not -name "index" -not -name "readme")
   # getting count of dirs
   total=$(echo "$dirs" | wc -l)
 fi
@@ -157,11 +165,11 @@ for dir in $dirs; do
   protein_p="${dir}/${code}_protein"
 
   # Clean PDB from ions, waters etc...
-  grep ^ATOM "${protein_p}.pdb" > "${protein_p}.temp"
+  grep ^ATOM "${protein_p}.pdb" > "${protein_p}_temp.pdb"
   # Adding charges, etc...
-  "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r "${protein_p}.temp" -o "${protein_p}.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
+  "${ADT}/bin/pythonsh" $prep_receptor -r "${protein_p}_temp.pdb" -o "${protein_p}.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
 
-  rm -fv "${protein_p}.temp"
+  rm -fv "${protein_p}_temp.pdb"
 
   # Checking error code
   if [ $? -ne 0 ]; then
@@ -198,7 +206,7 @@ for dir in $dirs; do
     exit 1
   fi
 
-  python ../prep_conf.py -r $protein -l $ligand -pp $pocket -o $conf_out
+  python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out
 
   #checking error code
   if [ $? -ne 0 ]; then

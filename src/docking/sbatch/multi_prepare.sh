@@ -1,12 +1,18 @@
 #!/bin/bash
 #SBATCH -t 180
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/%x-%j.out
-#SBATCH --job-name=docking_prep
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/8/%x-%A_%a.out #NOTE: change prep#
+#SBATCH --job-name=docking_prep8 #NOTE: change prep#
+
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
 #SBATCH -p all
-#SBATCH --mem=8G
-#SBATCH --cpus-per-task=4
-#SBATCH --ntasks=1
+#SBATCH --mem=4G
+#SBATCH --cpus-per-task=2
+
+#SBATCH --array=[1] #NOTE: N total processes
+
+prep_num=8 #NOTE: change prep#
 
 # adding needed libraries to path:
 
@@ -19,12 +25,9 @@ echo which obabel:   "$(which obabel)"
 echo which vina:     "$(which vina)"
 echo which pythonsh: "$(which pythonsh)"
 
-# Prepares PDBbind dataset for docking
-cd /cluster/home/t122995uhn/projects/MutDTA/src/docking/bash_scripts
-
 # activating python with correct packages
 #module load py10 << needed?
-source ../../../.venv/bin/activate
+source /cluster/home/t122995uhn/projects/MutDTA/.venv/bin/activate
 
 # Usage: PDBbind_prepare.sh path ADT_path template [OPTIONS]
 #        path     - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH).
@@ -36,7 +39,12 @@ source ../../../.venv/bin/activate
 #        -cd --config-dir: path to store new configurations in.
 #               Default is to store it with the prepared receptor as <PDBCode>_conf.txt
 
-#
-# test protein prep with: pythonsh ${ADT}/prepare_receptor4.py -r ./data/refined-set/3ao2/3ao2_protein.pdb -o ./3ao2.pdbqt
+prepsh="/cluster/home/t122995uhn/projects/MutDTA/src/docking/bash_scripts/PDBbind_prepare.sh"
+PDBbind="/cluster/projects/kumargroup/jean/data/refined-set/"
+ADT="/cluster/home/t122995uhn/lib/mgltools_x86_64Linux2_1.5.7/"
+template="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}.conf"
 
-./PDBbind_prepare.sh "/cluster/projects/kumargroup/jean/data/refined-set/" "/cluster/home/t122995uhn/lib/mgltools_x86_64Linux2_1.5.7/" "/cluster/home/t122995uhn/projects/MutDTA/data/PDBbind/kd_ki/X.csv"
+shortlist="/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv "
+conf_dir="/cluster/projects/kumargroup/jean/data/vina_out/run${prep_num}"
+
+$prepsh $PDBbind $ADT $template -sl $shortlist -cd $conf_dir
