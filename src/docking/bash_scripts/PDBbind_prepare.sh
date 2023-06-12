@@ -153,10 +153,15 @@ for dir in $dirs; do
     continue
   fi
 
-  #TODO: Clean PDB from HETATMs
   # running prepare_receptor4.py to convert protein to pdbqt
-  protein="${dir}/${code}_protein.pdb"
-  "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r $protein -o "${dir}/${code}_protein.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
+  protein_p="${dir}/${code}_protein"
+
+  # Clean PDB from ions, waters etc...
+  grep ^ATOM "${protein_p}.pdb" > "${protein_p}.temp"
+  # Adding charges, etc...
+  "${2}/bin/pythonsh" "${ADT_path}/prepare_receptor4.py" -r "${protein_p}.temp" -o "${protein_p}.pdbqt" -A checkhydrogens -U nphs_lps_waters_nonstdres
+
+  rm -fv "${protein_p}.temp"
 
   # Checking error code
   if [ $? -ne 0 ]; then
@@ -169,8 +174,8 @@ for dir in $dirs; do
   fi
 
   # running obabel to convert ligand sdf to pdbqt
-  ligand="${dir}/${code}_ligand.sdf"
-  obabel -isdf $ligand --title $code -opdbqt -O "${dir}/${code}_ligand.pdbqt"
+  ligand_p="${dir}/${code}_ligand"
+  obabel -isdf "${ligand_p}.sdf" --title $code -opdbqt -O "${ligand_p}.pdbqt"
 
   #checking error code
   if [ $? -ne 0 ]; then
@@ -180,8 +185,8 @@ for dir in $dirs; do
 
 
   # new protein and lig files
-  protein="${dir}/${code}_protein.pdbqt"
-  ligand="${dir}/${code}_ligand.pdbqt"
+  protein="${protein_p}.pdbqt"
+  ligand="${ligand_p}.pdbqt"
 
   # preparing config file with binding site info
   pocket="${dir}/${code}_pocket.pdb"
