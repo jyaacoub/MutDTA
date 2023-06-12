@@ -12,29 +12,66 @@
 #     1a28/
 #       ...
 #     ...
-
-# Check if the required arguments are provided
-if [ $# -lt 2 ] || [ $# -gt 3 ]; then
-  echo "Usage: $0 <path> <ADT_path> <shortlist>"
-  echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt."
-  echo -e "\t ADT_path - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
-  echo -e "\t shortlist (optional) - path to csv file containing a list of pdbcodes to process."
-  echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
+#>>>>>>>>>>>>>>>>> ARG PARSING >>>>>>>>>>>>>>>>>>>>>
+# Function to display script usage
+function usage {
+  echo "Usage: $0 path ADT_path template [OPTIONS]"
+  echo "       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
+  echo "       ADT_path - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
+  echo "       template - path to conf template file (create empty file if you want vina defaults)."
+  echo "Options:"
+  echo "       -sl --shortlist: path to csv file containing a list of pdbcodes to process."
+  echo "              Doesn't matter what the file is as long as the first column contains the pdbcodes."
+  echo "       -cd --config-dir: path to store new configurations in."
+  echo "              Default is to store it with the prepared receptor as <PDBCode>_conf.txt"
   exit 1
-fi
-# e.g. use: PDBbind_prepare.sh /home/jyaacoub/projects/MutDTA/data/PDBbind/raw/refined-set /home/jyaacoub/lib/mgltools_x86_64Linux2_1.5.7/ /home/jyaacoub/projects/MutDTA/data/PDBbind/kd_ki/X.csv
+}
 
-echo -e "\n### Starting ###\n"
-PDBbind_dir=$1
-ADT_path="${2}/MGLToolsPckgs/AutoDockTools/Utilities24/"
-
-if [ $# -eq 3 ]; then
-  shortlist=$3
-else
-  shortlist=""
+# Check the number of arguments
+if [[ $# -lt 3 ]]; then
+  usage
 fi
 
-# pre-run checks:
+# Assign the arguments to variables
+path="$1"
+ADT_path="$2"
+template="$3"
+shortlist=""
+config_dir=""
+
+# Parse the options
+while [[ $# -gt 3 ]]; do
+  key="$4"
+  case $key in
+    -sl|--shortlist)
+      shortlist="$5"
+      shift 2
+      ;;
+    -cd|--config-dir)
+      config_dir="$5"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $key"
+      usage
+      ;;
+  esac
+done
+
+# Print the parsed arguments
+echo "Path: $path"
+echo "ADT Path: $ADT_path"
+echo "Template: $template"
+if [[ -n "$shortlist" ]]; then
+  echo "Shortlist: $shortlist"
+fi
+if [[ -n "$config_dir" ]]; then
+  echo "Config Dir: $config_dir"
+fi
+exit 0
+#<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
+
+#<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
 # Checking if obabel command is available (install from https://openbabel.org/wiki/Category:Installation)
 if ! command -v obabel >/dev/null 2>&1; then
   echo "obabel is not installed or not in the system PATH"
@@ -88,13 +125,13 @@ else # otherwise use all
   # getting count of dirs
   total=$(echo "$dirs" | wc -l)
 fi
+#<<<<<<<<<<<<<<<<< PRE-RUN CHECKS <<<<<<<<<<<<<<<<<<
 
+#>>>>>>>>>>>>>>>>> MAIN LOOP >>>>>>>>>>>>>>>>>>>>>
 count=0
 errors=0
 # reset pdb_error.txt
 echo "" > pdb_error.txt
-
-# loop through each pdbcodes
 for dir in $dirs; do
   code=$(basename "$dir")
   echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"

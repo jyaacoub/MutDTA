@@ -23,13 +23,15 @@
 #     ...
 echo $(pwd)
 
+#>>>>>>>>>>>>>>>>> ARG PARSING >>>>>>>>>>>>>>>>>>>>>
 # Check if the required arguments are provided
 if [ $# -lt 2 ] || [ $# -gt 4 ]; then
   echo "Usage: $0 <path> <template> <shortlist> [<conf_dir>]"
-  echo -e "\t path - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
-  echo -e "\t template - path to conf template file"
+  echo -e "\t path      - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
+  echo -e "\t template  - path to conf template file (create empty file if you want vina defaults)."
   echo -e "\t shortlist - path to csv file containing a list of pdbcodes to process."
-  echo -e "\t            Doesnt matter what the file is as long as the first column contains the pdbcodes."
+  echo -e "\t             Doesnt matter what the file is as long as the first column contains the pdbcodes."
+  echo -e "Options:"
   echo -e "\t conf_dir (optional) - path to store new configurations in. default is to store it with the protein as {PDBCode}_conf.txt"
   exit 1
 fi
@@ -56,7 +58,9 @@ if [[ ! -z "$shortlist" ]] && [[ ! -f "$shortlist" ]]; then
   echo "shortlist file does not exist: ${shortlist}"
   exit 1
 fi
+#<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
+#<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
 if [[ ! -z "$shortlist" ]]; then
   # if shortlist is provided, use it
   echo "Using shortlist file: ${shortlist}"
@@ -82,11 +86,12 @@ else # otherwise use all
   # getting count of dirs
   total=$(echo "$dirs" | wc -l)
 fi
+#<<<<<<<<<<<<<<<<< PRE-RUN CHECKS <<<<<<<<<<<<<<<<<<
 
+
+#>>>>>>>>>>>>>>>>> MAIN LOOP >>>>>>>>>>>>>>>>>>>>>
 count=0
 errors=0
-
-# loop through each pdbcodes
 for dir in $dirs; do
   code=$(basename "$dir")
   echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"

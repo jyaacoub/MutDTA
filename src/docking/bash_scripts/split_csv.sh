@@ -64,7 +64,7 @@ echo "lines_per_partition: $lines_per_partition"
 # mkdir -p "$output_dir"
 
 # Split the input file into partitions
-split -l "$lines_per_partition" $input_file $output_path
+split --suffix-length=2 --additional-suffix='_split_out' -l "$lines_per_partition" $input_file $output_path
 
 
 #####
@@ -80,7 +80,9 @@ do
 done
 
 partition_index=0
-for partition_file in ${output_path}/*
+# only rename files with 2 char names (output from split is 2 char alphabetic: aa, ab, ac, ... 
+# followed by '_split_out')
+for partition_file in ${output_path}/??_split_out
 do
     mv -v "$partition_file" "${output_path}/$((partition_index++)).csv"
 done
