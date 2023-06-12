@@ -35,17 +35,17 @@ if os.path.basename(os.getcwd()) == 'data_analysis':
 print(os.getcwd())
 
 # %%
-for run_num in [6]:
-    y_path = 'data/PDBbind/kd_only/Y.csv'
+for run_num in [7]:
+    y_path = 'data/PDBbind/kd_ki/Y.csv'
     vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
-    save_path = 'results/PDBbind/media/kd_only'
+    save_path = 'results/PDBbind/media/kd_ki'
 
     ##%%
     vina_pred = pd.read_csv(vina_out)
     actual = pd.read_csv(y_path)
     
-    # making sure to use the same data:
-    filter = pd.read_csv('results/PDBbind/vina_out/run5.csv')['PDBCode'] 
+    #TODO: making sure to use the same data:
+    filter = pd.read_csv('results/PDBbind/vina_out/run1.csv')['PDBCode'] 
     vina_pred = vina_pred.merge(filter, on='PDBCode')
 
     ##%%
