@@ -1,7 +1,7 @@
 import plotly.express as px
 import plotly.graph_objects as go
 
-from docking_helpers.format_pdb import get_df
+from python_helpers.format_pdb import get_df
 
 def plot_atoms(df, bounding_box=True):
     """plots atoms in 3D space using plotly"""
