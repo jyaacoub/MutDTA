@@ -4,6 +4,9 @@ from io import StringIO
 import pandas as pd
 import numpy as np
 
+import os, re, argparse
+from python_helpers.display import plot_together
+
 def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]:
     """
     Splits a pdbqt file if duplicate protein structures are present and saves the 
@@ -119,6 +122,8 @@ def get_coords(lines:List[str]) -> pd.DataFrame:
         -------------------------------------------------------------------------------------
         1 -  6        Record name   "ATOM  "
                         [...]
+        
+        23 - 26        Integer       resSeq       Residue sequence number.
         31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
         39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
         47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
@@ -147,7 +152,7 @@ def get_coords(lines:List[str]) -> pd.DataFrame:
             coords.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
     return pd.DataFrame(coords, columns=['x', 'y', 'z'])
 
-def clean_pdb(file_p):
+def clean_pdb(file_p): #NOTE: this is no longer needed and instead is just done in the PDBbind_prepare.sh script via 'grep ATOM *'
     """
     This file will clean PDB of "waters, ligands, cofactors, ions deemed unnecessary for the docking".
     According to https://autodock-vina.readthedocs.io/en/latest/docking_basic.html#preparing-the-receptor
@@ -155,3 +160,42 @@ def clean_pdb(file_p):
     Mainly removing HETATM lines.
     """
     pass
+
+if __name__ == "__main__": # calling from cli will split pdbqt
+    parser = argparse.ArgumentParser(description='Split pdbqt file into protein and ligand')
+    parser.add_argument('-r', metavar='--receptor', type=str, help='path to pdbqt file', 
+                        required=True)
+    parser.add_argument('-v', help='To validate and view protein and ligand',
+                        required=False, default=False, action='store_true')
+
+    parser.add_argument('-s', metavar='--save', type=str, 
+                        help='What structures to save ("all", "mains", or "largest")',
+                        required=False, default='mains')
+    args = parser.parse_args()
+
+    if args.s.lower() not in ['all', 'mains', 'largest']:
+        parser.error(f'Invalid save option: {parser.parse_args().s}')
+
+    r_path = '/'.join(args.r.split('/')[:-1])
+
+    # making sure save path exists
+    os.makedirs(r_path, exist_ok=True)
+    # splitting pdbqt file
+    split_structure(file_path=args.r, save=args.s.lower())
+    
+
+    # viewing protein and ligand if requested
+    if args.v == 'y':
+        dfP, dfL = None, None
+        for f_name in os.listdir(r_path):
+            if re.search(r'split[\w\-]*.pdbqt',f_name):
+                if re.search('ligand',f_name):
+                    dfL = get_ATOM_df(open(f'{r_path}/{f_name}','r').readlines())
+                else:
+                    dfP = get_ATOM_df(open(f'{r_path}/{f_name}','r').readlines())
+                    
+        if dfP is not None and dfL is not None:
+            plot_together(dfL,dfP)
+        else:
+            print('Split failed, missing protein or ligand file')
+            exit(1)

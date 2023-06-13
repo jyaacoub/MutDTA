@@ -10,6 +10,7 @@ parser.add_argument('path', type=str,
                     help='Path to directory with PDBbind file structure or simple dir containing just vina outs (see arg -fr).')
 parser.add_argument('out_csv', type=str, 
                     help='Output path for the csv file (e.g.: PATH/TO/FILE/vina_out.csv)')
+
 parser.add_argument('-sl', metavar='--shortlist', type=str, required=False,
                     help='Shortlist csv file containing pdbcodes to extract. Otherwise extracts all in PDBbind dir. (REQUIRED IF -fr IS SET)')
 parser.add_argument('-fr', required=False, action='store_true', default=False,
@@ -17,6 +18,7 @@ parser.add_argument('-fr', required=False, action='store_true', default=False,
                     This will also set -dm to true.")
 parser.add_argument('-dm', required=False, action='store_true', default=False,
                     help="(Dont Move) - Don't move vina_log and vina_out files to new dir with same name as out_csv file.")
+
 parser.add_argument('-fm', required=False, action='store_true', default=False,
                     help="(Force Move) - Force move vina_log and vina_out files. Overrides -fr default action on -dm.")
 args = parser.parse_args()

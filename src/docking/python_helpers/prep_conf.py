@@ -100,9 +100,9 @@ if __name__ == '__main__':
         conf["center_x"] = pocket_df["x"].mean()
         conf["center_y"] = pocket_df["y"].mean()
         conf["center_z"] = pocket_df["z"].mean()
-        conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min()
-        conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min()
-        conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min()    
+        conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() # + 20 #TODO: increase search space?
+        conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() # + 20
+        conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() # + 20   
 
     # saving config file in same path as receptor
     if args.o is None:

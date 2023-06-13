@@ -2,7 +2,7 @@
 #SBATCH -t 4-00:00:00 #days-hours:minutes:seconds
 #SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run8/%x-%A_%a.out #NOTE: change run#
 
-#SBATCH --job-name=r7_vina_dock
+#SBATCH --job-name=r8_vina_dock #NOTE: change run#
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
