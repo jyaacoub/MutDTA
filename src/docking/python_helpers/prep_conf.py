@@ -9,7 +9,10 @@ Using ligand position to identify where the binding region is.
 
 import argparse, os, re
 from os import path as op
-from python_helpers.format_pdb import get_coords
+try:
+    from python_helpers.format_pdb import get_coords
+except ModuleNotFoundError:
+    from format_pdb import get_coords
 
 parser = argparse.ArgumentParser(description='Prepares config file for AutoDock Vina.')
 parser.add_argument('-p', metavar='--prep_path', type=str,

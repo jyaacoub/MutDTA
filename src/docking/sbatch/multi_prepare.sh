@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 180
 #SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/8/%x-%A_%a.out #NOTE: change prep#
-#SBATCH --job-name=docking_prep8 #NOTE: change prep#
+#SBATCH --job-name=v_prep8 #NOTE: change prep#
 
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
@@ -10,7 +10,7 @@
 #SBATCH --mem=4G
 #SBATCH --cpus-per-task=2
 
-#SBATCH --array=[1] #NOTE: N total processes
+#SBATCH --array=0-14 #NOTE: N total processes
 
 prep_num=8 #NOTE: change prep#
 
@@ -45,6 +45,6 @@ ADT="/cluster/home/t122995uhn/lib/mgltools_x86_64Linux2_1.5.7/"
 template="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}.conf"
 
 shortlist="/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv "
-conf_dir="/cluster/projects/kumargroup/jean/data/vina_out/run${prep_num}"
+conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}"
 
 $prepsh $PDBbind $ADT $template -sl $shortlist -cd $conf_dir
