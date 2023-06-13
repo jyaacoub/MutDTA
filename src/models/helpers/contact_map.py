@@ -1,6 +1,10 @@
 import numpy as np
-def create_contact(pdb_file: str) -> np.array:
+import matplotlib.pyplot as plt
+
+def get_contact(pdb_file: str, display=False) -> np.array:
     """
-    Given a pdb_file this will return a residue contact map
+    Given the pdb file path this will return a residue contact map 
     """
+    
+    
     pass

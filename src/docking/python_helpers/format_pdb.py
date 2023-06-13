@@ -112,6 +112,12 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     
     return structures
 
+def get_atom_df(lines:List[str]) -> pd.DataFrame:
+    """
+    Same as `get_coords()` but also includes df column for residue sequence number
+    """
+    raise NotImplementedError
+
 def get_coords(lines:List[str]) -> pd.DataFrame:
     """
     Returns a numpy array of coordinates from a pdb file.
@@ -152,14 +158,14 @@ def get_coords(lines:List[str]) -> pd.DataFrame:
             coords.append([float(line[30:38]), float(line[38:46]), float(line[46:54])])
     return pd.DataFrame(coords, columns=['x', 'y', 'z'])
 
-def clean_pdb(file_p): #NOTE: this is no longer needed and instead is just done in the PDBbind_prepare.sh script via 'grep ATOM *'
+def clean_pdb(lines: List[str]): #NOTE: this is no longer needed and instead is just done in the PDBbind_prepare.sh script via 'grep ATOM *'
     """
     This file will clean PDB of "waters, ligands, cofactors, ions deemed unnecessary for the docking".
     According to https://autodock-vina.readthedocs.io/en/latest/docking_basic.html#preparing-the-receptor
     
     Mainly removing HETATM lines.
     """
-    pass
+    return [l for l in lines if l[:4] == 'ATOM']
 
 if __name__ == "__main__": # calling from cli will split pdbqt
     parser = argparse.ArgumentParser(description='Split pdbqt file into protein and ligand')
@@ -190,9 +196,9 @@ if __name__ == "__main__": # calling from cli will split pdbqt
         for f_name in os.listdir(r_path):
             if re.search(r'split[\w\-]*.pdbqt',f_name):
                 if re.search('ligand',f_name):
-                    dfL = get_ATOM_df(open(f'{r_path}/{f_name}','r').readlines())
+                    dfL = get_atom_df(open(f'{r_path}/{f_name}','r').readlines()) 
                 else:
-                    dfP = get_ATOM_df(open(f'{r_path}/{f_name}','r').readlines())
+                    dfP = get_atom_df(open(f'{r_path}/{f_name}','r').readlines()) 
                     
         if dfP is not None and dfL is not None:
             plot_together(dfL,dfP)
