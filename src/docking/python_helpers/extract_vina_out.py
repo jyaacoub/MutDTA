@@ -1,4 +1,4 @@
-import os, argparse, re, math, shutil
+import os, argparse, re, math, shutil, json
 from tqdm import tqdm
 
 # Parse and extract args
@@ -65,7 +65,7 @@ errors = 0
 R=0.0019870937 # kcal/Mol*K (gas constant)
 T=273.15       # K
 RT = R*T
-
+error_files = {}
 with open(out_csv, "w") as out_f:
     out_f.write("PDBCode,vina_deltaG(kcal/mol),vina_kd(uM)\n")
 
@@ -75,7 +75,8 @@ with open(out_csv, "w") as out_f:
         
         if not os.path.isfile(log):
             errors += 1
-            print(f'FileNotFound on: {log}')
+            # print(f'FileNotFound on: {log}')
+            error_files['FileNotFound'] = error_files.get('FileNotFound', []).append(log)
             continue
 
         with open(log, "r") as f:
@@ -85,6 +86,7 @@ with open(out_csv, "w") as out_f:
                 deltaG = re.search(pattern, f.read()).group(1)
             except AttributeError:
                 errors += 1
+                error_files['AttributeError'] = error_files.get('AttributeError', []).append(log)
                 # print(f'AttributeError on: {log}') # will occur if docking fails
                 continue
                 
@@ -109,3 +111,20 @@ with open(out_csv, "w") as out_f:
 
 print(f"Total: {total} dirs processed")
 print(f"Errors: {errors}")
+save = input('Save error file? (y/n): ')
+if save.lower() == 'y':
+    save_path = input('\t Save as (default is ./extract_vina_out-err.json): ')
+    while save_path and not os.path.exists(save_path):
+        save_path = input('\t   Invalid path, try again: ')
+    
+    if save_path.strip() == '':
+        save_path = 'extract_vina_out-err.json'
+    
+    with open(save_path, 'w') as f:
+        json.dump(error_files, f)
+    print(error_files)
+    print('\nSaved...')
+else:
+    print(error_files)
+    
+    
