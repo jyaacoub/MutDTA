@@ -1,8 +1,6 @@
 import plotly.express as px
 import plotly.graph_objects as go
 
-from python_helpers.format_pdb import get_df
-
 def plot_atoms(df, bounding_box=True):
     """plots atoms in 3D space using plotly"""
     fig = px.scatter_3d(df, x='x', y='y', z='z', color='res_num')
@@ -40,6 +38,7 @@ def plot_together(dfL,dfP):
 
 
 if __name__ == '__main__':
+    from src.docking.python_helpers.format_pdb import get_df
     # split_structure(file_path='sample_data/1a1e_n-e.pdb', save='mains')
     dfP = get_df(open('sample_data/1a1e_n-e-split-1031.pdbqt','r').readlines())
     dfL = get_df(open('sample_data/1a1e_n-e-split-41_ligand.pdbqt','r').readlines())

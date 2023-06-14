@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 import os, re, argparse
-from python_helpers.display import plot_together
+from data_analysis.display import plot_together
 
 def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]:
     """
