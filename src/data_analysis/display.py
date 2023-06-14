@@ -1,6 +1,7 @@
 import plotly.express as px
 import plotly.graph_objects as go
 from src.docking.python_helpers.format_pdb import get_atom_df
+#NOTE: nbformat is needed to run from jypter
 
 def get_corners(maxs, mins):
     """returns corners of bounding box"""
@@ -31,9 +32,9 @@ def plot_atoms(df, bounding_box=True):
 
 def plot_together(dfL,dfP, show=True):
     """plotting ligand and protein in 3D space"""
-    fig = px.scatter_3d(dfP, x='x', y='y', z='z', color='res_num')
+    fig = px.scatter_3d(dfP, x='x', y='y', z='z', color='res_num', opacity=0.8)
     fig.add_scatter3d(x=dfL['x'], y=dfL['y'], z=dfL['z'], line={"color":'#000000'}, 
-                      marker={"color":'#000000'}, name='ligand')
+                      marker={"color":'#000000'}, name='ligand', opacity=0.8)
     if show:
         fig.show()
     return fig
@@ -82,8 +83,8 @@ def plot_all(vina_conf_path, show=True):
     assert len(coords) == 6, 'center and/or size coordinates missing'
     
     # plotting receptor and ligand
-    dfP = get_atom_df(open(ligand_path,'r').readlines())
-    dfL = get_atom_df(open(receptor_path,'r').readlines())
+    dfP = get_atom_df(open(receptor_path,'r').readlines())
+    dfL = get_atom_df(open(ligand_path,'r').readlines())
     
     fig = plot_together(dfL,dfP, show=False)
     
@@ -99,7 +100,7 @@ def plot_all(vina_conf_path, show=True):
         i = [7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2],
         j = [3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3],
         k = [0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
-        opacity=0.5,
+        opacity=0.25,
         color='#DC143C',
         flatshading = True)
     
@@ -107,7 +108,7 @@ def plot_all(vina_conf_path, show=True):
     if show:
         fig.show()
     
-    return fig
+    return fig, dfP, dfL
 
 if __name__ == '__main__':
     dfP = get_atom_df(open('sample_data/1a1e_n-e-split-1031.pdbqt','r').readlines())

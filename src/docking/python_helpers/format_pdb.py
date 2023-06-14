@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 
 import os, re, argparse
-from src.data_analysis.display import plot_together
 
 def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]:
     """
@@ -225,6 +224,7 @@ if __name__ == "__main__": # calling from cli will split pdbqt
                     dfP = get_atom_df(open(f'{r_path}/{f_name}','r').readlines()) 
                     
         if dfP is not None and dfL is not None:
+            from src.data_analysis.display import plot_together
             plot_together(dfL,dfP)
         else:
             print('Split failed, missing protein or ligand file')
