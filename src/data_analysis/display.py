@@ -1,6 +1,6 @@
 import plotly.express as px
 import plotly.graph_objects as go
-from src.docking.python_helpers.format_pdb import get_atom_df
+from src.docking.python_helpers.format_pdb import get_atom_df, get_coords
 #NOTE: nbformat is needed to run from jypter
 
 def get_corners(maxs, mins):
@@ -32,14 +32,14 @@ def plot_atoms(df, bounding_box=True):
 
 def plot_together(dfL,dfP, show=True):
     """plotting ligand and protein in 3D space"""
-    fig = px.scatter_3d(dfP, x='x', y='y', z='z', color='res_num', opacity=0.8)
+    fig = px.scatter_3d(dfP, x='x', y='y', z='z', color='res_num', opacity=0.9)
     fig.add_scatter3d(x=dfL['x'], y=dfL['y'], z=dfL['z'], line={"color":'#000000'}, 
-                      marker={"color":'#000000'}, name='ligand', opacity=0.8)
+                      marker={"color":'#000000'}, name='ligand', opacity=.99)
     if show:
         fig.show()
     return fig
         
-def plot_all(vina_conf_path, show=True):
+def plot_all(vina_conf_path, show=True, pocket=None, fig=None):
     """
     Similar to plot_together but with additional bounding box representing the pocket
     
@@ -87,21 +87,22 @@ def plot_all(vina_conf_path, show=True):
     dfL = get_atom_df(open(ligand_path,'r').readlines())
     
     fig = plot_together(dfL,dfP, show=False)
+    if fig is None:
+        fig = px.scatter_3d(dfL, x='x', y='y', z='z', color='res_num', opacity=0.8)
     
+    # ###### TEMP TO SEE IF POCKET IS NOT DEFINED PROPERLY #########
+    if pocket:
+        pocket_path = pocket
+        pocket_df = get_coords(open(pocket_path,'r').readlines())
+        
+        coords["center_x"] = (pocket_df["x"].max() + pocket_df["x"].min()) / 2
+        coords["center_y"] = (pocket_df["y"].max() + pocket_df["y"].min()) / 2
+        coords["center_z"] = (pocket_df["z"].max() + pocket_df["z"].min()) / 2
+        coords["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() + 10
+        coords["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() + 10
+        coords["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() + 10
     
-    
-    ###### TEMP TO SEE IF POCKET IS NOT DEFINED PROPERLY #########
-    pocket_path = '/cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_pocket.pdb'
-    pocket_df = get_atom_df(open(pocket_path,'r').readlines())
-    
-    coords["center_x"] = (pocket_df["x"].max() + pocket_df["x"].min()) / 2
-    coords["center_y"] = (pocket_df["y"].max() + pocket_df["y"].min()) / 2
-    coords["center_z"] = (pocket_df["z"].max() + pocket_df["z"].min()) / 2
-    coords["size_x"] = pocket_df["x"].max() - pocket_df["x"].min()
-    coords["size_y"] = pocket_df["y"].max() - pocket_df["y"].min()
-    coords["size_z"] = pocket_df["z"].max() - pocket_df["z"].min()
-    
-    ###########################
+    # ###########################
     
     cx, cy, cz = coords['center_x'], coords['center_y'], coords['center_z']
     sx, sy, sz = coords['size_x']/2, coords['size_y']/2, coords['size_z']/2
@@ -112,11 +113,10 @@ def plot_all(vina_conf_path, show=True):
         y=[cy-sy, cy-sy, cy+sy, cy+sy,   cy-sy, cy-sy, cy+sy, cy+sy],
         z=[cz-sz, cz-sz, cz-sz, cz-sz,   cz+sz, cz+sz, cz+sz, cz+sz],
 
-        i = [7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2],
-        j = [3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3],
-        k = [0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6],
+        i = [7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2, ],
+        j = [3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3, ],
+        k = [0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6, ],
         opacity=0.25,
-        color='#DC143C',
         flatshading = True)
     
     

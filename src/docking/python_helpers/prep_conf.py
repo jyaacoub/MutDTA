@@ -10,9 +10,9 @@ Using ligand position to identify where the binding region is.
 import argparse, os, re
 from os import path as op
 try:
-    from python_helpers.format_pdb import get_coords
+    from python_helpers.format_pdb import get_atom_df
 except ModuleNotFoundError:
-    from format_pdb import get_coords
+    from format_pdb import get_atom_df
 
 parser = argparse.ArgumentParser(description='Prepares config file for AutoDock Vina.')
 parser.add_argument('-p', metavar='--prep_path', type=str,
@@ -96,14 +96,14 @@ if __name__ == '__main__':
     
     # saving binding site info if path provided
     if args.pp is not None:
-        pocket_df = get_coords(open(args.pp, 'r').readlines())
+        pocket_df = get_atom_df(open(args.pp, 'r').readlines())
         # true center of pocket based on bounding box
         conf["center_x"] = (pocket_df["x"].max() + pocket_df["x"].min()) / 2
         conf["center_y"] = (pocket_df["y"].max() + pocket_df["y"].min()) / 2
         conf["center_z"] = (pocket_df["z"].max() + pocket_df["z"].min()) / 2
-        conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() # + 20 #TODO: increase search space?
-        conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() # + 20
-        conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() # + 20   
+        conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() + 10
+        conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() + 10
+        conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() + 10   
         
 
     # saving config file in same path as receptor

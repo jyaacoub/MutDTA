@@ -4,10 +4,15 @@
 # get_contact(path, display=True)
 
 from src.data_analysis.display import plot_all
-conf = '/cluster/projects/kumargroup/jean/data/vina_conf/run8/1a1e_conf.txt'
+code='1a1e'
+conf = f'/cluster/projects/kumargroup/jean/data/vina_conf/run8/{code}_conf.txt'
+pocket_p = f'/cluster/projects/kumargroup/jean/data/refined-set/{code}/{code}_pocket.pdb'
 
 # %% plotting
-fig, prot, lig = plot_all(conf, show=True)
+# fig, prot, lig = plot_all(conf, show=True)
+fig, prot, lig = plot_all(conf, show=False, pocket=pocket_p)
+# fig, prot, lig = plot_all(conf, show=True, fig=fig,
+#                         pocket=pocket_p)
 
 #%%
 
