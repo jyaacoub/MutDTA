@@ -55,3 +55,15 @@ num_modes = 20
 out = /cluster/projects/kumargroup/jean/data/vina_out/run8
 log = /cluster/projects/kumargroup/jean/data/vina_out/run8
 ```
+run8 FAILED - vina_conf were not set up properly and default values were used instead of above
+
+## run9
+Increased search space by +10 for binding pocket
+```conf
+energy_range = 10
+exhaustiveness = 50
+num_modes = 20
+out = /cluster/projects/kumargroup/jean/data/vina_out/run9
+log = /cluster/projects/kumargroup/jean/data/vina_out/run9
+```
+retrying run8 conf with ex=50

@@ -35,7 +35,7 @@ PDBbind_dir=$1
 template=$2
 shortlist=$3
 #NOTE: Hard coded path for pyconf
-pyconf_path="/cluster/home/t122995uhn/projects/MutDTA/src/docking/prep_conf.py"
+pyconf_path="/cluster/home/t122995uhn/projects/MutDTA/src/docking/python_helpers/prep_conf.py"
 
 if [ $# -eq 4 ]; then
   config_dir=$4
