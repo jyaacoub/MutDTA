@@ -97,12 +97,14 @@ if __name__ == '__main__':
     # saving binding site info if path provided
     if args.pp is not None:
         pocket_df = get_coords(open(args.pp, 'r').readlines())
-        conf["center_x"] = pocket_df["x"].mean()
-        conf["center_y"] = pocket_df["y"].mean()
-        conf["center_z"] = pocket_df["z"].mean()
+        # true center of pocket based on bounding box
+        conf["center_x"] = (pocket_df["x"].max() + pocket_df["x"].min()) / 2
+        conf["center_y"] = (pocket_df["y"].max() + pocket_df["y"].min()) / 2
+        conf["center_z"] = (pocket_df["z"].max() + pocket_df["z"].min()) / 2
         conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() # + 20 #TODO: increase search space?
         conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() # + 20
         conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() # + 20   
+        
 
     # saving config file in same path as receptor
     if args.o is None:
