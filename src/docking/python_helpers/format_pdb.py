@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 import os, re, argparse
-from data_analysis.display import plot_together
+from src.data_analysis.display import plot_together
 
 def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]:
     """
@@ -114,9 +114,31 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
 
 def get_atom_df(lines:List[str]) -> pd.DataFrame:
     """
-    Same as `get_coords()` but also includes df column for residue sequence number
+    Same as `get_coords()` but with additional data (* below), however this is limited to 
+    only "ATOM" records.
+    
+    See: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+        ATOM Format:
+        COLUMNS        DATA  TYPE    FIELD        DEFINITION
+        -------------------------------------------------------------------------------------
+        1 -  6         Record name   "ATOM  "
+        7 - 11         Integer       serial       Atom  serial number.
+       *13 - 16        Atom          name         Atom name.
+        17             Character     altLoc       Alternate location indicator.
+       *23 - 26        Integer       resSeq       Residue sequence number.
+       *31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
+       *39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
+       *47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
+                        [...]
     """
-    raise NotImplementedError
+    coords = []
+    for line in lines:
+        if (line[:6].strip() == 'ATOM'):
+            #                    name           resSeq              
+            coords.append([line[12:16], int(line[22:26]),
+                           #            x                   y                   z
+                           float(line[30:38]), float(line[38:46]), float(line[46:54])])
+    return pd.DataFrame(coords, columns=['name', 'res_num', 'x', 'y', 'z'])
 
 def get_coords(lines:List[str]) -> pd.DataFrame:
     """
@@ -126,13 +148,14 @@ def get_coords(lines:List[str]) -> pd.DataFrame:
         ATOM Format:
         COLUMNS        DATA  TYPE    FIELD        DEFINITION
         -------------------------------------------------------------------------------------
-        1 -  6        Record name   "ATOM  "
-                        [...]
-        
-        23 - 26        Integer       resSeq       Residue sequence number.
-        31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
-        39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
-        47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
+       *1 -  6         Record name   "ATOM  "
+        7 - 11         Integer       serial       Atom  serial number.
+       *13 - 16        Atom          name         Atom name.
+        17             Character     altLoc       Alternate location indicator.
+       *23 - 26        Integer       resSeq       Residue sequence number.
+       *31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
+       *39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.
+       *47 - 54        Real(8.3)     z            Orthogonal coordinates for Z in Angstroms.
                         [...]
         
         HETATM Format:
@@ -144,6 +167,7 @@ def get_coords(lines:List[str]) -> pd.DataFrame:
         39 - 46       Real(8.3)      y             Orthogonal coordinates for Y.
         47 - 54       Real(8.3)      z             Orthogonal coordinates for Z.
                         [...]
+    * Arguments we care about
     
     args:
         lines (List[str]): list of lines from pdb file.
