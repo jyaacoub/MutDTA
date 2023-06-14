@@ -36,9 +36,9 @@ print(os.getcwd())
 
 # %%
 for run_num in [8]:
-    y_path = 'data/PDBbind/kd_ki/Y.csv'
+    y_path = 'data/PDBbind/kd_only/Y.csv'
     vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
-    save_path = 'results/PDBbind/media/kd_ki'
+    save_path = 'results/PDBbind/media/kd_only'
 
     ##%%
     vina_pred = pd.read_csv(vina_out)
