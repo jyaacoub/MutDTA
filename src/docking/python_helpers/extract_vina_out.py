@@ -1,4 +1,4 @@
-import os, argparse, re, math
+import os, argparse, re, math, shutil
 from tqdm import tqdm
 
 # Parse and extract args
@@ -52,8 +52,9 @@ else:
 
 if not args.dm:
     new_dir = os.path.join(os.path.dirname(out_csv), os.path.basename(out_csv).split('.')[0])
-    print(f'new dir: {new_dir}')
-    os.mkdir(new_dir)
+    if not os.path.exists(new_dir):
+        print(f'new dir: {new_dir}')
+        os.mkdir(new_dir)
 
 # Getting count of dirs
 total = len(codes)
@@ -98,9 +99,9 @@ with open(out_csv, "w") as out_f:
         
         # also moving vina log and out files
         if not args.dm:
-            os.rename(src=os.path.join(dir_path, f"{code}_vina_out.pdbqt"), 
+            shutil.move(src=os.path.join(dir_path, f"{code}_vina_out.pdbqt"), 
                       dst=os.path.join(new_dir, f"{code}_vina_out.pdbqt"))
-            os.rename(src=log, 
+            shutil.move(src=log, 
                       dst=os.path.join(new_dir, f"{code}_vina_log.txt"))
             
         

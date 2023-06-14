@@ -35,7 +35,7 @@ if os.path.basename(os.getcwd()) == 'data_analysis':
 print(os.getcwd())
 
 # %%
-for run_num in [7]:
+for run_num in [8]:
     y_path = 'data/PDBbind/kd_ki/Y.csv'
     vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
     save_path = 'results/PDBbind/media/kd_ki'
