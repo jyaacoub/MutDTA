@@ -87,6 +87,21 @@ def plot_all(vina_conf_path, show=True):
     
     fig = plot_together(dfL,dfP, show=False)
     
+    
+    
+    ###### TEMP TO SEE IF POCKET IS NOT DEFINED PROPERLY #########
+    pocket_path = '/cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_pocket.pdb'
+    pocket_df = get_atom_df(open(pocket_path,'r').readlines())
+    
+    coords["center_x"] = (pocket_df["x"].max() + pocket_df["x"].min()) / 2
+    coords["center_y"] = (pocket_df["y"].max() + pocket_df["y"].min()) / 2
+    coords["center_z"] = (pocket_df["z"].max() + pocket_df["z"].min()) / 2
+    coords["size_x"] = pocket_df["x"].max() - pocket_df["x"].min()
+    coords["size_y"] = pocket_df["y"].max() - pocket_df["y"].min()
+    coords["size_z"] = pocket_df["z"].max() - pocket_df["z"].min()
+    
+    ###########################
+    
     cx, cy, cz = coords['center_x'], coords['center_y'], coords['center_z']
     sx, sy, sz = coords['size_x']/2, coords['size_y']/2, coords['size_z']/2
     # adding bounding box
