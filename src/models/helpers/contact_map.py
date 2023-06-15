@@ -21,6 +21,32 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
     # read and filter
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
+        residues = {} # residue dict
+        
+        ## read residues into res dict with the following format
+        ## res = {tergroup_res# : {CA: [x, y, z], CB: [x, y, z]} ...}
+        ter = 0 # prefix to indicate TER grouping
+        curr_res = None # res# number
+        for line in lines:
+            if (line[:6].strip() == 'TER'):
+                ter += 1
+            
+            if (line[:6].strip() != 'ATOM'): continue
+            
+            prev_res = curr_res
+            curr_res = int(line[22:26])
+            assert curr_res >= prev_res, f"Missing residue #{prev_res+1} OR out of order in {pdb_file}"
+            
+            atm_type = line[12:16].strip()
+            if atm_type not in ['CA', 'CB']: continue
+            
+            key = f"{ter}_{curr_res}"
+            if key in residues:
+                assert atm_type not in residues[key], f"Duplicate {atm_type} for residue {key} in {pdb_file}"
+                residues[key][atm_type] = np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]) #TODO: confirm this is correct
+            else:
+                residues[key] = {atm_type: np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])])}
+        
         coords = []
         if CA_only:
             for line in lines:
