@@ -124,6 +124,8 @@ def get_atom_df(lines:List[str]) -> pd.DataFrame:
         7 - 11         Integer       serial       Atom  serial number.
        *13 - 16        Atom          name         Atom name.
         17             Character     altLoc       Alternate location indicator.
+        18 - 20        Residue name  resName      Residue name.
+        22             Character     chainID      Chain identifier.
        *23 - 26        Integer       resSeq       Residue sequence number.
        *31 - 38        Real(8.3)     x            Orthogonal coordinates for X in Angstroms.
        *39 - 46        Real(8.3)     y            Orthogonal coordinates for Y in Angstroms.

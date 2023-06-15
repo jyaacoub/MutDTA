@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def get_contact(pdb_file: str, display=False, title="Residue Contact Map") -> np.array:
+def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Contact Map") -> np.array:
     """
     Given a pdb file path this will return the residue contact map for that structure.
     
@@ -10,6 +10,8 @@ def get_contact(pdb_file: str, display=False, title="Residue Contact Map") -> np
 
     Args:
         pdb_file (str): path to .pdb file to process.
+        CA_only (bool, optional): if true only use alpha carbon for calc distance. Otherwise 
+                                follow DGraphDTA definition, using CB for all except glycine.
         display (bool, optional): if true will display contact map. Defaults to False.
 
     Returns:
@@ -20,13 +22,32 @@ def get_contact(pdb_file: str, display=False, title="Residue Contact Map") -> np
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
         coords = []
-        for line in lines:
-            if (line[:6].strip() == 'ATOM' and 
-                line[12:16].strip()=='CA'): # getting alpha carbons only
-                #                           x                   y                   z
-                coords.append(np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]))
-            # elif l[:3] == 'TER': #NOTE: add this to split structures with multiple complexes (e.g.: 1a1e)
-            #     break
+        if CA_only:
+            for line in lines:
+                if (line[:6].strip() == 'ATOM' and 
+                    line[12:16].strip()=='CA'): # getting alpha carbons only
+                    #                           x                   y                   z
+                    coords.append(np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]))
+        else:
+            next_res = None # res# number
+            gly_CA = [] # buffer to save CA values in case of glycine 
+            for line in lines:
+                # reset res counter at TER
+                if (line[:6].strip() == 'TER'): next_res = None
+                if (line[:6].strip() != 'ATOM'): continue
+                
+                curr_res = int(line[22:26])
+                assert curr_res <= next_res, f"Missing residue #{next_res}"
+                if ((line[12:16].strip() == 'CB') and 
+                    (next_res is None or curr_res == next_res)):
+                    next_res = curr_res + 1
+                    #                           x                   y                   z
+                    coords.append(np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]))
+                #TODO: add exception for glycine using buffer or if statment to check if it is glycine 
+                # if line[17:20] =="GLY"
+                    
+                    
+            
             
     
     # Main loop to calc matrix
