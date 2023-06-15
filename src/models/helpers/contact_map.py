@@ -4,19 +4,13 @@ from Bio.PDB import PDBParser, Structure as BioStructure
 import matplotlib.pyplot as plt
 
 # biopy code from: https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/python/protein_contact_map/
-def calc_dist_matrix(chain_one: BioStructure, chain_two: BioStructure):
+def calc_dist_matrix(res: BioStructure):
     # TODO: instead of relying on biopython we can just get the coors of all the CA ATOMs (alpha carbons) 
     # and pass that into the calc_dist_matrix function directly as a list
-    """Returns a matrix of C-alpha distances between two chains"""
-    answer = np.zeros((len(chain_one), len(chain_two)), np.float32)
-    for row, residue_one in enumerate(chain_one):
-        for col, residue_two in enumerate(chain_two):
-            # using alpha carbon as center point for distance measurment 
-            c1, c2  = residue_one["CA"].coord,  residue_two["CA"].coord
-            answer[row, col] = np.sqrt(np.sum((c1-c2)**2)) # L2 distance 
+    """Returns a matrix of C-alpha distances"""
     return answer
 
-def get_contact(pdb_file: str, display=False) -> np.array:
+def get_contact(pdb_file: str, display=False, title="Residue Contact Map") -> np.array:
     """
     Given a pdb file path this will return the residue contact map for that structure.
     
@@ -31,22 +25,32 @@ def get_contact(pdb_file: str, display=False) -> np.array:
         np.array: residue contact map as a matrix.
     """
 
+    # read and filter
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
-        clean = []
-        for l in lines:
-            if l[:4] == 'ATOM':
-                clean.append(l)
+        coords = []
+        for line in lines:
+            if (line[:6].strip() == 'ATOM' and 
+                line[12:16].strip()=='CA'): # getting alpha carbons only
+                #                           x                   y                   z
+                coords.append(np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]))
             # elif l[:3] == 'TER': #NOTE: add this to split structures with multiple complexes (e.g.: 1a1e)
             #     break
-        
-        # Getting structure
-        structure = PDBParser().get_structure('', StringIO(''.join(clean)))
-        res = [r for r in structure.get_residues()]
-
-    # Calc matrix
-    m = calc_dist_matrix(res, res) # distance based on alpha carbon
+            
+    
+    # Main loop to calc matrix
+    m = np.zeros((len(coords), len(coords)), np.float32)
+    for row, r1 in enumerate(coords):
+        for col, r2 in enumerate(coords):
+            # lower triangle is all we need
+            if col >= row: break
+            m[row, col] = np.sqrt(np.sum((r1-r2)**2)) # L2 distance
+            # duplicating for visual purposes
+            m[col, row] = m[row, col]
+    
     if display:
         plt.imshow(m)
-        plt.title("Residue Contact Map")
+        plt.title(title)
         plt.show()
+        
+    return m

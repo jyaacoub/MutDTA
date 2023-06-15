@@ -134,7 +134,7 @@ def get_atom_df(lines:List[str]) -> pd.DataFrame:
     for line in lines:
         if (line[:6].strip() == 'ATOM'):
             #                    name           resSeq              
-            coords.append([line[12:16], int(line[22:26]),
+            coords.append([line[12:16].strip(), int(line[22:26]),
                            #            x                   y                   z
                            float(line[30:38]), float(line[38:46]), float(line[46:54])])
     return pd.DataFrame(coords, columns=['name', 'res_num', 'x', 'y', 'z'])

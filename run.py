@@ -1,18 +1,29 @@
-#%% from src.models.helpers.contact_map import get_contact
-# code = '1a1e'
-# path = f'/cluster/projects/kumargroup/jean/data/refined-set/{code}/{code}_protein.pdb'
-# get_contact(path, display=True)
+# %%
+from src.models.helpers.contact_map import get_contact
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import os
 
-from src.data_analysis.display import plot_all
-code='1a1e'
-conf = f'/cluster/projects/kumargroup/jean/data/vina_conf/run8/{code}_conf.txt'
-pocket_p = f'/cluster/projects/kumargroup/jean/data/refined-set/{code}/{code}_pocket.pdb'
+PDBbind = '/cluster/projects/kumargroup/jean/data/refined-set'
+path = lambda c: f'{PDBbind}/{c}/{c}_protein.pdb'
 
-# %% plotting
-# fig, prot, lig = plot_all(conf, show=True)
-fig, prot, lig = plot_all(conf, show=False, pocket=pocket_p)
-# fig, prot, lig = plot_all(conf, show=True, fig=fig,
-#                         pocket=pocket_p)
+# %% main loop to create and save contact maps
+
+# index error "CA" on 5aa9 (no CA for that residue??)
+r,c = 10,10
+f, ax = plt.subplots(r,c, figsize=(15, 15))
+i=0
+for code in tqdm(os.listdir(PDBbind)[:100]):
+    if os.path.isdir(os.path.join(PDBbind, code)) and code not in ["index", "readme"]:
+        cmap = get_contact(path(code))
+        
+        ax[i//c][i%c].imshow(cmap)
+        ax[i//c][i%c].set_title(code)
+        ax[i//c][i%c].axis('off')
+        i+=1
+        
 
 #%%
 
+
+# %%

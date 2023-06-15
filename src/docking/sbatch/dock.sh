@@ -3,7 +3,7 @@
 #SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/%x-%j.out
 #SBATCH --job-name=vina_dock
 
-#SBATCH --mem=12G
+#SBATCH --mem=8G
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
 
