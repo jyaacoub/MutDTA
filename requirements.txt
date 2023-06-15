@@ -7,5 +7,5 @@ requests
 scipy
 matplotlib
 
-lifelines
-biopython
+lifelines # used for concordance index calc
+#biopython # used for cmap

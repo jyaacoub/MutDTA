@@ -1,14 +1,5 @@
 import numpy as np
-from io import StringIO
-from Bio.PDB import PDBParser, Structure as BioStructure
 import matplotlib.pyplot as plt
-
-# biopy code from: https://warwick.ac.uk/fac/sci/moac/people/students/peter_cock/python/protein_contact_map/
-def calc_dist_matrix(res: BioStructure):
-    # TODO: instead of relying on biopython we can just get the coors of all the CA ATOMs (alpha carbons) 
-    # and pass that into the calc_dist_matrix function directly as a list
-    """Returns a matrix of C-alpha distances"""
-    return answer
 
 def get_contact(pdb_file: str, display=False, title="Residue Contact Map") -> np.array:
     """
