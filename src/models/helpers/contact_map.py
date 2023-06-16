@@ -72,8 +72,20 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
         for res in residues.values():
             coords.append(res["CA"])
     else:
-        for res in residues.values():
-            coords.append(res["CB"] if res["name"] != "GLY" else res["CA"])
+        for code in residues:
+            res = residues[code]
+            try:
+                coords.append(res["CB"] if res["name"] != "GLY" else res["CA"])
+            except KeyError as e:
+                # CB missing in residue that is not GLY
+                if check_missing:
+                    print(e)
+                    print(code)
+                    print(res)
+                    raise e
+                else:
+                    coords.append(res['CA'])
+                
     
     # Main loop to calc matrix
     m = np.zeros((len(coords), len(coords)), np.float32)
