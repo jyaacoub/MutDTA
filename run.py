@@ -19,12 +19,12 @@ for code in tqdm(os.listdir(PDBbind)[:100]):
 r,c = 10,10
 f, ax = plt.subplots(r,c, figsize=(15, 15))
 i=0
-threshold = 8.0
+threshold = 12.0
 for i, code in enumerate(cmaps.keys()):
-    cmap = cmaps[code] < 12.0
+    cmap = cmaps[code] if threshold is None else cmaps[code] < threshold
     ax[i//c][i%c].imshow(cmap)
     ax[i//c][i%c].set_title(code)
     ax[i//c][i%c].axis('off')
     i+=1
 
-# %%
+ # %%

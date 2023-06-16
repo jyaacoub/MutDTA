@@ -1,7 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 
-def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Contact Map") -> np.array:
+def get_contact(pdb_file: str, CA_only=True, check_missing=False,
+                display=False, title="Residue Contact Map") -> np.array:
     """
     Given a pdb file path this will return the residue contact map for that structure.
     
@@ -12,6 +14,8 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
         pdb_file (str): path to .pdb file to process.
         CA_only (bool, optional): if true only use alpha carbon for calc distance. Otherwise 
                                 follow DGraphDTA definition, using CB for all except glycine.
+        check_missing (bool, optional): Checking to ensure all residues are available. 
+                                Defaults to False.
         display (bool, optional): if true will display contact map. Defaults to False.
         title (str, optional): title for plot. Defaults to "Residue Contact Map".
         
@@ -22,12 +26,12 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
     # read and filter
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
-        residues = {} # residue dict
+        residues = OrderedDict() # residue dict
         
         ## read residues into res dict with the following format
         ## res = {ter#_res# : {CA: [x, y, z], CB: [x, y, z], name: resname},...}
         ter = 0 # prefix to indicate TER grouping
-        curr_res, prev_res = 0, -1
+        curr_res, prev_res = None, None
         for line in lines:
             if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
                 ter += 1
@@ -37,14 +41,20 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
             # make sure res# is in order and not missing
             prev_res = curr_res
             curr_res = int(line[22:26])
-            assert curr_res == prev_res or curr_res == prev_res+1, f"Missing residue #{prev_res+1} OR out of order in {pdb_file}"
-            
+            if check_missing:
+                assert prev_res is None or \
+                    curr_res == prev_res or \
+                    curr_res == prev_res+1, \
+                        f"Invalid order or missing residues: {prev_res} -> {curr_res} in {pdb_file}"
+                             
             # only want CA and CB atoms
             atm_type = line[12:16].strip()
             if atm_type not in ['CA', 'CB']: continue
+            icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
+                             # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
             
             # Glycine has no CB atom, so we save both 
-            key = f"{ter}_{curr_res}"
+            key = f"{ter}_{curr_res}_{icode}"
             assert atm_type not in residues.get(key, {}), f"Duplicate {atm_type} for residue {key} in {pdb_file}"
             # adding atom to residue
             residues.setdefault(key, {})[atm_type] = np.array(
