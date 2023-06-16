@@ -24,57 +24,45 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
         residues = {} # residue dict
         
         ## read residues into res dict with the following format
-        ## res = {tergroup_res# : {CA: [x, y, z], CB: [x, y, z]} ...}
+        ## res = {ter#_res# : {CA: [x, y, z], CB: [x, y, z], name: resname},...}
         ter = 0 # prefix to indicate TER grouping
         curr_res = None # res# number
         for line in lines:
-            if (line[:6].strip() == 'TER'):
+            if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
                 ter += 1
             
             if (line[:6].strip() != 'ATOM'): continue
             
+            # make sure res# is in order and not missing
             prev_res = curr_res
             curr_res = int(line[22:26])
             assert curr_res >= prev_res, f"Missing residue #{prev_res+1} OR out of order in {pdb_file}"
             
+            # only want CA and CB atoms
             atm_type = line[12:16].strip()
             if atm_type not in ['CA', 'CB']: continue
             
+            # Glycine has no CB atom, so we save both 
             key = f"{ter}_{curr_res}"
-            if key in residues:
-                assert atm_type not in residues[key], f"Duplicate {atm_type} for residue {key} in {pdb_file}"
-                residues[key][atm_type] = np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]) #TODO: confirm this is correct
-            else:
-                residues[key] = {atm_type: np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])])}
-        
-        coords = []
-        if CA_only:
-            for line in lines:
-                if (line[:6].strip() == 'ATOM' and 
-                    line[12:16].strip()=='CA'): # getting alpha carbons only
-                    #                           x                   y                   z
-                    coords.append(np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]))
-        else:
-            next_res = None # res# number
-            gly_CA = [] # buffer to save CA values in case of glycine 
-            for line in lines:
-                # reset res counter at TER
-                if (line[:6].strip() == 'TER'): next_res = None
-                if (line[:6].strip() != 'ATOM'): continue
-                
-                curr_res = int(line[22:26])
-                assert curr_res <= next_res, f"Missing residue #{next_res}"
-                if ((line[12:16].strip() == 'CB') and 
-                    (next_res is None or curr_res == next_res)):
-                    next_res = curr_res + 1
-                    #                           x                   y                   z
-                    coords.append(np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])]))
-                #TODO: add exception for glycine using buffer or if statment to check if it is glycine 
-                # if line[17:20] =="GLY"
-                    
-                    
+            assert atm_type not in residues.get(key, {}), f"Duplicate {atm_type} for residue {key} in {pdb_file}"
+            # adding atom to residue
+            residues.setdefault(key, {})[atm_type] = np.array(
+                [float(line[30:38]), float(line[38:46]), float(line[46:54])])
             
+            # Saving residue name
+            assert ("name" not in residues.get(key, {})) or \
+                (residues[key]["name"] == line[17:20].strip()), \
+                                        f"Inconsistent residue name for residue {key} in {pdb_file}"
+            residues[key]["name"] = line[17:20].strip()
             
+    # getting coords from residues
+    coords = []
+    if CA_only:
+        for res in residues.values():
+            coords.append(res["CA"])
+    else:
+        for res in residues.values():
+            coords.append(res["CB"] if res["name"] != "GLY" else res["CA"])
     
     # Main loop to calc matrix
     m = np.zeros((len(coords), len(coords)), np.float32)

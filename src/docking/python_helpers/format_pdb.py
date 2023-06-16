@@ -111,6 +111,44 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     
     return structures
 
+def get_cb_ca_coords(lines:List[str]) -> pd.DataFrame:
+    residues = {} # residue dict
+    
+    ## read residues into res dict with the following format
+    ## res = {ter#_res# : {CA: [x, y, z], CB: [x, y, z], name: resname},...}
+    ter = 0 # prefix to indicate TER grouping
+    curr_res = None # res# number
+    
+    for line in lines:
+        if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
+            ter += 1
+        
+        if (line[:6].strip() != 'ATOM'): continue
+        
+        # make sure res# is in order and not missing
+        prev_res = curr_res
+        curr_res = int(line[22:26])
+        assert curr_res >= prev_res, f"Missing residue #{prev_res+1} OR out of order"
+        
+        # only want CA and CB atoms
+        atm_type = line[12:16].strip()
+        if atm_type not in ['CA', 'CB']: continue
+        
+        # Glycine has no CB atom, so we save both 
+        key = f"{ter}_{curr_res}"
+        assert atm_type not in residues.get(key, {}), f"Duplicate {atm_type} for residue {key}"
+        # adding atom to residue
+        residues.setdefault(key, {})[atm_type] = np.array(
+            [float(line[30:38]), float(line[38:46]), float(line[46:54])])
+        
+        # Saving residue name
+        assert ("name" not in residues.get(key, {})) or \
+               (residues[key]["name"] == line[17:20].strip()), \
+                                                f"Inconsistent residue name for residue {key}"
+        residues[key]["name"] = line[17:20].strip()
+    return residues
+
+
 def get_atom_df(lines:List[str]) -> pd.DataFrame:
     """
     Same as `get_coords()` but with additional data (* below), however this is limited to 
