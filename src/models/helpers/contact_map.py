@@ -26,16 +26,16 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
         ## read residues into res dict with the following format
         ## res = {tergroup_res# : {CA: [x, y, z], CB: [x, y, z]} ...}
         ter = 0 # prefix to indicate TER grouping
-        curr_res = None # res# number
+        curr_res, prev_res = 0, -1
         for line in lines:
             if (line[:6].strip() == 'TER'):
                 ter += 1
             
-            if (line[:6].strip() != 'ATOM'): continue
+            if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
             
             prev_res = curr_res
             curr_res = int(line[22:26])
-            assert curr_res >= prev_res, f"Missing residue #{prev_res+1} OR out of order in {pdb_file}"
+            assert curr_res == prev_res or curr_res == prev_res+1, f"Missing residue #{prev_res+1} OR out of order in {pdb_file}"
             
             atm_type = line[12:16].strip()
             if atm_type not in ['CA', 'CB']: continue
