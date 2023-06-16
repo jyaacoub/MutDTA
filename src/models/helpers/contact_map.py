@@ -13,7 +13,8 @@ def get_contact(pdb_file: str, CA_only=True, display=False, title="Residue Conta
         CA_only (bool, optional): if true only use alpha carbon for calc distance. Otherwise 
                                 follow DGraphDTA definition, using CB for all except glycine.
         display (bool, optional): if true will display contact map. Defaults to False.
-
+        title (str, optional): title for plot. Defaults to "Residue Contact Map".
+        
     Returns:
         np.array: residue contact map as a matrix.
     """

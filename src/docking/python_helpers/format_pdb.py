@@ -111,7 +111,7 @@ def split_structure(file_path='sample_data/1a1e.pdbqt', save='all') -> List[str]
     
     return structures
 
-def get_cb_ca_coords(lines:List[str]) -> pd.DataFrame:
+def get_structure_dict(lines:List[str]) -> dict:
     residues = {} # residue dict
     
     ## read residues into res dict with the following format
