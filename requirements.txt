@@ -1,11 +1,20 @@
-pandas
 numpy
-plotly
+pandas
 tqdm
-ipykernel
-requests
+rdkit
 scipy
 matplotlib
 
 lifelines # used for concordance index calc
 #biopython # used for cmap
+
+# model building
+torch
+torch_geometric
+
+# optional:
+torchsummary 
+tabulate # for torch_geometric.nn.summary
+ipykernel
+plotly
+requests
