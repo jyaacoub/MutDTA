@@ -34,21 +34,34 @@ if os.path.basename(os.getcwd()) == 'data_analysis':
     import os; os.chdir('../../') # for if running from src/data_analysis/
 print(os.getcwd())
 
+core_2012_filter = []
+with open('data/PDBbind/2012_core_data.lst', 'r') as f:
+    for line in f.readlines():
+        if '#' == line[0]: continue
+        code = line[:4]
+        core_2012_filter.append(code)
+
+core_2012_filter = pd.DataFrame(core_2012_filter, columns=['PDBCode'])
+filter = core_2012_filter['PDBCode'] #pd.read_csv('results/PDBbind/vina_out/run1.csv')['PDBCode']
+
+# print missing from filter
+print(len(set(core_2012_filter['PDBCode']) - set(filter)), 'missing from filter')
+
 # %%
+save = True
 for run_num in [9]:
-    y_path = 'data/PDBbind/kd_only/Y.csv'
+    y_path = 'data/PDBbind/kd_ki/Y.csv'
     vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
-    save_path = 'results/PDBbind/media/kd_only'
+    save_path = 'results/PDBbind/media/kd_ki'
 
     ##%%
     vina_pred = pd.read_csv(vina_out)
     actual = pd.read_csv(y_path)
     
     #NOTE: making sure to use the same data:
-    filter = pd.read_csv('results/PDBbind/vina_out/run1.csv')['PDBCode'] 
     vina_pred = vina_pred.merge(filter, on='PDBCode')
 
-    ##%%
+    #%%
     mrgd = actual.merge(vina_pred, on='PDBCode')
     y = mrgd['affinity'].values
     z = mrgd['vina_kd(uM)'].values
@@ -73,15 +86,16 @@ for run_num in [9]:
     print(f"MAE: {mae}")
     print(f"RMSE: {rmse}")
 
-    ##%% saving results to csv file
-    # replacing existing record if run_num already exists
-    stats = pd.read_csv(f'{save_path}/vina_stats.csv', index_col=0)
+    #%% saving results to csv file
+    if save:
+        # replacing existing record if run_num already exists
+        stats = pd.read_csv(f'{save_path}/vina_stats.csv', index_col=0)
 
-    stats.loc[run_num] = [c_index, p_corr[0], p_corr[1], mse, mae, rmse]
-    stats = stats.sort_index()  # sorting by index
+        stats.loc[run_num] = [c_index, p_corr[0], p_corr[1], mse, mae, rmse]
+        stats = stats.sort_index()  # sorting by index
 
-    # saving to csv
-    stats.to_csv(f'{save_path}/vina_stats.csv')
+        # saving to csv
+        stats.to_csv(f'{save_path}/vina_stats.csv')
 
     ##%% plotting histogram of affinity values
     plt.hist(log_y, bins=10, alpha=0.5)
