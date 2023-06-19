@@ -70,13 +70,14 @@ with open(out_csv, "w") as out_f:
     out_f.write("PDBCode,vina_deltaG(kcal/mol),vina_kd(uM)\n")
 
     for code in tqdm(codes, desc='Extracting affinity values'):
+        if code == "PDBCode": continue
         dir_path = vina_dir if args.fr else os.path.join(vina_dir, code)
         log = os.path.join(dir_path, f"{code}_vina_log.txt")
         
         if not os.path.isfile(log):
             errors += 1
             # print(f'FileNotFound on: {log}')
-            error_files['FileNotFound'] = error_files.get('FileNotFound', []).append(log)
+            error_files['FileNotFound'] = error_files.get('FileNotFound', []) + [log]
             continue
 
         with open(log, "r") as f:
@@ -114,7 +115,7 @@ print(f"Errors: {errors}")
 save = input('Save error file? (y/n): ')
 if save.lower() == 'y':
     save_path = input('\t Save as (default is ./extract_vina_out-err.json): ')
-    while save_path and not os.path.exists(save_path):
+    while save_path and not (os.path.exists(save_path) or os.path.isdir(save_path) or os.path.isfile(save_path)):
         save_path = input('\t   Invalid path, try again: ')
     
     if save_path.strip() == '':
