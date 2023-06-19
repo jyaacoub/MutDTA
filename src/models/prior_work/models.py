@@ -108,7 +108,7 @@ class DGraphDTA(torch.nn.Module):
     
 if __name__ == "__main__":
     data = 'kiba'
-    model_file_name = f'src/models/checkpoints/DGraphDTA_{data}_t2.model'
+    model_file_name = f'results/model_checkpoints/DGraphDTA_{data}_t2.model'
     cuda_name = 'cuda:0'
     device = torch.device(cuda_name if torch.cuda.is_available() else 'cpu')
     print('cuda_name:', cuda_name)

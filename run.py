@@ -1,10 +1,5 @@
 #%%
-import matplotlib.pyplot as plt
-import numpy as np
+from src.models.prior_work import display_models
 
-# %%sample dgraphdta contact map:
-path = "/cluster/home/t122995uhn/projects/DGraphDTA/data/kiba/pconsc4/O00141.npy"
-cmap = np.load(path)
-plt.matshow(cmap)
-plt.show()
+display_models()
 # %%
