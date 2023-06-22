@@ -12,6 +12,7 @@ from tqdm import tqdm
 from src.models.prior_work import DGraphDTA
 from src.models.helpers.contact_map import get_contact
 from src.models.helpers.feature_extraction import smile_to_graph, target_to_graph
+from src.models.helpers.dataset_creation import create_dataset_for_test
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
 DATA = 'davis'
@@ -67,48 +68,37 @@ lig_seq = df_x.loc[PDB_CODE]['SMILE']
 label = df_y.loc[PDB_CODE]['affinity'] # kd in uM
 label = -np.log(label * 1e-6) # convert to M and take -log (pKd)
 
-# %%
-mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
 
 # %% Getting protein graph
 path = lambda c: f'{PDBBIND_STRC}/{c}/{c}_protein.pdb'
 cmap_p = lambda c: f'{PDBBIND_STRC}/{c}/{c}_contact_CB.npy'
 msa_p = lambda up: f'../data/msa/{up}_clean.aln'  # no longer needed due to issue with DGraphDTA
 
-cmap = get_contact(path(PDB_CODE), 
-                   CA_only=False, # CB is needed by DGraphDTA
-                   check_missing=False) 
-# np.save(cmap_p(PDB_CODE), cmap)
-pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, threshold=10.5)
+# example run:
+# cmap = get_contact(path(PDB_CODE), 
+#                    CA_only=False, # CB is needed by DGraphDTA
+#                    check_missing=False) 
+# # np.save(cmap_p(PDB_CODE), cmap)
+# pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, threshold=10.5)
 
-# Loading into tensors
-pro = geo_data.Data(x=torch.Tensor(pro_feat), # node feature matrix
-                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
-                    y=None).to(device)
-lig = geo_data.Data(x=torch.Tensor(mol_feat), # node feature matrix
-                    edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
-                    y=None).to(device)
+# mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
+# # Loading into tensors
+# pro = geo_data.Data(x=torch.Tensor(pro_feat), # node feature matrix
+#                     edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+#                     y=None).to(device)
+# lig = geo_data.Data(x=torch.Tensor(mol_feat), # node feature matrix
+#                     edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+#                     y=None).to(device)
 
-model.eval()
-pred = model(lig, pro) # output of model is pKd
-print('pred:', pred.item())
-print('label:', label)
+# model.eval()
+# pred = model(lig, pro) # output of model is pKd
+# print('pred:', pred.item())
+# print('label:', label)
 
 
 # %%
-df_x['smile_graph'] = df_x['SMILE'].apply(smile_to_graph) 
-# 36 codes fail
-print('\n',
-      sum(df_x.isna()['smile_graph']), 
-      'codes failed out of', df_x.shape[0])
-df_x = df_x.dropna()
+# merge with affinity convert to pKd
+df_x['affinity'] = -np.log(df_y['affinity']*1e-6)
+test_data = create_dataset_for_test(df_x[:100], cmap_p=cmap_p)
 
-#%% getting protein graphs
-# input args are: target_sequence, contact_map, threshold=10.5
-
-#%%
-def temp(row):
-    cmap = np.load(cmap_p(row.name))
-    return target_to_graph(row['prot_seq'], cmap, threshold=10.5)
-df_x['target_graph'] = df_x.apply(temp, axis=1)
 # %%

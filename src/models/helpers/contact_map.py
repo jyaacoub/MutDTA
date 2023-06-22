@@ -107,7 +107,7 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
         
     return m
 
-def create_save_cmaps(pdbcodes: Iterable(str), 
+def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str]):
     """
