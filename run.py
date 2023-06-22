@@ -162,3 +162,26 @@ plt.savefig(f'{save_path}/{key}_scatter.png')
 plt.show()
 
 # %%
+import pickle
+davis_y = pickle.load(open('/home/jyaacoub/projects/DGraphDTA/data/davis/Y', "rb"), encoding='latin1')
+# some processing is needed for davis -> pkd (standard value is Kd in nM)
+davis_y = -np.log10(davis_y / 1e9)
+kiba_y = pickle.load(open('/home/jyaacoub/projects/DGraphDTA/data/kiba/Y', "rb"), encoding='latin1')
+# %%
+# plotting davis and kiba distributions
+d_flat = davis_y.flatten()
+k_flat = kiba_y.flatten()
+
+# dropping nan values
+d = d_flat[~np.isnan(d_flat)]
+k = k_flat[~np.isnan(k_flat)]
+
+# plotting
+plt.hist(d, bins=10, alpha=0.5)
+plt.hist(k, bins=10, alpha=0.5)
+plt.title('Histogram of affinity values (pkd)')
+plt.legend(['davis', 'kiba'])
+plt.savefig(f'{save_path}/davis_kiba_hist.png')
+
+
+# %%
