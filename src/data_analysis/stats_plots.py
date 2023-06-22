@@ -1,6 +1,6 @@
 #%% visualizing and analyzing docking results
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, spearmanr
 import pandas as pd
 import numpy as np
 
@@ -42,14 +42,15 @@ with open('data/PDBbind/2012_core_data.lst', 'r') as f:
         core_2012_filter.append(code)
 
 core_2012_filter = pd.DataFrame(core_2012_filter, columns=['PDBCode'])
-filter = core_2012_filter['PDBCode'] #pd.read_csv('results/PDBbind/vina_out/run1.csv')['PDBCode']
+filter =pd.read_csv('results/PDBbind/vina_out/run9.csv')['PDBCode'] #core_2012_filter['PDBCode']
 
 # print missing from filter
-print(len(set(core_2012_filter['PDBCode']) - set(filter)), 'missing from filter')
+# print(len(set(core_2012_filter['PDBCode']) - set(filter)), 'missing from filter')
 
 # %%
-save = True
-for run_num in [9]:
+save = False
+for run_num in [8,9]:
+    print(f'run{run_num}:')
     y_path = 'data/PDBbind/kd_ki/Y.csv'
     vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
     save_path = 'results/PDBbind/media/kd_ki'
@@ -61,7 +62,7 @@ for run_num in [9]:
     #NOTE: making sure to use the same data:
     vina_pred = vina_pred.merge(filter, on='PDBCode')
 
-    #%%
+    ##%%
     mrgd = actual.merge(vina_pred, on='PDBCode')
     y = mrgd['affinity'].values
     z = mrgd['vina_kd(uM)'].values
@@ -71,22 +72,27 @@ for run_num in [9]:
     ##%% Statistics
     # calc concordance index 
     c_index = concordance_index(log_y, log_z)
-    print(f"Concordance index: {c_index}")
+    print(f"Concordance index: {c_index:.3f}")
 
     # pearson correlation
     p_corr = pearsonr(log_y, log_z)
-    print(f"Pearson correlation: {p_corr[0]}")
-    print(f"Pearson p-value: {p_corr[1]}")
+    print(f"Pearson correlation: {p_corr[0]:.3f}")
+    print(f"Pearson p-value: {p_corr[1]:.3f}")
+    
+    # spearman correlation
+    s_corr = spearmanr(log_y, log_z)
+    print(f"Spearman correlation: {s_corr[0]:.3f}")
+    print(f"Spearman p-value: {s_corr[1]:.3f}")
 
     # error
     mse = np.mean((log_y-log_z)**2)
     mae = np.mean(np.abs(log_y-log_z))
     rmse = np.sqrt(mse)
-    print(f"MSE: {mse}")
-    print(f"MAE: {mae}")
-    print(f"RMSE: {rmse}")
+    print(f"MSE: {mse:.3f}")
+    print(f"MAE: {mae:.3f}")
+    print(f"RMSE: {rmse:.3f}")
 
-    #%% saving results to csv file
+    ##%% saving results to csv file
     if save:
         # replacing existing record if run_num already exists
         stats = pd.read_csv(f'{save_path}/vina_stats.csv', index_col=0)
@@ -101,7 +107,7 @@ for run_num in [9]:
     plt.hist(log_y, bins=10, alpha=0.5)
     plt.hist(log_z, bins=10, alpha=0.5)
     plt.legend(['Experimental', 'Vina'])
-    plt.title('Histogram of affinity values (-log(Kd))')
+    plt.title(f'run{run_num} - Histogram of affinity values (-log(Kd))')
     plt.savefig(f'{save_path}/vina_{run_num}_hist.png')
     plt.show()
 
@@ -112,7 +118,7 @@ for run_num in [9]:
     plt.plot(log_y, m*log_y + b, color='black', alpha=0.8)
     plt.xlabel('Experimental affinity value')
     plt.ylabel('Vina prediction')
-    plt.title('Scatter plot of affinity values (-log(Kd))')
+    plt.title(f'run{run_num} - Scatter plot of affinity values (-log(Kd))')
 
     plt.savefig(f'{save_path}/vina_{run_num}_scatter.png')
     plt.show()
