@@ -42,7 +42,7 @@ DATA = 'kiba'
 #           6q4e
 
 #%%
-device = 'cpu' # torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 model = DGraphDTA()
 model.to(device)
 
@@ -60,6 +60,12 @@ df_seq = pd.read_csv('data/PDBbind/kd_ki/pdb_seq_lrgst.csv', index_col=0) # col:
 # %% Getting protein graph
 path = lambda c: f'{PDBBIND_STRC}/{c}/{c}_protein.pdb'
 cmap_p = lambda c: f'{PDBBIND_STRC}/{c}/{c}_contact_CB_lone.npy'
+#
+
+#%% randomly splitting data into train, val, test
+np.random.seed(0)
+pdb_train, pdb_val, pdb_test = np.split(df_x.index, [int(.6*len(df_x)), int(.8*len(df_x))])
+#TODO: finish this
 
 #%%
 actual = []
@@ -67,7 +73,7 @@ pred = []
 model.eval()
 errors = []
 RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
-for code in tqdm(df_x.index):
+for code in tqdm(df_x.index): #TODO: batch the data for faster inference using GPU
     cmap = np.load(cmap_p(code))
     pro_seq = df_seq.loc[code]['seq']
     lig_seq = df_x.loc[code]['SMILE']
@@ -160,28 +166,5 @@ plt.title(f'Scatter plot of affinity values (pkd)')
 
 plt.savefig(f'{save_path}/{key}_scatter.png')
 plt.show()
-
-# %%
-import pickle
-davis_y = pickle.load(open('/home/jyaacoub/projects/DGraphDTA/data/davis/Y', "rb"), encoding='latin1')
-# some processing is needed for davis -> pkd (standard value is Kd in nM)
-davis_y = -np.log10(davis_y / 1e9)
-kiba_y = pickle.load(open('/home/jyaacoub/projects/DGraphDTA/data/kiba/Y', "rb"), encoding='latin1')
-# %%
-# plotting davis and kiba distributions
-d_flat = davis_y.flatten()
-k_flat = kiba_y.flatten()
-
-# dropping nan values
-d = d_flat[~np.isnan(d_flat)]
-k = k_flat[~np.isnan(k_flat)]
-
-# plotting
-plt.hist(d, bins=10, alpha=0.5)
-plt.hist(k, bins=10, alpha=0.5)
-plt.title('Histogram of affinity values (pkd)')
-plt.legend(['davis', 'kiba'])
-plt.savefig(f'{save_path}/davis_kiba_hist.png')
-
 
 # %%
