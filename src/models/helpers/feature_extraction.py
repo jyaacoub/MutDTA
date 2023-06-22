@@ -79,10 +79,15 @@ def target_to_graph(target_sequence, contact_map, threshold=10.5):
     
     
     target_size = len(target_sequence)
+    print('target size:', target_size)
+    print('contact map size:', contact_map.shape)
+    assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
+    assert contact_map.shape[0] == target_size, 'contact map size does not match target sequence size'
     # adding self loop then thresholding
     # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
     # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
     index_row, index_col = np.where(contact_map <= threshold)
+    assert index_row.max() < target_size and index_col.max() < target_size, 'contact map size does not match target sequence size'
     
     # converting edge matrix to edge index for pytorch geometric
     target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])

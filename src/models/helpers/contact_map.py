@@ -2,11 +2,13 @@ from typing import Callable, Iterable
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+from tqdm import tqdm
 
 import pandas as pd
 
 def get_contact(pdb_file: str, CA_only=True, check_missing=False,
-                display=False, title="Residue Contact Map") -> np.array:
+                display=False, title="Residue Contact Map", 
+                raw=False) -> np.array:
     """
     Given a pdb file path this will return the residue contact map for that structure.
     
@@ -21,6 +23,9 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
                                 Defaults to False.
         display (bool, optional): if true will display contact map. Defaults to False.
         title (str, optional): title for plot. Defaults to "Residue Contact Map".
+        raw (bool, optional): If True, no splitting is done to isolate a single structure 
+                    and the contact map is produced for the entire pdb file. 
+                    Defaults to False.
         
     Returns:
         np.array: residue contact map as a matrix.
@@ -38,6 +43,7 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
         for line in lines:
             if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
                 ter += 1
+                if not raw: break # break after first TER
             
             if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
             
