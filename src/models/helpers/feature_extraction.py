@@ -26,9 +26,9 @@ def smile_to_graph(smile):
     try:
         mol = Chem.MolFromSmiles(smile)
         c_size = mol.GetNumAtoms()
-    except AttributeError:
-        print('rdkit error for smile:', smile)
-        return None
+    except AttributeError as e:
+        # adding to stack trace
+        raise ValueError(f'rdkit failed to convert SMILE: {smile}') from e
 
     # getting node features
     atoms = mol.GetAtoms()
@@ -79,11 +79,9 @@ def target_to_graph(target_sequence, contact_map, threshold=10.5):
     
     
     target_size = len(target_sequence)
-    print('target size:', target_size)
-    print('contact map size:', contact_map.shape)
     assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
     # its ok if it is smaller, but not larger (due to missing residues in pdb)
-    assert contact_map.shape[0] <= target_size, 'contact map size is larger than target sequence size'
+    assert contact_map.shape[0] == target_size, 'contact map size does not match target sequence size'
     
     
     # adding self loop then thresholding
