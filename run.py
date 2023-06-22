@@ -7,6 +7,7 @@ import pandas as pd
 from rdkit import Chem
 import networkx as nx
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from src.models.prior_work import DGraphDTA
 from src.models.helpers.contact_map import get_contact
@@ -78,11 +79,11 @@ cmap = get_contact(path(PDB_CODE),
                    CA_only=False, # CB is needed by DGraphDTA
                    check_missing=False) 
 # np.save(cmap_p(PDB_CODE), cmap)
-pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, threshold=0)
+pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, threshold=10.5)
 
 # Loading into tensors
 pro = geo_data.Data(x=torch.Tensor(pro_feat), # node feature matrix
-                    edge_index=torch.LongTensor([[0,0]]).transpose(1, 0),
+                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                     y=None).to(device)
 lig = geo_data.Data(x=torch.Tensor(mol_feat), # node feature matrix
                     edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
@@ -92,25 +93,22 @@ model.eval()
 pred = model(lig, pro) # output of model is pKd
 print('pred:', pred.item())
 print('label:', label)
-# %%
-# %%
-class TestDataset(geo_data.InMemoryDataset):
-    def __init__(self, root: str | None = None,  dataset: str | None = 'kd_ki', xd=None, y=None,
-                 smile_graph=None, target_key=None, target_graph=None,
-                 transform: Callable[..., Any] | None = None, 
-                 pre_transform: Callable[..., Any] | None = None, 
-                 pre_filter: Callable[..., Any] | None = None, 
-                 log: bool = True):
-        super().__init__(root, transform, pre_transform, pre_filter, log)
 
 
-def create_test_data():
-    # col: PDBCode,protID,lig_name,prot_seq,SMILE
-    df_x = pd.read_csv('data/PDBbind/kd_ki/X.csv', index_col=0)
-    # col: PDBCode,affinity 
-    df_y = pd.read_csv('data/PDBbind/kd_ki/Y.csv', index_col=0)
-    
-    #
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=TEST_BATCH_SIZE, shuffle=False,
-                                              collate_fn=collate)
-    
+# %%
+df_x['smile_graph'] = df_x['SMILE'].apply(smile_to_graph) 
+# 36 codes fail
+print('\n',
+      sum(df_x.isna()['smile_graph']), 
+      'codes failed out of', df_x.shape[0])
+df_x = df_x.dropna()
+
+#%% getting protein graphs
+# input args are: target_sequence, contact_map, threshold=10.5
+
+#%%
+def temp(row):
+    cmap = np.load(cmap_p(row.name))
+    return target_to_graph(row['prot_seq'], cmap, threshold=10.5)
+df_x['target_graph'] = df_x.apply(temp, axis=1)
+# %%

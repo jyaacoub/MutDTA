@@ -23,8 +23,12 @@ def atom_features(atom):
     
 # mol smile to mol graph edge index
 def smile_to_graph(smile):
-    mol = Chem.MolFromSmiles(smile)
-    c_size = mol.GetNumAtoms()
+    try:
+        mol = Chem.MolFromSmiles(smile)
+        c_size = mol.GetNumAtoms()
+    except AttributeError:
+        print('rdkit error for smile:', smile)
+        return None
 
     # getting node features
     atoms = mol.GetAtoms()
@@ -63,10 +67,9 @@ def target_to_graph(target_sequence, contact_map, threshold=10.5):
         target_sequence (str): sequence of target protein
         contact_map (str or np.array): file path for contact map or the 
             actual map itself.
-        threshold (float, optional): Threshold for what defines an edge 
-            (DGraphDTA used prediced contact map by pcons4 and so 0.5 was 
-            used as the threshold). Defaults to 10.5 (Angstroms for real 
-            contact maps)
+        threshold (float, optional): Threshold for what defines an edge, 
+            anything under this value is considered an edge. Defaults to 
+            10.5 Angstroms.
 
     Returns:
         Tuple(np.array): truple of (target_size, target_feature, target_edge_index)
@@ -76,9 +79,10 @@ def target_to_graph(target_sequence, contact_map, threshold=10.5):
     
     
     target_size = len(target_sequence)
-    # Applying threshold to contact map and adding self loop
-    index_row, index_col = np.where(contact_map >= threshold)
-    contact_map += np.matrix(np.eye(contact_map.shape[0]))
+    # adding self loop then thresholding
+    # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
+    # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
+    index_row, index_col = np.where(contact_map <= threshold)
     
     # converting edge matrix to edge index for pytorch geometric
     target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])
