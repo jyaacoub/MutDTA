@@ -1,9 +1,10 @@
-from typing import List
+from typing import Iterable, List
 import requests as r
 import pandas as pd
 import os, re
 from tqdm import tqdm
 from urllib.parse import quote
+from rdkit.Chem.PandasTools import LoadSDF
 
 def get_mutated_seq(HGVSc: List[str], 
                     url=lambda x: f'https://mutalyzer.nl/api/normalize/{x}') -> dict:
@@ -26,7 +27,7 @@ def get_mutated_seq(HGVSc: List[str],
         
     return mut_seq
 
-def get_SMILE(drug_names: List[str],
+def download_SMILE(drug_names: List[str],
               url=lambda x: f'https://cactus.nci.nih.gov/chemical/structure/{quote(x)}/smiles') -> dict:
     """Gets SMILE strings from given drug names"""
     drug_SMILEs = {}
@@ -35,6 +36,20 @@ def get_SMILE(drug_names: List[str],
         drug_SMILEs[drug_name] = r.get(url(drug_name)).text
     
     return drug_SMILEs
+
+def get_SMILE(info_df: pd.DataFrame, 
+              dir=lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf'):
+    """
+    Returns dict of {lig_name: SMILE} from given info_df.
+    `info_df` contains the PDBcodes as the index and the corresponding drug names in column 'lig_name'.
+    """
+    drug_smi = {}
+    for code, row in tqdm(info_df.iterrows(), 'Extracting SMILE strings from sdf'):
+        lig_name = row['lig_name']
+        if lig_name in drug_smi: continue
+        drug_smi[lig_name] = LoadSDF(dir(code), smilesName='smile')['smile'][0]
+        
+    return drug_smi
 
 def get_prot_seq(protIDs: List[str], 
                   url=lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta') -> dict:

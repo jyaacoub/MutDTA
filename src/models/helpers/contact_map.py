@@ -1,6 +1,9 @@
+from typing import Callable, Iterable
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+
+import pandas as pd
 
 def get_contact(pdb_file: str, CA_only=True, check_missing=False,
                 display=False, title="Residue Contact Map") -> np.array:
@@ -103,6 +106,27 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
         plt.show()
         
     return m
+
+def create_save_cmaps(pdbcodes: Iterable(str), 
+                      pdb_p: Callable[[str], str],
+                      cmap_p: Callable[[str], str]):
+    """
+    Given a list of PDBcodes, this will create and save the contact maps for each.
+    Example path callable functions:        
+        pdb_p = lambda c: f'/path/to/refined-set/{c}/{c}_protein.pdb'
+        cmap_p = lambda c: f'path/to/refined-set/{c}/{c}_contact_CB.npy'
+
+    Args:
+        pdbcodes (Iterable(str)): list of PDBcodes to create contact maps for.
+        pdb_p (Callable[[str], str]): function to get pdb file path from pdbcode.
+        cmap_p (Callable[[str], str]): function to get cmap save file path from pdbcode.
+    """
+    for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
+        cmap = get_contact(pdb_p(pdbcode), # pdbcode is index
+                        CA_only=False, # CB is needed by DGraphDTA
+                        check_missing=False)
+        np.save(cmap_p(pdbcode), cmap)
+
 
 if __name__ == "__main__":
     from tqdm import tqdm
