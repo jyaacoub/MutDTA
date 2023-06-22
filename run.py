@@ -1,4 +1,5 @@
 #%%
+import os
 from typing import Any, Callable, Optional
 from torch_geometric import data as geo_data
 import torch
@@ -21,8 +22,7 @@ from src.models.helpers.feature_extraction import smile_to_graph, target_to_grap
 from src.models.helpers.dataset_creation import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
-DATA = 'davis'
-PDB_CODE = '1b38' 
+DATA = 'kiba'
 # codes with MSA available (uniprot = P24941)
 #           1b38
 #           1e1v
@@ -60,7 +60,6 @@ df_seq = pd.read_csv('data/PDBbind/kd_ki/pdb_seq_lrgst.csv', index_col=0) # col:
 # %% Getting protein graph
 path = lambda c: f'{PDBBIND_STRC}/{c}/{c}_protein.pdb'
 cmap_p = lambda c: f'{PDBBIND_STRC}/{c}/{c}_contact_CB_lone.npy'
-msa_p = lambda up: f'../data/msa/{up}_clean.aln'  # no longer needed due to issue with DGraphDTA\
 
 #%%
 actual = []
@@ -68,7 +67,7 @@ pred = []
 model.eval()
 errors = []
 RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
-for code in tqdm(df_x.index): # 10gs 5j41 1a4k fails
+for code in tqdm(df_x.index):
     cmap = np.load(cmap_p(code))
     pro_seq = df_seq.loc[code]['seq']
     lig_seq = df_x.loc[code]['SMILE']
@@ -102,7 +101,6 @@ assert len(actual) == len(pred), 'actual and pred are not the same length'
 # enable rdkit warnings
 RDLogger.EnableLog('rdApp.*')
 
-
 # %% Stats
 log_y, log_z = np.array(actual), np.array(pred)
 # calc concordance index 
@@ -127,12 +125,28 @@ print(f"MSE: {mse:.3f}")
 print(f"MAE: {mae:.3f}")
 print(f"RMSE: {rmse:.3f}")
 
+#%% saving to csv file
+save_path = 'results/model_media/'
+csv_file = f'{save_path}/DGraphDTA_stats.csv'
+key = f'pre-trained_{DATA}_kd_ki'
+
+# creating stats csv if it doesnt exist
+if not os.path.exists(f'{save_path}/DGraphDTA_stats.csv'): 
+    stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+    stats.set_index('run', inplace=True)
+    stats.to_csv(csv_file)
+
+#%% replacing existing record if run_num already exists
+stats = pd.read_csv(csv_file, index_col=0)
+stats.loc[key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
+stats.to_csv(csv_file)
+
 # %%
 plt.hist(log_y, bins=10, alpha=0.5)
 plt.hist(log_z, bins=10, alpha=0.5)
-plt.legend(['Experimental', 'Vina'])
-plt.title(f'Histogram of affinity values (-log(Kd))')
-# plt.savefig(f'{save_path}/vina_{run_num}_hist.png')
+plt.legend(['Experimental', key])
+plt.title(f'Histogram of affinity values (pkd)')
+plt.savefig(f'{save_path}/{key}_scatter.png')
 plt.show()
 
 # scatter plot of affinity values
@@ -141,10 +155,10 @@ m, b = np.polyfit(log_y, log_z, 1)
 plt.scatter(log_y, log_z, alpha=0.5)
 plt.plot(log_y, m*log_y + b, color='black', alpha=0.8)
 plt.xlabel('Experimental affinity value')
-plt.ylabel('DGraphDTA prediction')
-plt.title(f'Scatter plot of affinity values (-log(Kd))')
+plt.ylabel(f'{key} prediction')
+plt.title(f'Scatter plot of affinity values (pkd)')
 
-# plt.savefig(f'{save_path}/vina_{run_num}_scatter.png')
+plt.savefig(f'{save_path}/{key}_scatter.png')
 plt.show()
 
 # %%
