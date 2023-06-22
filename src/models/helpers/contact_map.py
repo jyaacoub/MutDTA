@@ -17,7 +17,8 @@ RES_CODE = {
     'TYR': 'Y', 'VAL': 'V'
 }
 
-def get_sequence(pdb_file: str, check_missing=False, raw=False) -> Tuple[str, OrderedDict]:
+def get_sequence(pdb_file: str, check_missing=False, raw=False, 
+                 select_largest=True) -> Tuple[str, OrderedDict]:
     """
     Given a pdb file path this will return the residue sequence for that structure
     (could be missing residues) and the residue dict in order of seq# that contains coords.
@@ -29,6 +30,8 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False) -> Tuple[str, Or
         raw (bool, optional): If True, no splitting is done to isolate a single structure 
                     and the contact map is produced for the entire pdb file. 
                     Defaults to False.
+        select_largest (bool, optional): If True, only the largest chain is used. Otherwise
+                    returns the first chain. Defaults to True.
         
     Returns:
         Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
@@ -37,13 +40,14 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False) -> Tuple[str, Or
     # read and filter
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
-        residues = OrderedDict() # residue dict
-        ter = 0 # prefix to indicate TER grouping
+        chains = OrderedDict() # chain dict of dicts
+        ter = 0 # chain terminator
+        chains[0] = OrderedDict() # first chain
         curr_res, prev_res = None, None
         for line in lines:
             if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
                 ter += 1
-                if not raw: break # break after first TER
+                chains[ter] = OrderedDict()
             
             if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
             
@@ -63,24 +67,30 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False) -> Tuple[str, Or
                              # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
             
             # Glycine has no CB atom, so we save both 
-            key = f"{ter}_{curr_res}_{icode}"
-            assert atm_type not in residues.get(key, {}), f"Duplicate {atm_type} for residue {key} in {pdb_file}"
+            key = f"{curr_res}_{icode}"
+            assert atm_type not in chains[ter].get(key, {}), f"Duplicate {atm_type} for residue {key} in {pdb_file}"
             # adding atom to residue
-            residues.setdefault(key, {})[atm_type] = np.array(
+            chains[ter].setdefault(key, {})[atm_type] = np.array(
                 [float(line[30:38]), float(line[38:46]), float(line[46:54])])
             
             # Saving residue name
-            assert ("name" not in residues.get(key, {})) or \
-                (residues[key]["name"] == line[17:20].strip()), \
+            assert ("name" not in chains[ter].get(key, {})) or \
+                (chains[ter][key]["name"] == line[17:20].strip()), \
                                         f"Inconsistent residue name for residue {key} in {pdb_file}"
-            residues[key]["name"] = line[17:20].strip()
+            chains[ter][key]["name"] = line[17:20].strip()
             
-    
+    # getting sequence of largest chain
+    chain_opt = 0
+    if select_largest:
+        for i in range(len(chains)):
+            if len(chains[i]) > len(chains[chain_opt]): chain_opt = i
+        
+    return_chain = chains[chain_opt]
     seq = '' # sequence of residues based on pdb file
-    for res in residues:
-        name = residues[res]["name"]
-        seq += RES_CODE[name]
-    return seq, residues
+    for res in return_chain:
+        seq += RES_CODE[return_chain[res]["name"]]
+            
+    return seq, return_chain
 
 
 def get_contact(pdb_file: str, CA_only=True, check_missing=False,
@@ -204,3 +214,14 @@ if __name__ == "__main__":
         ax[i//c][i%c].set_title(code)
         ax[i//c][i%c].axis('off')
         i+=1
+        
+        
+    #%% Create and save just sequences:
+    df_x = pd.read_csv('data/PDBbind/kd_ki/X.csv', index_col=0) 
+    df_seq = pd.DataFrame(index=df_x.index, columns=['seq'])
+    for code in tqdm(df_x.index, 'Getting experimental sequences'):
+        seq, _ = get_sequence(path(code), check_missing=False, raw=False, select_largest=True)
+        df_seq.loc[code]['seq'] = seq
+        
+    # save sequences
+    df_seq.to_csv('data/PDBbind/kd_ki/pdb_seq_lrgst.csv')
