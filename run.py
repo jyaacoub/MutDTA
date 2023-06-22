@@ -15,7 +15,7 @@ from lifelines.utils import concordance_index
 from tqdm import tqdm
 
 from src.models.prior_work import DGraphDTA
-from src.models.helpers.contact_map import get_contact, create_save_cmaps
+from src.models.helpers.contact_map import get_contact, get_sequence
 from src.models.helpers.feature_extraction import smile_to_graph, target_to_graph
 from src.models.helpers.dataset_creation import create_dataset_for_test, collate
 
@@ -79,7 +79,23 @@ path = lambda c: f'{PDBBIND_STRC}/{c}/{c}_protein.pdb'
 cmap_p = lambda c: f'{PDBBIND_STRC}/{c}/{c}_contact_CB_lone.npy'
 msa_p = lambda up: f'../data/msa/{up}_clean.aln'  # no longer needed due to issue with DGraphDTA
 
-create_save_cmaps(df_x.index, path, cmap_p) # create and save contact maps
+# %%
+# create_save_cmaps(df_x.index, path, cmap_p) # create and save contact maps
+df_seq = pd.DataFrame(index=df_x.index, columns=['seq'])
+for code in tqdm(df_x.index, 'Getting experimental sequences'):
+    seq, _ = get_sequence(path(code), check_missing=False, raw=False)
+    df_seq.loc[code]['seq'] = seq
+    
+# save sequences
+df_seq.to_csv('data/PDBbind/kd_ki/pdb_seq.csv')
+# rcmap = get_contact(path('1a1e'))[0]
+# pcmap = get_contact(path('1a1e'))[0]
+# fig, ax = plt.subplots(2,2, figsize=(15,15))
+# ax[0][0].matshow(rcmap)
+# ax[0][1].matshow(pcmap)
+# ax[1][0].matshow(rcmap == rcmap)
+# ax[1][1].matshow(rcmap == pcmap)
+
 #%%
 pred = []
 model.eval()

@@ -1,4 +1,4 @@
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import OrderedDict
@@ -6,38 +6,38 @@ from tqdm import tqdm
 
 import pandas as pd
 
-def get_contact(pdb_file: str, CA_only=True, check_missing=False,
-                display=False, title="Residue Contact Map", 
-                raw=False) -> np.array:
-    """
-    Given a pdb file path this will return the residue contact map for that structure.
+RES_CODE = {
+    'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
+    'ASX': 'B', 'CYS': 'C', 'GLU': 'E', 'GLN': 'Q',
     
-    Examples: 1a1e has multiple main structures and so it creates a quadrant, 
-    1o0n is a single structure and doesnt create quadrants
+    'GLX': 'Z', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
+    'LEU': 'L', 'LYS': 'K', 'MET': 'M', 'PHE': 'F',
+    
+    'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
+    'TYR': 'Y', 'VAL': 'V'
+}
+
+def get_sequence(pdb_file: str, check_missing=False, raw=False) -> Tuple[str, OrderedDict]:
+    """
+    Given a pdb file path this will return the residue sequence for that structure
+    (could be missing residues) and the residue dict in order of seq# that contains coords.
 
     Args:
         pdb_file (str): path to .pdb file to process.
-        CA_only (bool, optional): if true only use alpha carbon for calc distance. Otherwise 
-                                follow DGraphDTA definition, using CB for all except glycine.
-        check_missing (bool, optional): Checking to ensure all residues are available. 
+        check_missing (bool, optional): Adds check to ensure all residues are available. 
                                 Defaults to False.
-        display (bool, optional): if true will display contact map. Defaults to False.
-        title (str, optional): title for plot. Defaults to "Residue Contact Map".
         raw (bool, optional): If True, no splitting is done to isolate a single structure 
                     and the contact map is produced for the entire pdb file. 
                     Defaults to False.
         
     Returns:
-        np.array: residue contact map as a matrix.
+        Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
     """
 
     # read and filter
     with open(pdb_file, 'r') as f:
         lines = f.readlines()
         residues = OrderedDict() # residue dict
-        
-        ## read residues into res dict with the following format
-        ## res = {ter#_res# : {CA: [x, y, z], CB: [x, y, z], name: resname},...}
         ter = 0 # prefix to indicate TER grouping
         curr_res, prev_res = None, None
         for line in lines:
@@ -75,6 +75,41 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
                                         f"Inconsistent residue name for residue {key} in {pdb_file}"
             residues[key]["name"] = line[17:20].strip()
             
+    
+    seq = '' # sequence of residues based on pdb file
+    for res in residues:
+        name = residues[res]["name"]
+        seq += RES_CODE[name]
+    return seq, residues
+
+
+def get_contact(pdb_file: str, CA_only=True, check_missing=False,
+                display=False, title="Residue Contact Map", 
+                raw=False) -> Tuple[np.array, str]:
+    """
+    Given a pdb file path this will return the residue contact map for that structure.
+    
+    Examples: 1a1e has multiple main structures and so it creates a quadrant, 
+    1o0n is a single structure and doesnt create quadrants
+
+    Args:
+        pdb_file (str): path to .pdb file to process.
+        CA_only (bool, optional): if true only use alpha carbon for calc distance. Otherwise 
+                                follow DGraphDTA definition, using CB for all except glycine.
+        check_missing (bool, optional): Checking to ensure all residues are available. 
+                                Defaults to False.
+        display (bool, optional): if true will display contact map. Defaults to False.
+        title (str, optional): title for plot. Defaults to "Residue Contact Map".
+        raw (bool, optional): If True, no splitting is done to isolate a single structure 
+                    and the contact map is produced for the entire pdb file. 
+                    Defaults to False.
+        
+    Returns:
+        Tuple[np.array, str]: residue contact map as a matrix and the sequence of residues.
+    """
+    # getting sequence and residue dict
+    seq, residues = get_sequence(pdb_file, check_missing=check_missing, raw=raw)
+            
     # getting coords from residues
     coords = []
     if CA_only:
@@ -111,7 +146,7 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
         plt.title(title)
         plt.show()
         
-    return m
+    return m, seq
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
@@ -128,10 +163,11 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         cmap_p (Callable[[str], str]): function to get cmap save file path from pdbcode.
     """
     for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
-        cmap = get_contact(pdb_p(pdbcode), # pdbcode is index
+        cmap, _ = get_contact(pdb_p(pdbcode), # pdbcode is index
                         CA_only=False, # CB is needed by DGraphDTA
                         check_missing=False)
         np.save(cmap_p(pdbcode), cmap)
+        
 
 
 if __name__ == "__main__":
@@ -149,7 +185,7 @@ if __name__ == "__main__":
     for code in tqdm(os.listdir(PDBbind)[32:100]):
         if os.path.isdir(os.path.join(PDBbind, code)) and code not in ["index", "readme"]:
             try:
-                cmap = get_contact(path(code), CA_only=True)
+                cmap, _ = get_contact(path(code), CA_only=True)
                 cmaps[code] = cmap
             except Exception as e:
                 print(code)
