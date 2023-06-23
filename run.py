@@ -23,10 +23,11 @@ from src.models.helpers.feature_extraction import smile_to_graph, target_to_grap
 from src.models.helpers.dataset_creation import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
-DATA = 'kiba'
+DATA = 'davis'
 SET = 'test'
-MODEL_KEY = f'trained_{DATA}_{SET}'
-SAVE_RESULTS = False
+TRAIN = False
+MODEL_KEY = f'trained_{DATA}_{SET}' if TRAIN else f'pretrained_{DATA}_{SET}'
+SAVE_RESULTS = True
 
 save_mdl_path = f'results/model_checkpoints/ours/{MODEL_KEY}.mdl'
 np.random.seed(0)
@@ -61,52 +62,54 @@ pdb_train, pdb_test = np.split(df_x.index, [int(.8*len(df_x))])
 
 #%% nonbatched training
 # training:
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-criterion = torch.nn.MSELoss()
+if TRAIN:
 
-train_set = pdb_train
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    criterion = torch.nn.MSELoss()
 
-model.train()
-errors = []
-RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
-for code in tqdm(train_set, 'training'):
-    cmap = np.load(cmap_p(code))
-    pro_seq = df_seq.loc[code]['seq']
-    lig_seq = df_x.loc[code]['SMILE']
-    label = torch.Tensor([[-np.log(df_y.loc[code]['affinity'] * 1e-6)]]).to(device)
-    
-    pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, threshold=8.0)
-    try:
-        mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
-    except ValueError:
-        errors.append(code)
-        continue
-    
-    pro = geo_data.Data(x=torch.Tensor(pro_feat),
-                        edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
-                        y=None).to(device)
-    lig = geo_data.Data(x=torch.Tensor(mol_feat),
-                        edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
-                        y=None).to(device)
-    
-    optimizer.zero_grad()
-    output = model(lig, pro)
-    loss = criterion(output, label)
-    loss.backward()
-    optimizer.step()
+    train_set = pdb_train
+
+    model.train()
+    errors = []
+    RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
+    for code in tqdm(train_set, 'training'):
+        cmap = np.load(cmap_p(code))
+        pro_seq = df_seq.loc[code]['seq']
+        lig_seq = df_x.loc[code]['SMILE']
+        label = torch.Tensor([[-np.log(df_y.loc[code]['affinity'] * 1e-6)]]).to(device)
         
-    # Update tqdm description with the current loss value
-    # tqdm.set_postfix(Loss=loss.item())
+        pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, threshold=8.0)
+        try:
+            mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
+        except ValueError:
+            errors.append(code)
+            continue
+        
+        pro = geo_data.Data(x=torch.Tensor(pro_feat),
+                            edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+                            y=None).to(device)
+        lig = geo_data.Data(x=torch.Tensor(mol_feat),
+                            edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+                            y=None).to(device)
+        
+        optimizer.zero_grad()
+        output = model(lig, pro)
+        loss = criterion(output, label)
+        loss.backward()
+        optimizer.step()
+            
+        # Update tqdm description with the current loss value
+        # tqdm.set_postfix(Loss=loss.item())
 
-# enable rdkit warnings
-RDLogger.EnableLog('rdApp.*')
-print(f'Final MSE loss: {loss}')
-print(f'{len(errors)} errors out of {len(train_set)}')
+    # enable rdkit warnings
+    RDLogger.EnableLog('rdApp.*')
+    print(f'Final MSE loss: {loss}')
+    print(f'{len(errors)} errors out of {len(train_set)}')
 
-# saving model as checkpoint
-if SAVE_RESULTS:
-    torch.save(model.state_dict(), save_mdl_path)
-    print(f'Model saved to: {save_mdl_path}')
+    # saving model as checkpoint
+    if SAVE_RESULTS:
+        torch.save(model.state_dict(), save_mdl_path)
+        print(f'Model saved to: {save_mdl_path}')
 
 #%% Testing
 test_set = pdb_test if SET == "test" else df_x.index
@@ -148,9 +151,29 @@ print(f'{len(errors)} errors out of {len(test_set)}')
 assert len(actual) == len(pred), 'actual and pred are not the same length'
 # enable rdkit warnings
 RDLogger.EnableLog('rdApp.*')
+log_y, log_z = np.array(actual), np.array(pred)
+
+# %%
+plt.hist(log_y, bins=10, alpha=0.5)
+plt.hist(log_z, bins=10, alpha=0.5)
+plt.legend(['Experimental', MODEL_KEY])
+plt.title(f'Histogram of affinity values (pkd)')
+if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_his.png')
+plt.show()
+
+# scatter plot of affinity values
+# fitting a line
+m, b = np.polyfit(log_y, log_z, 1)
+plt.scatter(log_y, log_z, alpha=0.5)
+plt.plot(log_y, m*log_y + b, color='black', alpha=0.8)
+plt.xlabel('Experimental affinity value')
+plt.ylabel(f'{MODEL_KEY} prediction')
+plt.title(f'Scatter plot of affinity values (pkd)')
+
+if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_scatter.png')
+plt.show()
 
 # %% Stats
-log_y, log_z = np.array(actual), np.array(pred)
 # calc concordance index 
 c_index = concordance_index(log_y, log_z)
 print(f"Concordance index: {c_index:.3f}")
@@ -185,26 +208,4 @@ if SAVE_RESULTS:
     stats = pd.read_csv(csv_file, index_col=0)
     stats.loc[MODEL_KEY] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
     stats.to_csv(csv_file)
-
-# %%
-plt.hist(log_y, bins=10, alpha=0.5)
-plt.hist(log_z, bins=10, alpha=0.5)
-plt.legend(['Experimental', MODEL_KEY])
-plt.title(f'Histogram of affinity values (pkd)')
-if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_his.png')
-plt.show()
-
-# scatter plot of affinity values
-# fitting a line
-m, b = np.polyfit(log_y, log_z, 1)
-plt.scatter(log_y, log_z, alpha=0.5)
-plt.plot(log_y, m*log_y + b, color='black', alpha=0.8)
-plt.xlabel('Experimental affinity value')
-plt.ylabel(f'{MODEL_KEY} prediction')
-plt.title(f'Scatter plot of affinity values (pkd)')
-
-if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_scatter.png')
-plt.show()
-
-# %%
-
+#%%
