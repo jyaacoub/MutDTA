@@ -22,24 +22,9 @@ from src.models.helpers.feature_extraction import smile_to_graph, target_to_grap
 from src.models.helpers.dataset_creation import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
-DATA = 'kiba'
-# codes with MSA available (uniprot = P24941)
-#           1b38
-#           1e1v
-#           1e1x
-#           1jsv
-#           1pxn
-#           1pxo
-#           1pxp
-#           2exm
-#           2fvd
-#           2xmy
-#           2xnb
-#           5jq5
-#           6guh
-#           6guk
-#           6q4g
-#           6q4e
+DATA = 'davis'
+SET = 'test'
+key = f'pretrained_{DATA}_{SET}'
 
 #%%
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -65,15 +50,22 @@ cmap_p = lambda c: f'{PDBBIND_STRC}/{c}/{c}_contact_CB_lone.npy'
 #%% randomly splitting data into train, val, test
 np.random.seed(0)
 pdb_train, pdb_val, pdb_test = np.split(df_x.index, [int(.6*len(df_x)), int(.8*len(df_x))])
-#TODO: finish this
 
-#%%
+
+#%% training:
+#TODO: finish this
+# training:
+
+
+
+#%% Testing
+test_set = pdb_test if SET == "test" else df_x.index
 actual = []
 pred = []
 model.eval()
 errors = []
 RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
-for code in tqdm(df_x.index): #TODO: batch the data for faster inference using GPU
+for code in tqdm(test_set): #TODO: batch the data for faster inference using GPU
     cmap = np.load(cmap_p(code))
     pro_seq = df_seq.loc[code]['seq']
     lig_seq = df_x.loc[code]['SMILE']
@@ -102,7 +94,7 @@ for code in tqdm(df_x.index): #TODO: batch the data for faster inference using G
     pred.append(p.item())
     actual.append(label)
     
-print(f'{len(errors)} errors out of {len(df_x)}')
+print(f'{len(errors)} errors out of {len(test_set)}')
 assert len(actual) == len(pred), 'actual and pred are not the same length'
 # enable rdkit warnings
 RDLogger.EnableLog('rdApp.*')
@@ -134,7 +126,6 @@ print(f"RMSE: {rmse:.3f}")
 #%% saving to csv file
 save_path = 'results/model_media/'
 csv_file = f'{save_path}/DGraphDTA_stats.csv'
-key = f'pre-trained_{DATA}_kd_ki'
 
 # creating stats csv if it doesnt exist
 if not os.path.exists(f'{save_path}/DGraphDTA_stats.csv'): 
