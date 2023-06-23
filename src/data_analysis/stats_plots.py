@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 import pandas as pd
 import numpy as np
+import random
 
 #%% cindex:
 def concordance_index(y_true, y_pred):
@@ -43,6 +44,14 @@ with open('data/PDBbind/2012_core_data.lst', 'r') as f:
 
 core_2012_filter = pd.DataFrame(core_2012_filter, columns=['PDBCode'])
 filter =pd.read_csv('results/PDBbind/vina_out/run9.csv')['PDBCode'] #core_2012_filter['PDBCode']
+
+
+np.random.seed(0)
+random.seed(0)
+df_x = pd.read_csv('data/PDBbind/kd_ki/X.csv') 
+pdbcodes = np.array(df_x['PDBCode'])
+random.shuffle(pdbcodes)
+_, filter = np.split(df_x['PDBCode'], [int(.8*len(df_x))])
 
 # print missing from filter
 # print(len(set(core_2012_filter['PDBCode']) - set(filter)), 'missing from filter')
@@ -108,7 +117,7 @@ for run_num in [8,9]:
     plt.hist(log_z, bins=10, alpha=0.5)
     plt.legend(['Experimental', 'Vina'])
     plt.title(f'run{run_num} - Histogram of affinity values (-log(Kd))')
-    plt.savefig(f'{save_path}/vina_{run_num}_hist.png')
+    if save: plt.savefig(f'{save_path}/vina_{run_num}_hist.png')
     plt.show()
 
     # scatter plot of affinity values
@@ -120,6 +129,6 @@ for run_num in [8,9]:
     plt.ylabel('Vina prediction')
     plt.title(f'run{run_num} - Scatter plot of affinity values (-log(Kd))')
 
-    plt.savefig(f'{save_path}/vina_{run_num}_scatter.png')
+    if save: plt.savefig(f'{save_path}/vina_{run_num}_scatter.png')
     plt.show()
 # %%
