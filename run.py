@@ -54,7 +54,7 @@ model_file_name = f'results/model_checkpoints/prior_work/DGraphDTA_{DATA}_t2.mod
 model.load_state_dict(torch.load(model_file_name, map_location=device))
 
 #%% randomly splitting data into train, val, test
-pdbcodes = df_x.index
+pdbcodes = np.array(df_x.index)
 random.shuffle(pdbcodes)
 pdb_train, pdb_test = np.split(df_x.index, [int(.8*len(df_x))])
 
