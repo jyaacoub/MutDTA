@@ -35,26 +35,24 @@ if os.path.basename(os.getcwd()) == 'data_analysis':
     import os; os.chdir('../../') # for if running from src/data_analysis/
 print(os.getcwd())
 
-core_2012_filter = []
-with open('data/PDBbind/2012_core_data.lst', 'r') as f:
-    for line in f.readlines():
-        if '#' == line[0]: continue
-        code = line[:4]
-        core_2012_filter.append(code)
+# CASF-2012 core dataset
+# core_2012_filter = []
+# with open('data/PDBbind/2012_core_data.lst', 'r') as f:
+#     for line in f.readlines():
+#         if '#' == line[0]: continue
+#         code = line[:4]
+#         core_2012_filter.append(code)
+# core_2012_filter = pd.DataFrame(core_2012_filter, columns=['PDBCode'])
 
-core_2012_filter = pd.DataFrame(core_2012_filter, columns=['PDBCode'])
-filter =pd.read_csv('results/PDBbind/vina_out/run9.csv')['PDBCode'] #core_2012_filter['PDBCode']
+# filter = pd.read_csv('results/PDBbind/vina_out/run9.csv')['PDBCode'] #core_2012_filter['PDBCode']
 
-
+# Filter out for test split only
 np.random.seed(0)
 random.seed(0)
 df_x = pd.read_csv('data/PDBbind/kd_ki/X.csv') 
 pdbcodes = np.array(df_x['PDBCode'])
 random.shuffle(pdbcodes)
 _, filter = np.split(df_x['PDBCode'], [int(.8*len(df_x))])
-
-# print missing from filter
-# print(len(set(core_2012_filter['PDBCode']) - set(filter)), 'missing from filter')
 
 # %%
 save = False
@@ -75,8 +73,8 @@ for run_num in [8,9]:
     mrgd = actual.merge(vina_pred, on='PDBCode')
     y = mrgd['affinity'].values
     z = mrgd['vina_kd(uM)'].values
-    log_y = -np.log(y)
-    log_z = -np.log(z)
+    log_y = -np.log(y*1e-6)
+    log_z = -np.log(z*1e-6)
 
     ##%% Statistics
     # calc concordance index 

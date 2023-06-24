@@ -11,12 +11,10 @@ import random
 
 from rdkit import Chem
 
-import matplotlib.pyplot as plt
-from scipy.stats import pearsonr, spearmanr
-from lifelines.utils import concordance_index
 from tqdm import tqdm
 from rdkit import RDLogger
 
+from src.data_analysis import get_metrics
 from src.models.prior_work import DGraphDTA
 from src.models.helpers.contact_map import get_contact, get_sequence, create_save_cmaps
 from src.models.helpers.feature_extraction import smile_to_graph, target_to_graph
@@ -153,61 +151,11 @@ print(f'{len(errors)} errors out of {len(test_set)}')
 assert len(actual) == len(pred), 'actual and pred are not the same length'
 # enable rdkit warnings
 RDLogger.EnableLog('rdApp.*')
-log_y, log_z = np.array(actual), np.array(pred)
 
-# %%
-plt.hist(log_y, bins=10, alpha=0.5)
-plt.hist(log_z, bins=10, alpha=0.5)
-plt.legend(['Experimental', MODEL_KEY])
-plt.title(f'Histogram of affinity values (pkd)')
-if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_his.png')
-plt.show()
-
-# scatter plot of affinity values
-# fitting a line
-m, b = np.polyfit(log_y, log_z, 1)
-plt.scatter(log_y, log_z, alpha=0.5)
-plt.plot(log_y, m*log_y + b, color='black', alpha=0.8)
-plt.xlabel('Experimental affinity value')
-plt.ylabel(f'{MODEL_KEY} prediction')
-plt.title(f'Scatter plot of affinity values (pkd)')
-
-if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_scatter.png')
-plt.show()
-
-# %% Stats
-# calc concordance index 
-c_index = concordance_index(log_y, log_z)
-print(f"Concordance index: {c_index:.3f}")
-
-# pearson correlation
-p_corr = pearsonr(log_y, log_z)
-print(f"Pearson correlation: {p_corr[0]:.3f}")
-print(f"Pearson p-value: {p_corr[1]:.3f}")
-
-# spearman correlation
-s_corr = spearmanr(log_y, log_z)
-print(f"Spearman correlation: {s_corr[0]:.3f}")
-print(f"Spearman p-value: {s_corr[1]:.3f}")
-
-# error
-mse = np.mean((log_y-log_z)**2)
-mae = np.mean(np.abs(log_y-log_z))
-rmse = np.sqrt(mse)
-print(f"MSE: {mse:.3f}")
-print(f"MAE: {mae:.3f}")
-print(f"RMSE: {rmse:.3f}")
-
-#%% saving to csv file
-# creating stats csv if it doesnt exist
-if not os.path.exists(f'{media_save_p}/DGraphDTA_stats.csv'): 
-    stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-    stats.set_index('run', inplace=True)
-    stats.to_csv(csv_file)
-
-#%% replacing existing record if run_num already exists
-if SAVE_RESULTS:
-    stats = pd.read_csv(csv_file, index_col=0)
-    stats.loc[MODEL_KEY] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
-    stats.to_csv(csv_file)
 #%%
+get_metrics(np.array(actual), np.array(pred),
+            save_results=False,
+            save_path=media_save_p,
+            model_key=MODEL_KEY,
+            csv_file=csv_file
+            )
