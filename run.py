@@ -9,6 +9,10 @@ from scipy.stats import pearsonr, spearmanr
 from lifelines.utils import concordance_index
 
 from src.data_analysis import get_metrics
+#%%
+# res_file = '/home/jyaacoub/projects/data/refined-set/index/INDEX_refined_set.2020'
+# with open(res_file)
+
 
 #%% plot bar graph of results by row
 # cols are: run,cindex,pearson,spearman,mse,mae,rmse
@@ -53,8 +57,9 @@ df_seq = mrgd.merge(df_seq, on='PDBCode')
 df_seq.sort_values(by='seq_len', inplace=True)
 
 #%%
-num_bins=15
+num_bins=10
 bin_size = int(len(df_seq)/num_bins)
+print(f'bin size: {bin_size}')
 bins = {} # dic of pd dfs and avg seq len
 for i in range(num_bins):
     df_seq_bin = df_seq.iloc[i*bin_size:(i+1)*bin_size]
@@ -63,11 +68,23 @@ for i in range(num_bins):
     
 
 # %% 
+metrics = []
 for i in range(num_bins):
-    len = bins[i][0]
     df_b = bins[i][1]
     pkd_y, pkd_z = df_b['actual_pkd'].to_numpy(), df_b['vina_pkd'].to_numpy()
-    print(f'\nBin {i}, {len}')
-    get_metrics(pkd_y, pkd_z, save_results=False, show=False)
+    print(f'\nBin {i}, size: {len(df_b)}, seq len: {bins[i][0]}')
+    metrics.append(get_metrics(pkd_y, pkd_z, save_results=False, show=False))
+print("sample metrics:", *metrics[0])
+# %%
+options = ['c_index', 'p_corr', 's_corr', 'mse', 'mae', 'rmse']
+choice = 0
+# cindex scatter by seq len
+seq_len = [str(v[0]) for v in bins.values()]
+cindex = [m[5] for m in metrics]
+plt.scatter(seq_len, cindex)
+plt.xlabel('sequence length')
+plt.ylabel('cindex')
+plt.title('Vina cindex vs sequence length')
+
 
 # %%
