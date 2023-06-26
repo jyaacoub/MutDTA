@@ -250,6 +250,8 @@ Starting from a PDBbind directory format with protein pdb and ligand sdf files.
 ## 1.A Prepare PDBQT and conf files
 Run the following script `src/docking/sbatch/prepare.sh`. This will also prepare configuration files in the same place for vina to run off of.
 
+>make sure to create `vina_conf/run?` directory if using seperate path for config files.
+
 ## 1.B Prepare just conf files
 Assuming we have PDBQT files prepared we can just create conf files by running `src/docking/sbatch/prepare_conf_only.sh`.
 ```
