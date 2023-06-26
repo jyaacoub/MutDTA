@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 180
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/9/%x-%A_%a.out #NOTE: change prep#
-#SBATCH --job-name=conf_prep9 #NOTE: change prep#
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/10/%x-%A_%a.out #NOTE: change prep#
+#SBATCH --job-name=conf_prep10 #NOTE: change prep#
 
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
@@ -12,7 +12,7 @@
 
 #SBATCH --array=0-20 #NOTE: N total processes
 
-prep_num=9 #NOTE: change prep#
+prep_num=10 #NOTE: change prep#
 
 # adding needed libraries to path:
 

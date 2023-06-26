@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH -t 4-00:00:00 #days-hours:minutes:seconds
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run9/%x-%A_%a.out #NOTE: change run#
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run10/%x-%A_%a.out #NOTE: change run#
 
-#SBATCH --job-name=r9_vina_dock #NOTE: change run#
+#SBATCH --job-name=r10_vina_dock #NOTE: change run#
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
@@ -16,7 +16,7 @@
 
 # Docking and tools
 export PATH=/cluster/home/t122995uhn/lib/AutoDock_Vina/bin/:$PATH
-run_num=9 #NOTE: change run#
+run_num=10 #NOTE: change run#
 echo which vina:     "$(which vina)"
 echo "run_num: $run_num"
 
@@ -26,7 +26,7 @@ echo "run_num: $run_num"
 #         shortlist (optional) - path to csv file containing a list of pdbcodes to process.
 #                    Doesnt matter what the file is as long as the first column contains the pdbcodes.
 # 
-#NOTE: To test vina: run vina --config "$conf" --out "${dir}/${code}_vina_out.pdbqt" --log "${dir}/${code}_vina_log.txt" --seed 904455071
+#NOTe: To test vina: run vina --config "$conf" --out "${dir}/${code}_vina_out.pdbqt" --log "${dir}/${code}_vina_log.txt" --seed 904455071
 # e.g.: vina --config /cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_conf.txt --seed 904455071
 # shortlist file is different for each job in the array
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${run_num}/"

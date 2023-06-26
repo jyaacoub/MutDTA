@@ -67,3 +67,14 @@ out = /cluster/projects/kumargroup/jean/data/vina_out/run9
 log = /cluster/projects/kumargroup/jean/data/vina_out/run9
 ```
 retrying run8 conf with ex=50
+
+## run10
+Increased search space by +30 for binding pocket
+```conf
+energy_range = 20
+exhaustiveness = 50
+num_modes = 10
+out = /cluster/projects/kumargroup/jean/data/vina_out/run9
+log = /cluster/projects/kumargroup/jean/data/vina_out/run9
+```
+increased energy range and search space.

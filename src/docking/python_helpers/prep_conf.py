@@ -101,9 +101,9 @@ if __name__ == '__main__':
         conf["center_x"] = (pocket_df["x"].max() + pocket_df["x"].min()) / 2
         conf["center_y"] = (pocket_df["y"].max() + pocket_df["y"].min()) / 2
         conf["center_z"] = (pocket_df["z"].max() + pocket_df["z"].min()) / 2
-        conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() + 10
-        conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() + 10
-        conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() + 10   
+        conf["size_x"] = pocket_df["x"].max() - pocket_df["x"].min() + 30
+        conf["size_y"] = pocket_df["y"].max() - pocket_df["y"].min() + 30
+        conf["size_z"] = pocket_df["z"].max() - pocket_df["z"].min() + 30   
         
 
     # saving config file in same path as receptor

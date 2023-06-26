@@ -177,6 +177,7 @@ data/structures/
 data/
 
 results/PDBbind/vina_out/run?/*
+results/PDBbind/vina_out/run??/*
 
 
 ### MGL TOOLS ###
