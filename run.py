@@ -10,28 +10,8 @@ from lifelines.utils import concordance_index
 
 from src.data_analysis import get_metrics
 #%%
-# res_file = '/home/jyaacoub/projects/data/refined-set/index/INDEX_refined_set.2020'
-# with open(res_file)
 
-
-#%% plot bar graph of results by row
-# cols are: run,cindex,pearson,spearman,mse,mae,rmse
-# df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv')[2:]
-# df_res.sort_values(by='run', inplace=True)
-
-# df_res.loc[-1] = ['vina', 0.68,0.508,0.520,17.812,3.427,4.220]
-
-# for col in df_res.columns[1:]:
-#     plt.figure()
-#     bars = plt.bar(df_res['run'],df_res[col])
-#     bars[0].set_color('green')
-#     bars[2].set_color('green')
-#     bars[-1].set_color('red')
-#     plt.title(col)
-#     plt.xlabel('run')
-#     plt.xticks(rotation=30)
-#     # plt.ylim((0.2, 0.8))
-#     plt.show()
+#%%
 run_num=9
 y_path = 'data/PDBbind/kd_ki/Y.csv'
 vina_out = f'results/PDBbind/vina_out/run{run_num}.csv'
@@ -49,42 +29,52 @@ actual.drop('affinity', axis=1, inplace=True)
 mrgd = actual.merge(vina_pred, on='PDBCode')
 
 #%% 
-df_seq = pd.read_csv('data/PDBbind/kd_ki/pdb_seq.csv')
-df_seq['seq_len'] = df_seq['seq'].str.len()
-df_seq.drop('seq', axis=1, inplace=True)
-df_seq = mrgd.merge(df_seq, on='PDBCode')
+res_file = '/home/jyaacoub/projects/data/refined-set/index/INDEX_refined_set.2020'
+with open(res_file, 'r') as f:
+    lines = f.readlines()
+    print(len(lines))
+    res_dict = {}
+    for l in lines:
+        if l[0] == '#': continue
+        code = l[0:5].strip()
+        res = float(l[5:10])
+        res_dict[code] = res
 
-df_seq.sort_values(by='seq_len', inplace=True)
+df_res = pd.DataFrame.from_dict(res_dict, orient='index', columns=['res'])
+df_res.index.name = 'PDBCode'
+df_res = mrgd.merge(df_res, on='PDBCode')
+
+df_res.sort_values(by='res', inplace=True)
 
 #%%
 num_bins=10
-bin_size = int(len(df_seq)/num_bins)
+bin_size = int(len(df_res)/num_bins)
 print(f'bin size: {bin_size}')
-bins = {} # dic of pd dfs and avg seq len
+bins = {} # dic of pd dfs and avg res
 for i in range(num_bins):
-    df_seq_bin = df_seq.iloc[i*bin_size:(i+1)*bin_size]
-    avg_len = int(df_seq_bin['seq_len'].mean())
-    bins[i] = (avg_len, df_seq_bin)
-    
+    df_res_bin = df_res.iloc[i*bin_size:(i+1)*bin_size]
+    avg_len = int(df_res_bin['res'].mean()*100)/100
+    bins[i] = (avg_len, df_res_bin)
 
 # %% 
 metrics = []
 for i in range(num_bins):
     df_b = bins[i][1]
     pkd_y, pkd_z = df_b['actual_pkd'].to_numpy(), df_b['vina_pkd'].to_numpy()
-    print(f'\nBin {i}, size: {len(df_b)}, seq len: {bins[i][0]}')
+    print(f'\nBin {i}, size: {len(df_b)}, res: {bins[i][0]}')
     metrics.append(get_metrics(pkd_y, pkd_z, save_results=False, show=False))
 print("sample metrics:", *metrics[0])
+
 # %%
 options = ['c_index', 'p_corr', 's_corr', 'mse', 'mae', 'rmse']
 choice = 0
-# cindex scatter by seq len
-seq_len = [str(v[0]) for v in bins.values()]
-cindex = [m[5] for m in metrics]
-plt.scatter(seq_len, cindex)
-plt.xlabel('sequence length')
-plt.ylabel('cindex')
-plt.title('Vina cindex vs sequence length')
-
+# cindex scatter by res
+bin_res = [str(v[0]) for v in bins.values()]
+cindex = [m[0] for m in metrics]
+plt.bar(bin_res, cindex)
+plt.ylim((0.5,0.9))
+plt.xlabel('Resolution (A)')
+plt.ylabel('C-index')
+plt.title('Vina cindex vs resolution')
 
 # %%
