@@ -48,6 +48,7 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False,
             if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
                 ter += 1
                 chains[ter] = OrderedDict()
+                curr_res, prev_res = None, None
             
             if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
             
