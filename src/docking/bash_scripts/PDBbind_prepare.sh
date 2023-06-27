@@ -203,7 +203,8 @@ for dir in $dirs; do
   if [[ ! -f "$protein" || ! -f "$ligand" || ! -f "$pocket" ]]; then
     echo "Error: One or more prep files not found for $code"
     ((errors++))
-    exit 1
+    #exit 1
+    continue
   fi
 
   python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out

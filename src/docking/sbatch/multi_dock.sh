@@ -1,15 +1,15 @@
 #!/bin/bash
-#SBATCH -t 4-00:00:00 #days-hours:minutes:seconds
+#SBATCH -t 1-00:00:00 #days-hours:minutes:seconds
 #SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run10/%x-%A_%a.out #NOTE: change run#
 
 #SBATCH --job-name=r10_vina_dock #NOTE: change run#
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
+##SBATCH --mail-type=ALL
+##SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
 #SBATCH --mem=4G
 #SBATCH --cpus-per-task=2
 
-#SBATCH --array=0-20 #NOTE: N total processes
+#SBATCH --array=0,2,4,6,8,10,12,14 #NOTE: N total processes
 # takes ~1.5 days on 5 process nodes with 3,000 pdbs
 
 # adding needed libraries to path:
@@ -30,7 +30,7 @@ echo "run_num: $run_num"
 # e.g.: vina --config /cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_conf.txt --seed 904455071
 # shortlist file is different for each job in the array
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${run_num}/"
-shortlist=/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv
+shortlist=/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}_r_50.csv
 
 echo "shortlist: $shortlist"
 echo "conf_dir: $conf_dir"
