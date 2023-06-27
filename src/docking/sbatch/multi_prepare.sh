@@ -47,4 +47,8 @@ template="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}.conf"
 shortlist="/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv "
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}"
 
+if [ ! -d $conf_dir ]; then
+  mkdir $conf_dir
+fi
+
 $prepsh $PDBbind $ADT $template -sl $shortlist -cd $conf_dir
