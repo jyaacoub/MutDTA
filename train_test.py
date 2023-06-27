@@ -16,9 +16,9 @@ from rdkit import RDLogger
 
 from src.data_analysis import get_metrics
 from src.models.prior_work import DGraphDTA
-from src.models.helpers.contact_map import get_contact, get_sequence, create_save_cmaps
-from src.models.helpers.feature_extraction import smile_to_graph, target_to_graph
-from src.models.helpers.dataset_creation import create_dataset_for_test, collate
+from data_processing.contact_map import get_contact, get_sequence, create_save_cmaps
+from data_processing.feature_extraction import smile_to_graph, target_to_graph
+from data_processing.dataset_creation import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
 DATA = 'davis'

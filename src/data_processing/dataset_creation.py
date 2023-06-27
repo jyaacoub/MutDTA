@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from torch_geometric import data as geo_data
 
-from src.models.helpers.feature_extraction import smile_to_graph, target_to_graph
+from data_processing.feature_extraction import smile_to_graph, target_to_graph
 
 
 def create_dataset_for_test(df_x: pd.DataFrame,

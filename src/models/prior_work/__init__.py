@@ -19,26 +19,6 @@ def display_models():
         
         cp = torch.load(model_file_name, map_location=device) # loading checkpoint
         model.load_state_dict(cp)
-        # %% Print model summary
-        prot = geo_data.Data(x=torch.Tensor(54,54), # node feature matrix
-                            edge_index=torch.LongTensor([[0,1]]).transpose(1, 0),
-                            y=torch.FloatTensor([1])).to(device)
-        lig = geo_data.Data(x=torch.Tensor(78,78), # node feature matrix
-                            edge_index=torch.LongTensor([[0,1]]).transpose(1, 0),
-                            y=torch.FloatTensor([1])).to(device)
-        model_summary = summary(model, lig, prot)
-
-        # model size
-        param_size = 0
-        for param in model.parameters():
-            param_size += param.nelement() * param.element_size()
-        buffer_size = 0
-        for buffer in model.buffers():
-            buffer_size += buffer.nelement() * buffer.element_size()
-
-        size_all_mb = (param_size + buffer_size) / 1024**2
-
-        # %%
-        print(f'Model: {model_file_name}')
-        print(model_summary)
-        print('model size: {:.3f}MB'.format(size_all_mb))
+        
+        print(model)
+        

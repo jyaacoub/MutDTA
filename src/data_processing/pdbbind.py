@@ -30,7 +30,7 @@ class PDBbindProcessor(Processor):
                             'UniProt AC': 'protID', 
                             'Canonical SMILES': 'SMILE'}, inplace=True)
         
-        df.to_csv(''.join(xlsx_path.split('.')[:-1])+'.csv')
+        df.to_csv(''.join(xlsx_path.split('.')[:-1]) + '.csv')
     
     @staticmethod
     def prep_data_for_mdl(data_path='data/'):
