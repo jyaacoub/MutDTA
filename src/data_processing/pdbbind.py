@@ -49,7 +49,8 @@ class PDBbindProcessor(Processor):
         """
         raise NotImplementedError
         
-    def prep_save_data(self, csv_path='data/PDBbind/raw/P-L_refined_set_all.csv', 
+    @staticmethod
+    def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv', 
                         prot_seq_csv='data/prot_seq.csv', 
                         save_path='data/PDBbind/kd_only', Kd_only=True) -> Tuple[pd.DataFrame]:
         """
@@ -92,9 +93,9 @@ class PDBbindProcessor(Processor):
 
         # getting protein sequences and saving them 
         if not os.path.exists(prot_seq_csv):
-            seq = self.get_prot_seq(df['protID'])
+            seq = PDBbindProcessor.get_prot_seq(df['protID'])
             # default save path in 'data/prot_seq.csv'
-            self.save_prot_seq(seq, save_path=prot_seq_csv)
+            PDBbindProcessor.save_prot_seq(seq, save_path=prot_seq_csv)
             seq = pd.Series(seq, name='prot_seq')
             seq.index.name = 'protID'
             seq = pd.DataFrame(seq)
