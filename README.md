@@ -11,8 +11,11 @@ Improving the precision oncology pipeline by providing binding affinity purtubat
   - [x] Set up Docking on cluster
   - [x] Build scripts to automate ligand and protein prep (including grid for binding site).
   - [x] Run docking on PDBbind dataset
-- [ ] Model training
-- [ ] Model evaluation
+- [ ] Model baseline
+  - [ ] DGraphDTA
+       - [x] Evaluate pretrained model on PDBbind dataset
+       - [x] Train model on *refined-set* PDBbind dataset and evaluate
+       - [ ] Train model on *general* PDBbind dataset and evaluate
 
 # AutoDock Vina Procedure
 See [README/VINA_PROCEDURE.md](./README/VINA_PROCEDURE.MD) for detailed steps
