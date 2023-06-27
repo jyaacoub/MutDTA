@@ -18,5 +18,5 @@ Improving the precision oncology pipeline by providing binding affinity purtubat
        - [ ] Train model on *general* PDBbind dataset and evaluate
 
 # AutoDock Vina Procedure
-See [README/VINA_PROCEDURE.md](./README/VINA_PROCEDURE.MD) for detailed steps
+See [README/VINA_PROCEDURE.md](./docs/VINA_PROCEDURE.MD) for detailed steps
 
