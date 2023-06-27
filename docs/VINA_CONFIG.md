@@ -1,3 +1,6 @@
+# Vina Run Configurations
+This is to keep track of the different runs of vina I have tried. See [vina_out](/results/PDBbind/vina_out/) directory for output files.
+
 ## run1
 first run of vina, due to errors in prep only 3015 PDBs were run out of 4650. No random seed defined.
 ```conf
