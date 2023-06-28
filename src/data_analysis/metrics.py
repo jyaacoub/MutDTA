@@ -1,3 +1,8 @@
+"""
+This file contains functions for evaluating docking and affinity prediction model results. 
+"""
+
+
 import os
 from typing import Tuple
 from numbers import Number

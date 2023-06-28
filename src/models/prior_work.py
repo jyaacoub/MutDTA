@@ -11,27 +11,7 @@ from torch_geometric.utils import dropout_adj
 from torch_geometric.nn import summary
 from torch_geometric import data as geo_data
 
-
-class BaseModel(nn.Module):
-    """
-    Base model for printing summary
-    """
-    def __str__(self) -> str:
-        main_str = super().__str__()
-        # model size
-        param_size = 0
-        for param in self.parameters():
-            param_size += param.nelement() * param.element_size()
-        buffer_size = 0
-        for buffer in self.buffers():
-            buffer_size += buffer.nelement() * buffer.element_size()
-
-        size_all_mb = (param_size + buffer_size) / 1024**2
-
-
-        main_str += f'\nmodel size: {size_all_mb:.3f}MB'
-        return main_str
-
+from src.models.general import BaseModel
 
 ################ DGraphDTA: ################
 class DGraphDTA(BaseModel):
@@ -154,6 +134,11 @@ class DGraphDTA(BaseModel):
 ############ GraphDTA ############
 # GCN based model
 class GraphDTA(BaseModel):
+    """
+    Added a graph representation of the ligands to the DeepDTA model (still uses 1d conv for protein)
+        See: https://github.com/thinng/GraphDTA
+        paper: https://doi.org/10.1093/bioinformatics/btaa921
+    """
     def __init__(self, n_output=1, n_filters=32, embed_dim=128,num_features_xd=78, num_features_xt=25, output_dim=128, dropout=0.2):
         super(GraphDTA, self).__init__()
 

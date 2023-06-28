@@ -1,4 +1,5 @@
-from src.models.prior_work.models import DGraphDTA
+from src.models.prior_work import DGraphDTA, GraphDTA
+from src.models.mut_dta import MutDTA
 
 
 def display_models():

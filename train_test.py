@@ -15,7 +15,7 @@ from tqdm import tqdm
 from rdkit import RDLogger
 
 from src.data_analysis import get_metrics
-from src.models.prior_work import DGraphDTA
+from models import DGraphDTA
 
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.protein import get_contact, get_sequence, create_save_cmaps
