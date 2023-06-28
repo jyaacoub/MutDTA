@@ -16,16 +16,18 @@ from rdkit import RDLogger
 
 from src.data_analysis import get_metrics
 from src.models.prior_work import DGraphDTA
-from data_processing.contact_map import get_contact, get_sequence, create_save_cmaps
-from data_processing.feature_extraction import smile_to_graph, target_to_graph
-from data_processing.dataset_creation import create_dataset_for_test, collate
+
+from src.feature_extraction import smile_to_graph, target_to_graph
+from src.feature_extraction.protein import get_contact, get_sequence, create_save_cmaps
+
+from src.data_processing.dataset_creation import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
 DATA = 'davis'
 SET = 'test'
 TRAIN = False
 MODEL_KEY = f'trained_{DATA}_{SET}' if TRAIN else f'pretrained_{DATA}_{SET}'
-SAVE_RESULTS = True
+SAVE_RESULTS = False
 
 save_mdl_path = f'results/model_checkpoints/ours/{MODEL_KEY}.mdl'
 np.random.seed(0)
@@ -154,8 +156,9 @@ RDLogger.EnableLog('rdApp.*')
 
 #%%
 get_metrics(np.array(actual), np.array(pred),
-            save_results=False,
+            save_results=SAVE_RESULTS,
             save_path=media_save_p,
             model_key=MODEL_KEY,
             csv_file=csv_file
             )
+# %%
