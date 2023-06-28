@@ -1,6 +1,6 @@
 from typing import Any, Mapping
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
 
 from torch_geometric.nn import (GCNConv, GATConv, 
@@ -16,15 +16,14 @@ class BaseModel(nn.Module):
     """
     Base model for printing summary
     """
-    
     def __str__(self) -> str:
         main_str = super().__str__()
         # model size
         param_size = 0
-        for param in model.parameters():
+        for param in self.parameters():
             param_size += param.nelement() * param.element_size()
         buffer_size = 0
-        for buffer in model.buffers():
+        for buffer in self.buffers():
             buffer_size += buffer.nelement() * buffer.element_size()
 
         size_all_mb = (param_size + buffer_size) / 1024**2
@@ -136,8 +135,8 @@ class DGraphDTA(BaseModel):
     def __str__(self) -> str:
         main_str = super().__str__()
         
-        prot_shape = self.pro_conv1.weight.shape
-        lig_shape = self.mol_conv1.weight.shape
+        prot_shape = (self.pro_conv1.in_channels, self.pro_conv1.out_channels)
+        lig_shape = (self.mol_conv1.in_channels, self.mol_conv1.out_channels)
         device = next(self.parameters()).device
         
         prot = geo_data.Data(x=torch.Tensor(*prot_shape), # node feature matrix
