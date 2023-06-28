@@ -222,7 +222,9 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
-                      cmap_p: Callable[[str], str]):
+                      cmap_p: Callable[[str], str],
+                      CA_only=False,
+                      check_missing=False):
     """
     Given a list of PDBcodes, this will create and save the contact maps for each.
     Example path callable functions:        
@@ -236,8 +238,8 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     """
     for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
         cmap, _ = get_contact(pdb_p(pdbcode), # pdbcode is index
-                        CA_only=False, # CB is needed by DGraphDTA
-                        check_missing=False)
+                        CA_only=CA_only, # CB is needed by DGraphDTA
+                        check_missing=check_missing)
         np.save(cmap_p(pdbcode), cmap)
         
 
