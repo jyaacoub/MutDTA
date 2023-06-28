@@ -1,3 +1,13 @@
+"""
+Processors for downloading and processing data from various sources.
+
+Primary use is for handling data at the high level if you wish to extract features,
+see `src/feature_extraction/` instead.
+
+e.g.: here we might want to use prep_save_data to get the X and Y csv files for training.
+
+"""
+
 from typing import Iterable, List, Tuple
 import requests as r
 import pandas as pd
@@ -129,7 +139,48 @@ class PDBbindProcessor(Processor):
             This method is not yet implemented for this class.
         """
         raise NotImplementedError
+    
+    @staticmethod
+    def get_binding_data(index_file : str) -> pd.DataFrame:
+        """
+        Extracts binding data from given index file and returns it as a dataframe.
+        Sample file header:
         
+            PDB code, resolution, release year, -logKd/Ki, Kd/Ki, reference, ligand name 
+            3zzf  2.20  2012   0.40  Ki=400mM      // 3zzf.pdf (NLG)        
+
+        Parameters
+        ----------
+        `index_file` : str
+            Path to the v2020-other-PL/index/INDEX_general_PL_data.2020 from PDBbind
+
+        Returns
+        -------
+        pd.DataFrame
+            With cols:
+            
+            PDBCode,resolution,release_year,pkd
+        """
+        data = {}
+        with open(index_file, 'r') as f:
+            for line in f.readlines():
+                if line.startswith('#'): continue
+                code = line[:4]
+                try:
+                    res = line[5:10].strip()
+                    res = float(res) if res != 'NMR' else None
+                    year = int(line[11:16])
+                    pkd = float(line[17:23])
+                    data[code] = [res, year, pkd]
+                except ValueError as e:
+                    print(f'Error with line: {line}')
+                    raise e
+        
+        df = pd.DataFrame.from_dict(data, orient='index', columns=['resolution', 'release_year', 'pkd'])
+        df.index.name = 'PDBCode'
+        
+        return df
+    
     @staticmethod
     def prep_save_data(csv_path='data/PDBbind/raw/P-L_refined_set_all.csv', 
                         prot_seq_csv='data/prot_seq.csv', 

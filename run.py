@@ -14,7 +14,16 @@ create_save_cmaps(pdb_codes,
 
 
 
-
+# v2020-other-PL/index/INDEX_general_PL_data.2020  contains all we need for binding data
+# includes pkd values
+# # ==============================================================================
+# # List of protein-ligand complexes with known binding data in PDBbind v.2020
+# # 19443 protein-ligand complexes in total, sorted by binding data
+# # Latest update: July 2021
+# # PDB code, resolution, release year, -logKd/Ki, Kd/Ki, reference, ligand name
+# # ==============================================================================
+# 3zzf  2.20  2012   0.40  Ki=400mM      // 3zzf.pdf (NLG)
+# 3gww  2.46  2009   0.45  IC50=355mM    // 3gwu.pdf (SFX)
 
 
 
@@ -53,7 +62,7 @@ create_save_cmaps(pdb_codes,
 
 
 # def extract_ligands(pdb_code, file):
-#     """ Extraction of the heteroatoms of .pdb files """
+#     """ Extraction of the heteroatoms of .pdb files """ #NOTE: from PDBbind docs (prt3) -> peptides shorter than 20 residues are cosidered to be ligands
 #     pdb = PDBParser().get_structure(pdb_code, file)
 #     io = PDBIO()
 #     io.set_structure(pdb)

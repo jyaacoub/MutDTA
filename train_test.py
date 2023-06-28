@@ -22,7 +22,7 @@ from src.feature_extraction.protein import get_contact, get_sequence, create_sav
 
 from src.data_processing.data_loaders import create_dataset_for_test, collate
 
-PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
+PDBBIND_STRC = '/home/jyaacoub/projects/data/v2020-other-PL'
 DATA = 'davis'
 SET = 'test'
 TRAIN = False
