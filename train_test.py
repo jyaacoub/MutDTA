@@ -20,7 +20,7 @@ from src.models.prior_work import DGraphDTA
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.protein import get_contact, get_sequence, create_save_cmaps
 
-from src.data_processing.dataset_creation import create_dataset_for_test, collate
+from src.data_processing.data_loaders import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/refined-set'
 DATA = 'davis'

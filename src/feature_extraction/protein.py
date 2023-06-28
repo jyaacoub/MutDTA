@@ -55,18 +55,17 @@ def target_to_graph(target_sequence, contact_map, threshold=10.5):
 def target_to_feature(target_seq):
     # aln_dir = 'data/' + dataset + '/aln'
     pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq))) #NOTE: DGraphDTA never uses pssm due to logic error (see: https://github.com/jyaacoub/DGraphDTA/commit/ba06f7ece847ba0c806c6a9034748b62cfd2c09a)
-    other_feature = seq_feature(target_seq)
-    return np.concatenate((np.transpose(pssm, (1, 0)), other_feature), axis=1)
-
-def seq_feature(pro_seq):
-    pro_hot = np.zeros((len(pro_seq), len(ResInfo.amino_acids)))
-    pro_property = np.zeros((len(pro_seq), 12))
-    for i in range(len(pro_seq)):
+    
+    pro_hot = np.zeros((len(target_seq), len(ResInfo.amino_acids)))
+    pro_property = np.zeros((len(target_seq), 12))
+    for i in range(len(target_seq)):
         # if 'X' in pro_seq:
         #     print(pro_seq)
-        pro_hot[i,] = one_hot(pro_seq[i], ResInfo.amino_acids)
-        pro_property[i,] = residue_features(pro_seq[i])
-    return np.concatenate((pro_hot, pro_property), axis=1)
+        pro_hot[i,] = one_hot(target_seq[i], ResInfo.amino_acids)
+        pro_property[i,] = residue_features(target_seq[i])
+    
+    return np.concatenate((np.transpose(pssm, (1, 0)), 
+                           pro_hot, pro_property), axis=1)
 
 def residue_features(residue):
     feats = [residue in ResInfo.aliphatic, residue in ResInfo.aromatic,
