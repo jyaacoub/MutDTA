@@ -1,6 +1,7 @@
 #%%
 import os
 from src.feature_extraction.protein import create_save_cmaps
+from src.data_processing import PDBbindProcessor
 
 pdb_path = '/home/jyaacoub/projects/data/v2020-other-PL'
 
@@ -8,13 +9,13 @@ pdb_codes = os.listdir(pdb_path)
 # filter out readme and index folders
 pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
 #%%
-create_save_cmaps(pdb_codes,
-                  pdb_p=lambda x: f'{pdb_path}/{x}/{x}_protein.pdb',
-                  cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB.npy')
+# create_save_cmaps(pdb_codes,
+#                   pdb_p=lambda x: f'{pdb_path}/{x}/{x}_protein.pdb',
+#                   cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB.npy')
 
 
 
-# v2020-other-PL/index/INDEX_general_PL_data.2020  contains all we need for binding data
+#%% v2020-other-PL/index/INDEX_general_PL_data.2020  contains all we need for binding data
 # includes pkd values
 # # ==============================================================================
 # # List of protein-ligand complexes with known binding data in PDBbind v.2020
@@ -25,7 +26,9 @@ create_save_cmaps(pdb_codes,
 # 3zzf  2.20  2012   0.40  Ki=400mM      // 3zzf.pdf (NLG)
 # 3gww  2.46  2009   0.45  IC50=355mM    // 3gwu.pdf (SFX)
 
-
+index_file = '../data/v2020-other-PL/index/INDEX_general_PL_data.2020'
+df_binding = PDBbindProcessor.get_binding_data(index_file)
+df_binding.to_csv('./data/PDBbind/general_PL_data.csv')
 
 
 
