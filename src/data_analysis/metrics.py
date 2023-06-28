@@ -1,8 +1,7 @@
 """
 This file contains functions for evaluating docking and affinity prediction model results. 
 """
-
-
+#%%
 import os
 from typing import Tuple
 from numbers import Number
@@ -12,6 +11,41 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
+def pdb_wRMSD(pdb_file: str, pred_file: str) -> Number:
+    """
+    "An important extension of the RMSD measure, the weighted RMSD (wRMSD), 
+    allows focusing on selected atomic subsets, for example, downplaying the 
+    regions known to be inherently unstructured."
+        \- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4321859/
+    """
+    raise NotImplementedError
+
+
+def pdb_RMSD(pdb_file: str, pred_file: str) -> Number:
+    """
+    Returns the root mean square deviation (RMSD) between two structures.
+    
+    From (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4321859/) the RMSD of the 
+    lowest-energy structures wrt the experiments are used to measure predictive 
+    performance for docking.
+    
+    The average RMSD of the predicted ligand conformations across all complexes 
+    is used as the final performance metric for the docking task.
+    
+    Parameters
+    ----------
+    `pdb_file` : str
+        The path to the actual experimental structure.
+    `pred_file` : str
+        Path to the predicted structure by docking.
+
+    Returns
+    -------
+    Number
+        The RMSD between the two structures.
+    """
+    raise NotImplementedError 
+#%%
 def concordance_index(y_true, y_pred): #TODO: make this faster
     """
     Calculates the concordance index (CI) between two arrays of affinity values.
@@ -129,7 +163,7 @@ def get_metrics(log_y:np.array, log_z:np.array, save_results=True,
     return c_index, p_corr, s_corr, mse, mae, rmse
 
 
-
+#%%
 if __name__ == '__main__':
     #%% visualizing and analyzing docking results
     import matplotlib.pyplot as plt

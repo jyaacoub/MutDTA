@@ -2,8 +2,28 @@ from typing import Iterable, List
 from tqdm import tqdm
 import os
 import requests as r
+from io import StringIO
 
 class Downloader:
+    @staticmethod
+    def get_file_obj(ID: str, url=lambda x: f'https://files.rcsb.org/download/{x}.pdb') -> StringIO:
+        """
+        Returns a file object for the given ID after downloading it from the given url.
+
+        Parameters
+        ----------
+        `ID` : str
+            The ID of the file to download
+        `url` : _type_, optional
+            The url to download the file, by default lambdax:f'https://files.rcsb.org/download/{x}.pdb'
+
+        Returns
+        -------
+        StringIO
+            The file object.
+        """
+        return StringIO(r.get(url(ID)).text)
+        
     @staticmethod
     def download(IDs: Iterable[str], 
                  save_path=lambda x:'./data/structures/ligands/{x}.sdf', 
