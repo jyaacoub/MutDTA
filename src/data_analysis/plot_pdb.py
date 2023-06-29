@@ -1,3 +1,8 @@
+"""
+This file contains functions to plot pdb files in 3D space using plotly.
+"""
+
+
 import plotly.express as px
 import plotly.graph_objects as go
 from src.docking.python_helpers.format_pdb import get_atom_df, get_coords

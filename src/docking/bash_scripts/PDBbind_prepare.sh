@@ -16,7 +16,7 @@
 # Function to display script usage
 function usage {
   echo "Usage: $0 path ADT template [OPTIONS]"
-  echo "       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
+  echo "       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt."
   echo "       ADT - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')"
   echo "       template - path to conf template file (create empty file if you want vina defaults)."
   echo "Options:"
@@ -37,7 +37,7 @@ prep_confpy=${bash_scripts}/../python_helpers/prep_conf.py
 
 
 # Assign the arguments to variables
-PDBbind="$1"
+PDBbind=$(realpath $1)
 ADT="$2"
 prep_receptor="${ADT}/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
 template="$3"

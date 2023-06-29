@@ -1,13 +1,20 @@
 from typing import Any, Mapping
 import torch
-import torch.nn as nn
+from torch import nn
 import torch.nn.functional as F
-from torch_geometric.nn import GCNConv, GATConv, global_max_pool as gmp, global_add_pool as gap,global_mean_pool as gep,global_sort_pool
+
+from torch_geometric.nn import (GCNConv, GATConv, 
+                                global_max_pool as gmp, 
+                                global_mean_pool as gep)
 from torch_geometric.utils import dropout_adj
 
+from torch_geometric.nn import summary
+from torch_geometric import data as geo_data
+
+from src.models.general import BaseModel
 
 ################ DGraphDTA: ################
-class DGraphDTA(torch.nn.Module):
+class DGraphDTA(BaseModel):
     """
     Improves upon GraphDTA by providing contact maps for a better representation of the protein 
     (instead of just a convolution like in DeepDTA)
@@ -22,16 +29,16 @@ class DGraphDTA(torch.nn.Module):
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
         self.mol_conv2 = GCNConv(num_features_mol, num_features_mol * 2)
         self.mol_conv3 = GCNConv(num_features_mol * 2, num_features_mol * 4)
-        self.mol_fc_g1 = torch.nn.Linear(num_features_mol * 4, 1024)
-        self.mol_fc_g2 = torch.nn.Linear(1024, output_dim)
+        self.mol_fc_g1 = nn.Linear(num_features_mol * 4, 1024)
+        self.mol_fc_g2 = nn.Linear(1024, output_dim)
 
         # self.pro_conv1 = GCNConv(embed_dim, embed_dim)
         self.pro_conv1 = GCNConv(num_features_pro, num_features_pro)
         self.pro_conv2 = GCNConv(num_features_pro, num_features_pro * 2)
         self.pro_conv3 = GCNConv(num_features_pro * 2, num_features_pro * 4)
         # self.pro_conv4 = GCNConv(embed_dim * 4, embed_dim * 8)
-        self.pro_fc_g1 = torch.nn.Linear(num_features_pro * 4, 1024)
-        self.pro_fc_g2 = torch.nn.Linear(1024, output_dim)
+        self.pro_fc_g1 = nn.Linear(num_features_pro * 4, 1024)
+        self.pro_fc_g2 = nn.Linear(1024, output_dim)
 
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
@@ -105,8 +112,33 @@ class DGraphDTA(torch.nn.Module):
         out = self.out(xc)
         return out
     
-    # GCN based model
-class GraphDTA(torch.nn.Module):
+    def __str__(self) -> str:
+        main_str = super().__str__()
+        
+        prot_shape = (self.pro_conv1.in_channels, self.pro_conv1.out_channels)
+        lig_shape = (self.mol_conv1.in_channels, self.mol_conv1.out_channels)
+        device = next(self.parameters()).device
+        
+        prot = geo_data.Data(x=torch.Tensor(*prot_shape), # node feature matrix
+                            edge_index=torch.LongTensor([[0,1]]).transpose(1, 0),
+                            y=torch.FloatTensor([1])).to(device)
+        lig = geo_data.Data(x=torch.Tensor(*lig_shape), # node feature matrix
+                            edge_index=torch.LongTensor([[0,1]]).transpose(1, 0),
+                            y=torch.FloatTensor([1])).to(device)
+        
+        model_summary = summary(self, lig, prot)
+
+        return main_str + '\n\n' + model_summary
+    
+    
+############ GraphDTA ############
+# GCN based model
+class GraphDTA(BaseModel):
+    """
+    Added a graph representation of the ligands to the DeepDTA model (still uses 1d conv for protein)
+        See: https://github.com/thinng/GraphDTA
+        paper: https://doi.org/10.1093/bioinformatics/btaa921
+    """
     def __init__(self, n_output=1, n_filters=32, embed_dim=128,num_features_xd=78, num_features_xt=25, output_dim=128, dropout=0.2):
         super(GraphDTA, self).__init__()
 
@@ -115,8 +147,8 @@ class GraphDTA(torch.nn.Module):
         self.conv1 = GCNConv(num_features_xd, num_features_xd)
         self.conv2 = GCNConv(num_features_xd, num_features_xd*2)
         self.conv3 = GCNConv(num_features_xd*2, num_features_xd * 4)
-        self.fc_g1 = torch.nn.Linear(num_features_xd*4, 1024)
-        self.fc_g2 = torch.nn.Linear(1024, output_dim)
+        self.fc_g1 = nn.Linear(num_features_xd*4, 1024)
+        self.fc_g2 = nn.Linear(1024, output_dim)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
 

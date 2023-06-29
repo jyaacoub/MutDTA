@@ -5,17 +5,78 @@ from collections import OrderedDict
 from tqdm import tqdm
 
 import pandas as pd
+from src.feature_extraction import ResInfo, one_hot
 
-RES_CODE = {
-    'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D',
-    'ASX': 'B', 'CYS': 'C', 'GLU': 'E', 'GLN': 'Q',
+########################################################################
+###################### Protein Feature Extraction ######################
+########################################################################
+# pconsc4 predicted contact map save in data/dataset/pconsc4
+def target_to_graph(target_sequence, contact_map, threshold=10.5):
+    """
+    Feature extraction for protein sequence using contact map to generate 
+    edge index and node features
+
+    Args:
+        target_sequence (str): sequence of target protein
+        contact_map (str or np.array): file path for contact map or the 
+            actual map itself.
+        threshold (float, optional): Threshold for what defines an edge, 
+            anything under this value is considered an edge. Defaults to 
+            10.5 Angstroms.
+
+    Returns:
+        Tuple(np.array): truple of (target_size, target_feature, target_edge_index)
+    """
+    # loading up contact map if it is a file path
+    if type(contact_map) == str: contact_map = np.load(contact_map)
     
-    'GLX': 'Z', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
-    'LEU': 'L', 'LYS': 'K', 'MET': 'M', 'PHE': 'F',
     
-    'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
-    'TYR': 'Y', 'VAL': 'V'
-}
+    target_size = len(target_sequence)
+    assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
+    # its ok if it is smaller, but not larger (due to missing residues in pdb)
+    assert contact_map.shape[0] == target_size, 'contact map size does not match target sequence size'
+    
+    
+    # adding self loop then thresholding
+    # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
+    # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
+    index_row, index_col = np.where(contact_map <= threshold)
+    assert index_row.max() < target_size and index_col.max() < target_size, 'contact map size does not match target sequence size'
+    
+    # converting edge matrix to edge index for pytorch geometric
+    target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])
+    
+    # getting node features
+    target_feature = target_to_feature(target_sequence)
+    
+    return target_size, target_feature, target_edge_index
+
+# target aln file save in data/dataset/aln
+def target_to_feature(target_seq):
+    # aln_dir = 'data/' + dataset + '/aln'
+    pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq))) #NOTE: DGraphDTA never uses pssm due to logic error (see: https://github.com/jyaacoub/DGraphDTA/commit/ba06f7ece847ba0c806c6a9034748b62cfd2c09a)
+    
+    pro_hot = np.zeros((len(target_seq), len(ResInfo.amino_acids)))
+    pro_property = np.zeros((len(target_seq), 12))
+    for i in range(len(target_seq)):
+        # if 'X' in pro_seq:
+        #     print(pro_seq)
+        pro_hot[i,] = one_hot(target_seq[i], ResInfo.amino_acids)
+        pro_property[i,] = residue_features(target_seq[i])
+    
+    return np.concatenate((np.transpose(pssm, (1, 0)), 
+                           pro_hot, pro_property), axis=1)
+
+def residue_features(residue):
+    feats = [residue in ResInfo.aliphatic, residue in ResInfo.aromatic,
+            residue in ResInfo.polar_neutral, residue in ResInfo.acidic_charged,
+            residue in ResInfo.basic_charged,
+            
+            ResInfo.weight[residue], ResInfo.pka[residue], 
+            ResInfo.pkb[residue], ResInfo.pkx[residue],
+            ResInfo.pl[residue], ResInfo.hydrophobic_ph2[residue], 
+            ResInfo.hydrophobic_ph7[residue]]
+    return np.array(feats)
 
 def get_sequence(pdb_file: str, check_missing=False, raw=False, 
                  select_largest=True) -> Tuple[str, OrderedDict]:
@@ -89,7 +150,7 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False,
     return_chain = chains[chain_opt]
     seq = '' # sequence of residues based on pdb file
     for res in return_chain:
-        seq += RES_CODE[return_chain[res]["name"]]
+        seq += ResInfo.pep_to_code[return_chain[res]["name"]]
             
     return seq, return_chain
 
@@ -161,7 +222,9 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
-                      cmap_p: Callable[[str], str]):
+                      cmap_p: Callable[[str], str],
+                      CA_only=False,
+                      check_missing=False):
     """
     Given a list of PDBcodes, this will create and save the contact maps for each.
     Example path callable functions:        
@@ -175,8 +238,8 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     """
     for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
         cmap, _ = get_contact(pdb_p(pdbcode), # pdbcode is index
-                        CA_only=False, # CB is needed by DGraphDTA
-                        check_missing=False)
+                        CA_only=CA_only, # CB is needed by DGraphDTA
+                        check_missing=check_missing)
         np.save(cmap_p(pdbcode), cmap)
         
 

@@ -11,7 +11,7 @@ display_help() {
     echo "  num_partitions   Number of partitions to create."
     echo
     echo "Example:"
-    echo "  ./split_csv.sh -h input.csv output_partitions 5"
+    echo "  ./split_csv.sh -i input.csv output_partitions 5"
 }
 
 if [[ $# -lt 3 ]] || [[ $# -gt 4 ]]; then
