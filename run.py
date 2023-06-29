@@ -33,22 +33,33 @@ df_binding.to_csv('./data/PDBbind/general_PL_data.csv')
 
 #%%
 dict_smi = PDBbindProcessor.get_SMILE(df_binding.index,
-                           dir=lambda x: f'{pdb_path}/{x}/{x}_ligand.sdf',)
+                           dir=lambda x: f'{pdb_path}/{x}/{x}_ligand.mol2') #WARNING: some fail with mol2 and some fail with sdf...
 
 df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
 df_smi.index.name = 'PDBCode'
 print(df_smi.head())
 
-# 1979 missing unique lig_names out of 19443 
-print(f'{len(df_smi[df_smi.SMILE.isna()])} missing SMILEs out of {len(df_smi)} = {len(df_smi[df_smi.SMILE.isna()])/len(df_smi)*100:.2f}%')
+# better way to do this:
+# code='4obv'
+# m = Chem.MolFromMol2File(f'{pdb_path}/{code}/{code}_ligand.mol2')
+# Chem.MolToSmiles(m, isomericSmiles=False) # setting this to False means each SMILE is unique (canonical)
+
+
+#%%-> 3178 incomplete pdb codes
+print(f'{len(df_smi[df_smi.SMILE.isna()])} total missing SMILEs out of \t' +
+      f'{len(df_smi)} = {len(df_smi[df_smi.SMILE.isna()])/len(df_smi)*100:.2f}%')
 
 missing = df_smi[df_smi.SMILE.isna()].merge(df_binding, on='PDBCode')
-#-> 3178 incomplete pdb codes
-print(f'{len(missing.lig_name.unique())} unique lig_names missing out of {len(df_smi)} = {len(missing.lig_name.unique())/len(df_smi)*100:.2f}%')
+num_missing_ln = len(missing.lig_name.unique())
+total_ln = len(df_binding.lig_name.unique())
+# -> 1979 missing unique lig_names 
+print(f'{num_missing_ln} unique lig_names missing out of \t'+
+      f'{total_ln} = {num_missing_ln/total_ln*100:.2f}%')
+
 #%%
 # getting missing SMILEs from Cactus
 # some dont appear to be in Cactus...
-downloaded_smi = Downloader.get_SMILE(list(df_smi[df_smi.SMILE.isna()].index))
+downloaded_smi = Downloader.get_SMILE(list(missing.lig_name.unique()))
 
 #%% get remaining SMILEs from PDB
 import requests as r

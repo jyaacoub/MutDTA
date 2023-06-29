@@ -8,6 +8,8 @@ e.g.: here we might want to use prep_save_data to get the X and Y csv files for 
 
 """
 
+from argparse import ArgumentError as ArgError
+from ctypes import ArgumentError
 from typing import Callable, Iterable, List, Tuple
 from urllib.parse import quote
 import requests as r
@@ -15,47 +17,11 @@ import os, re
 
 import pandas as pd
 from tqdm import tqdm
-
+from rdkit import Chem
 from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
 
-class Processor:
-
-    @staticmethod
-    def get_SMILE(IDs: Iterable[str],  # can download from https://files.rcsb.org/ligands/view/SQ9_ideal.sdf
-                dir: Callable[[str], str] = 
-                lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf') -> dict:
-        """
-        Uses rdkit to converts sdf files to SMILE strings and returns dict with {ID: SMILE}.
-        lig_names are not unique and so IDs must be something other than ligand names pdbcodes 
-        (e.g.: https://en.wikipedia.org/wiki/K-mer)
-
-        Parameters
-        ----------
-        `IDs` : Iterable[str]
-            Iterable of codes to pass on to `dir` to get the path to the sdf file.
-        `dir` : Callable[[str], str], optional
-            Callable function that returns the path to read sdf files from, 
-            by default lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf'
-
-        Returns
-        -------
-        dict
-            Dict with {ID: SMILE}
-        """
-        drug_smi = {}
-        RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
-        for id in tqdm(IDs, desc='Extracting SMILE strings from sdf'):
-            assert id not in drug_smi, f'duplicate ID: {id}'
-            
-            try:
-                drug_smi[id] = LoadSDF(dir(id), smilesName='smile')['smile'][0]
-            except KeyError as e:
-                drug_smi[id] = None
-        RDLogger.EnableLog('rdApp.*')
-            
-        return drug_smi
-    
+class Processor:    
     @staticmethod
     def save_prot_seq(prot_dict: dict, save_path="data/prot_seq.csv", overwrite=False) -> None:
         """
@@ -71,6 +37,53 @@ class Processor:
                 
 
 class PDBbindProcessor(Processor):
+    @staticmethod
+    def get_SMILE(IDs: Iterable[str],
+                dir: Callable[[str], str] = 
+                lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.mol2') -> dict:
+        """
+        Uses rdkit to converts sdf (or mol2) files to SMILE strings and returns dict with {ID: SMILE}.
+        lig_names are not unique and so IDs must be something other than ligand names pdbcodes 
+        (e.g.: https://en.wikipedia.org/wiki/K-mer)
+
+        Parameters
+        ----------
+        `IDs` : Iterable[str]
+            Iterable of codes to pass on to `dir` to get the path to the sdf file.
+        `dir` : Callable[[str], str], optional
+            Callable function that returns the path to read sdf (or mol2) files from, 
+            by default lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf'
+
+        Returns
+        -------
+        dict
+            Dict with {ID: SMILE}
+        """
+        drug_smi = {}
+        RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
+        for id in tqdm(IDs, desc='Extracting SMILE strings from sdf'):
+            assert id not in drug_smi, f'duplicate ID: {id}'
+            fp = dir(id)
+            try:
+                if fp.endswith('.sdf'):
+                    drug_smi[id] = LoadSDF(fp, smilesName='smile',
+                        # setting this to False means each SMILE is unique (canonical)
+                                           isomericSmiles=False)['smile'][0]
+                elif fp.endswith('.mol2'):
+                    m=Chem.MolFromMol2File(fp)
+                    drug_smi[id] = Chem.MolToSmiles(m, 
+                                                    isomericSmiles=False) 
+                else:
+                    raise ValueError(f'Invalid file type: {fp}')
+            except KeyError as e:
+                drug_smi[id] = None
+            except ArgumentError as e:
+                print(f'Error with {id}')
+                raise e
+        RDLogger.EnableLog('rdApp.*')
+            
+        return drug_smi
+    
     @staticmethod
     def excel_to_csv(xlsx_path='data/PDBbind/raw/P-L_refined_set_all.xlsx') -> None:
         """
