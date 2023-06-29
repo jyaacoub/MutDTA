@@ -1,10 +1,63 @@
 from typing import Iterable, List
-from tqdm import tqdm
 import os
 import requests as r
 from io import StringIO
+from urllib.parse import quote
+
+from tqdm import tqdm
 
 class Downloader:
+    @staticmethod
+    def get_prot_seq(protIDs: List[str], 
+                    url=lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta') -> dict:
+        """
+        Fetches FASTA files from given url and returns dict with {ID: seq}
+        
+        URL is passed in as a callable function which accepts a string (the protID) and returns a url 
+        to download that file.
+            e.g. for uniprot: lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta'    
+        """
+        prot_seq = {}
+        for protID in tqdm(protIDs, 'Downloading protein sequences'):
+            if protID in prot_seq: continue
+            FASTA = r.get(url(protID)).text
+            prot_seq[protID] = ''.join(FASTA.split('\n')[1:])
+            
+        return prot_seq
+    
+    @staticmethod
+    def get_mutated_seq(HGVSc: List[str], 
+                        url=lambda x: f'https://mutalyzer.nl/api/normalize/{x}') -> dict:
+        """
+        Fetches mutated sequences from given url and returns dict with {HGVSc: seq}
+        
+        URL is passed in as a callable function which accepts a string (the HGVSc) and returns a url 
+        to download that file.
+            e.g. for mutalyzer: lambda x: f'https://mutalyzer.nl/api/normalize/{x}'
+            
+        Returned json is of the form:
+            {protein: {predicted: "<Mutated Seq>",…},…}   
+            
+        to get native (non-mutated) sequence, use "reference" instead of "predicted"
+        """
+        mut_seq = {}
+        for mut in tqdm(HGVSc, 'Downloading mutated sequences'):
+            if mut in mut_seq: continue
+            mut_seq[mut] = r.get(url(mut)).json()['protein']['predicted']
+            
+        return mut_seq
+    
+    @staticmethod
+    def get_SMILE(drug_names: Iterable[str],
+                url=lambda x: f'https://cactus.nci.nih.gov/chemical/structure/{quote(x)}/smiles') -> dict:
+        """Gets SMILE strings from given drug names and returns dict with {drug_name: SMILE}"""
+        drug_SMILEs = {}
+        for drug_name in tqdm(drug_names, 'Downloading SMILE strings'):
+            if drug_name in drug_SMILEs: continue
+            drug_SMILEs[drug_name] = r.get(url(drug_name)).text
+        
+        return drug_SMILEs
+
     @staticmethod
     def get_file_obj(ID: str, url=lambda x: f'https://files.rcsb.org/download/{x}.pdb') -> StringIO:
         """

@@ -1,7 +1,8 @@
 #%%
 import os
 from src.feature_extraction.protein import create_save_cmaps
-from src.data_processing import PDBbindProcessor
+from src.data_processing import PDBbindProcessor, Downloader
+import pandas as pd
 
 pdb_path = '/home/jyaacoub/projects/data/v2020-other-PL'
 
@@ -30,11 +31,18 @@ index_file = '../data/v2020-other-PL/index/INDEX_general_PL_data.2020'
 df_binding = PDBbindProcessor.get_binding_data(index_file)
 df_binding.to_csv('./data/PDBbind/general_PL_data.csv')
 
+#%%
+dict_smi = PDBbindProcessor.get_SMILE(df_binding,
+                           dir=lambda x: f'{pdb_path}/{x}/{x}_ligand.sdf',)
 
-
-
-
-
+df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
+df_smi.name = 'PDBCode'
+# 1979 missing SMILEs out of 19443
+print(f'{len(df_smi[df_smi.SMILE.isna()])} missing SMILEs out of {len(df_smi)}')
+#%%
+# getting missing SMILEs from Cactus
+# some dont appear to be in Cactus...
+downloaded_smi = Downloader.get_SMILE(list(df_smi[df_smi.SMILE.isna()].index))
 
 #%%
 

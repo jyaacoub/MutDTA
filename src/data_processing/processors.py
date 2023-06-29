@@ -1,5 +1,5 @@
 """
-Processors for downloading and processing data from various sources.
+Processors for processing data from various sources.
 
 Primary use is for handling data at the high level if you wish to extract features,
 see `src/feature_extraction/` instead.
@@ -9,79 +9,52 @@ e.g.: here we might want to use prep_save_data to get the X and Y csv files for 
 """
 
 from typing import Iterable, List, Tuple
-import requests as r
-import pandas as pd
-import os, re
-from tqdm import tqdm
 from urllib.parse import quote
+import requests as r
+import os, re
+
+import pandas as pd
+from tqdm import tqdm
+
+from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
 
-class Processor:    
-    @staticmethod
-    def get_mutated_seq(HGVSc: List[str], 
-                        url=lambda x: f'https://mutalyzer.nl/api/normalize/{x}') -> dict:
-        """
-        Fetches mutated sequences from given url and returns dict with {HGVSc: seq}
-        
-        URL is passed in as a callable function which accepts a string (the HGVSc) and returns a url 
-        to download that file.
-            e.g. for mutalyzer: lambda x: f'https://mutalyzer.nl/api/normalize/{x}'
-            
-        Returned json is of the form:
-            {protein: {predicted: "<Mutated Seq>",…},…}   
-            
-        to get native (non-mutated) sequence, use "reference" instead of "predicted"
-        """
-        mut_seq = {}
-        for mut in tqdm(HGVSc, 'Downloading mutated sequences'):
-            if mut in mut_seq: continue
-            mut_seq[mut] = r.get(url(mut)).json()['protein']['predicted']
-            
-        return mut_seq
-    
-    @staticmethod
-    def download_SMILE(drug_names: List[str],
-                url=lambda x: f'https://cactus.nci.nih.gov/chemical/structure/{quote(x)}/smiles') -> dict:
-        """Gets SMILE strings from given drug names"""
-        drug_SMILEs = {}
-        for drug_name in tqdm(drug_names, 'Downloading SMILE strings'):
-            if drug_name in drug_SMILEs: continue
-            drug_SMILEs[drug_name] = r.get(url(drug_name)).text
-        
-        return drug_SMILEs
+class Processor:
 
     @staticmethod
-    def get_SMILE(info_df: pd.DataFrame, 
-                dir=lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf'):
+    def get_SMILE(info_df: pd.DataFrame,  # can download from https://files.rcsb.org/ligands/view/SQ9_ideal.sdf
+                dir=lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf') -> dict:
         """
-        Returns dict of {lig_name: SMILE} from given info_df.
-        `info_df` contains the PDBcodes as the index and the corresponding drug names in column 'lig_name'.
+        Uses rdkit to converts sdf files to SMILE strings and returns dict with {lig_name: SMILE}, 
+        given `info_df` which contains the PDBcodes as the index and the corresponding drug names 
+        in column 'lig_name'.
+
+        Parameters
+        ----------
+        `info_df` : pd.DataFrame
+            Dataframe containing PDBcodes as the index and the corresponding drug names in column 'lig_name'.
+        `dir` : _type_, optional
+            Callable function that returns the path to read sdf files from, 
+            by default lambda x :f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf'
+
+        Returns
+        -------
+        dict
+            Dict with {lig_name: SMILE}
         """
         drug_smi = {}
-        for code, row in tqdm(info_df.iterrows(), 'Extracting SMILE strings from sdf'):
+        RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
+        for code, row in tqdm(info_df.iterrows(), total=len(info_df), 
+                              desc='Extracting SMILE strings from sdf'):
             lig_name = row['lig_name']
-            if lig_name in drug_smi: continue
-            drug_smi[lig_name] = LoadSDF(dir(code), smilesName='smile')['smile'][0]
+            if lig_name in drug_smi and drug_smi[lig_name] is not None: continue
+            try:
+                drug_smi[lig_name] = LoadSDF(dir(code), smilesName='smile')['smile'][0]
+            except KeyError as e:
+                drug_smi[lig_name] = None
+        RDLogger.EnableLog('rdApp.*')
             
         return drug_smi
-    
-    @staticmethod
-    def get_prot_seq(protIDs: List[str], 
-                    url=lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta') -> dict:
-        """
-        Fetches FASTA files from given url and returns dict with {ID: seq}
-        
-        URL is passed in as a callable function which accepts a string (the protID) and returns a url 
-        to download that file.
-            e.g. for uniprot: lambda x: f'https://rest.uniprot.org/uniprotkb/{x}.fasta'    
-        """
-        prot_seq = {}
-        for protID in tqdm(protIDs, 'Downloading protein sequences'):
-            if protID in prot_seq: continue
-            FASTA = r.get(url(protID)).text
-            prot_seq[protID] = ''.join(FASTA.split('\n')[1:])
-            
-        return prot_seq
     
     @staticmethod
     def save_prot_seq(prot_dict: dict, save_path="data/prot_seq.csv", overwrite=False) -> None:
@@ -159,7 +132,7 @@ class PDBbindProcessor(Processor):
         pd.DataFrame
             With cols:
             
-            PDBCode,resolution,release_year,pkd
+            PDBCode,resolution,release_year,pkd,lig_name
         """
         data = {}
         with open(index_file, 'r') as f:
@@ -171,12 +144,14 @@ class PDBbindProcessor(Processor):
                     res = float(res) if res != 'NMR' else None
                     year = int(line[11:16])
                     pkd = float(line[17:23])
-                    data[code] = [res, year, pkd]
+                    lig_name = re.search(r'\((.*)\)', line).group(1)
+                    data[code] = [res, year, pkd, lig_name]
                 except ValueError as e:
                     print(f'Error with line: {line}')
                     raise e
         
-        df = pd.DataFrame.from_dict(data, orient='index', columns=['resolution', 'release_year', 'pkd'])
+        df = pd.DataFrame.from_dict(data, orient='index', 
+                                    columns=['resolution', 'release_year', 'pkd', 'lig_name'])
         df.index.name = 'PDBCode'
         
         return df
