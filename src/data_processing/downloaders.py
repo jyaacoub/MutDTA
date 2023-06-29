@@ -91,10 +91,10 @@ class Downloader:
         ----------
         `IDs` : Iterable[str]
             List of IDs to download
-        `save_path` : Callable[str,], optional
+        `save_path` : Callable[[str], str], optional
             Callable fn that returns the save path for file, by default 
             lambda x :'./data/structures/ligands/{x}.sdf'
-        `url` : Callable[str,], optional
+        `url` : Callable[[str], str], optional
             Callable fn that returns the url to download file, by default 
             lambda x :f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'
             
