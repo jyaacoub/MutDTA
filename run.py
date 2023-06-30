@@ -1,10 +1,11 @@
 #%%
 import os
-from src.feature_extraction.protein import create_save_cmaps
+from src.feature_extraction.protein import create_save_cmaps, get_sequence
 from src.data_processing import PDBbindProcessor, Downloader
+from tqdm import tqdm
 import pandas as pd
 
-pdb_path = '/cluster/home/t122995uhn/projects/data/v2020-other-PL/'
+pdb_path = '../data/v2020-other-PL/'
 
 pdb_codes = os.listdir(pdb_path)
 # filter out readme and index folders
@@ -14,8 +15,6 @@ create_save_cmaps(pdb_codes,
                   pdb_p=lambda x: f'{pdb_path}/{x}/{x}_protein.pdb',
                   cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB.npy')
 
-
-# exit
 
 #%% v2020-other-PL/index/INDEX_general_PL_data.2020  contains all we need for binding data
 # includes pkd values
@@ -57,18 +56,43 @@ total_ln = len(df_binding.lig_name.unique())
 print(f'{num_missing_ln} unique lig_names missing out of \t'+
       f'{total_ln} = {num_missing_ln/total_ln*100:.2f}%')
 
+#%% getting prot seqs
+
+# %% Saving with SMILEs
+df = df_smi[df_smi.SMILE.notna()].merge(df_binding, on='PDBCode')
+# df.drop(columns=['lig_name'], inplace=True)
+
+
+# %% getting prot seqs
+seqs ={}
+for code in tqdm(df.index):
+      seq, _ = get_sequence(f'{pdb_path}/{code}/{code}_protein.pdb')
+      seqs[code] = seq
+   
+#%%   
+df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
+df_seq.index.name = 'PDBCode'
+
+#%% merging seqs with df and saving
+#change column name
+
+df = df.merge(df_seq, on='PDBCode')
+# mv SMILE to end
+df = df[[c for c in df.columns if c not in ['prot_seq', 'SMILE']] + ['SMILE', 'prot_seq']]
+df.to_csv('./data/PDBbind/general_XY.csv')
+
 #%%
 # getting missing SMILEs from Cactus
-# some dont appear to be in Cactus...
-downloaded_smi = Downloader.get_SMILE(list(missing.lig_name.unique()))
+# # some dont appear to be in Cactus...
+# downloaded_smi = Downloader.get_SMILE(list(missing.lig_name.unique()))
 
-#%% get remaining SMILEs from PDB
-import requests as r
-from urllib.parse import quote
-url = lambda l: f'https://www.rcsb.org/ligand/{quote(l)}'
-for lig in df_binding.lig_name.unique():
-    res = r.get(url(lig))
-    if res.status_code > 400: print(lig)
+# #%% get remaining SMILEs from PDB
+# import requests as r
+# from urllib.parse import quote
+# url = lambda l: f'https://www.rcsb.org/ligand/{quote(l)}'
+# for lig in df_binding.lig_name.unique():
+#     res = r.get(url(lig))
+#     if res.status_code > 400: print(lig)
 
 #%%
 

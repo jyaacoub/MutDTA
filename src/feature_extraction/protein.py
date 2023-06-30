@@ -79,7 +79,7 @@ def residue_features(residue):
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
 
-def get_sequence(pdb_file: str, check_missing=False, raw=False, 
+def get_sequence(pdb_file: str, check_missing=False, 
                  select_largest=True) -> Tuple[str, OrderedDict]:
     """
     Given a pdb file path this will return the residue sequence for that structure
@@ -89,9 +89,6 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False,
         pdb_file (str): path to .pdb file to process.
         check_missing (bool, optional): Adds check to ensure all residues are available. 
                                 Defaults to False.
-        raw (bool, optional): If True, no splitting is done to isolate a single structure 
-                    and the contact map is produced for the entire pdb file. 
-                    Defaults to False.
         select_largest (bool, optional): If True, only the largest chain is used. Otherwise
                     returns the first chain. Defaults to True.
         
@@ -158,7 +155,7 @@ def get_sequence(pdb_file: str, check_missing=False, raw=False,
 
 def get_contact(pdb_file: str, CA_only=True, check_missing=False,
                 display=False, title="Residue Contact Map", 
-                raw=False) -> Tuple[np.array, str]:
+                largest=True) -> Tuple[np.array, str]:
     """
     Given a pdb file path this will return the residue contact map for that structure.
     
@@ -173,15 +170,15 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
                                 Defaults to False.
         display (bool, optional): if true will display contact map. Defaults to False.
         title (str, optional): title for plot. Defaults to "Residue Contact Map".
-        raw (bool, optional): If True, no splitting is done to isolate a single structure 
-                    and the contact map is produced for the entire pdb file. 
-                    Defaults to False.
+        largest (bool, optional): If True, we only use the largest chain. Otherwise
+                            we use the first chain. Defaults to True.
         
     Returns:
         Tuple[np.array, str]: residue contact map as a matrix and the sequence of residues.
     """
     # getting sequence and residue dict
-    seq, residues = get_sequence(pdb_file, check_missing=check_missing, raw=raw)
+    seq, residues = get_sequence(pdb_file, check_missing=check_missing, 
+                                 select_largest=largest)
             
     # getting coords from residues
     coords = []
@@ -225,25 +222,42 @@ def create_save_cmaps(pdbcodes: Iterable[str],
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
                       CA_only=False,
-                      check_missing=False):
+                      check_missing=False) -> dict:
     """
     Given a list of PDBcodes, this will create and save the contact maps for each.
-    Example path callable functions:        
+    Example path callable functions:
         pdb_p = lambda c: f'/path/to/refined-set/{c}/{c}_protein.pdb'
         cmap_p = lambda c: f'path/to/refined-set/{c}/{c}_contact_CB.npy'
 
-    Args:
-        pdbcodes (Iterable(str)): list of PDBcodes to create contact maps for.
-        pdb_p (Callable[[str], str]): function to get pdb file path from pdbcode.
-        cmap_p (Callable[[str], str]): function to get cmap save file path from pdbcode.
+    Parameters
+    ----------
+    `pdbcodes` : Iterable[str]
+        list of PDBcodes to create contact maps for.
+    `pdb_p` : Callable[[str], str]
+        function to get pdb file path from pdbcode.
+    `cmap_p` : Callable[[str], str]
+        function to get cmap save file path from pdbcode.
+    `CA_only` : bool, optional
+        If true then we use CA as point for distance measure, by default False
+    `check_missing` : bool, optional
+        Dont allow any missing residues, by default False
+
+    Returns
+    -------
+    dict
+        dictionary of sequences for each pdbcode
     """
+    seqs = {}
     for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
         # skipping if already created
         if os.path.isfile(cmap_p(pdbcode)): continue
-        cmap, _ = get_contact(pdb_p(pdbcode), # pdbcode is index
+        cmap, seq = get_contact(pdb_p(pdbcode), # pdbcode is index
                         CA_only=CA_only, # CB is needed by DGraphDTA
                         check_missing=check_missing)
+        seqs[pdbcode] = seq
         np.save(cmap_p(pdbcode), cmap)
+        
+    return seqs
         
 
 
