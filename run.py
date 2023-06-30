@@ -11,10 +11,11 @@ pdb_codes = os.listdir(pdb_path)
 # filter out readme and index folders
 pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
 #%%
-create_save_cmaps(pdb_codes,
+seqs = create_save_cmaps(pdb_codes,
                   pdb_p=lambda x: f'{pdb_path}/{x}/{x}_protein.pdb',
-                  cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB.npy')
+                  cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB_lone.npy')
 
+# exit()
 
 #%% v2020-other-PL/index/INDEX_general_PL_data.2020  contains all we need for binding data
 # includes pkd values
@@ -146,4 +147,23 @@ df.to_csv('./data/PDBbind/general_XY.csv')
 
 # with open(f'{code}.pdb', 'w') as f:
 #     f.write(Downloader.get_file_obj(code).read())
+# %%
+# cols are: run,cindex,pearson,spearman,mse,mae,rmse
+import matplotlib.pyplot as plt
+df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv')[6:]
+df_res.sort_values(by='run', inplace=True)
+
+df_res.loc[-1] = ['vina', 0.68,0.508,0.520,17.812,3.427,4.220] # hard coded vina results
+
+for col in df_res.columns[1:]:
+    plt.figure()
+    bars = plt.bar(df_res['run'],df_res[col])
+    bars[0].set_color('green')
+    bars[2].set_color('black')
+    bars[-1].set_color('red')
+    plt.title(col)
+    plt.xlabel('run')
+    plt.xticks(rotation=30)
+    # plt.ylim((0.2, 0.8))
+    plt.show()
 # %%
