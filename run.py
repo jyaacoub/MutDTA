@@ -4,17 +4,18 @@ from src.feature_extraction.protein import create_save_cmaps
 from src.data_processing import PDBbindProcessor, Downloader
 import pandas as pd
 
-pdb_path = '/home/jyaacoub/projects/data/v2020-other-PL'
+pdb_path = '/cluster/home/t122995uhn/projects/data/v2020-other-PL/'
 
 pdb_codes = os.listdir(pdb_path)
 # filter out readme and index folders
 pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
 #%%
-# create_save_cmaps(pdb_codes,
-#                   pdb_p=lambda x: f'{pdb_path}/{x}/{x}_protein.pdb',
-#                   cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB.npy')
+create_save_cmaps(pdb_codes,
+                  pdb_p=lambda x: f'{pdb_path}/{x}/{x}_protein.pdb',
+                  cmap_p=lambda x: f'{pdb_path}/{x}/{x}_cmap_CB.npy')
 
 
+# exit
 
 #%% v2020-other-PL/index/INDEX_general_PL_data.2020  contains all we need for binding data
 # includes pkd values
@@ -27,13 +28,13 @@ pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
 # 3zzf  2.20  2012   0.40  Ki=400mM      // 3zzf.pdf (NLG)
 # 3gww  2.46  2009   0.45  IC50=355mM    // 3gwu.pdf (SFX)
 
-index_file = '../data/v2020-other-PL/index/INDEX_general_PL_data.2020'
+index_file = f'{pdb_path}/index/INDEX_general_PL_data.2020'
 df_binding = PDBbindProcessor.get_binding_data(index_file)
 df_binding.to_csv('./data/PDBbind/general_PL_data.csv')
 
 #%%
 dict_smi = PDBbindProcessor.get_SMILE(df_binding.index,
-                           dir=lambda x: f'{pdb_path}/{x}/{x}_ligand.mol2') #WARNING: some fail with mol2 and some fail with sdf...
+                           dir=lambda x: f'{pdb_path}/{x}/{x}_ligand.sdf') #WARNING: some fail with mol2 and some fail with sdf...
 
 df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
 df_smi.index.name = 'PDBCode'

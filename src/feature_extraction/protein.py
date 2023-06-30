@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from collections import OrderedDict
 from tqdm import tqdm
 
+import os
 import pandas as pd
 from src.feature_extraction import ResInfo, one_hot
 
@@ -237,6 +238,8 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         cmap_p (Callable[[str], str]): function to get cmap save file path from pdbcode.
     """
     for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
+        # skipping if already created
+        if os.path.isfile(cmap_p(pdbcode)): continue
         cmap, _ = get_contact(pdb_p(pdbcode), # pdbcode is index
                         CA_only=CA_only, # CB is needed by DGraphDTA
                         check_missing=check_missing)
