@@ -114,10 +114,12 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             
             pro = geo_data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
-                                y=label)
+                                y=label,
+                                code=code)
             lig = geo_data.Data(x=torch.Tensor(mol_feat),
                                 edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
-                                y=label)
+                                y=label,
+                                code=code)
             data_list.append([pro, lig])
             
         print(f'{len(errors)} codes failed to create graphs')

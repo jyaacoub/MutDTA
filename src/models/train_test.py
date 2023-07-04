@@ -118,4 +118,4 @@ def test(model, test_loader, device):
 
     print(f"Test Loss: {test_loss:.4f}")
     
-    return pred, actual
+    return test_loss, pred, actual
