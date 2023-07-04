@@ -67,9 +67,10 @@ pred, actual = test(model, test_loader, device)
 # %%
 media_save_p = 'results/model_media/'
 csv_file = f'{media_save_p}/DGraphDTA_stats.csv'
-get_metrics(pred, actual, save_results=SAVE_RESULTS,
+get_metrics(pred, actual,
             save_results=SAVE_RESULTS,
             save_path=media_save_p,
             model_key=MODEL_KEY,
             csv_file=csv_file
             )
+# %%

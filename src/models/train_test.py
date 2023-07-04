@@ -53,8 +53,8 @@ def train(model, train_loader, val_loader, device,
                 progress_bar.set_postfix({"Train Loss": train_loss / (progress_bar.n + 1)})
                 progress_bar.update(1)
 
-        # Compute average training loss for the epoch
-        train_loss /= len(train_loader)
+            # Compute average training loss for the epoch
+            train_loss /= len(train_loader)
 
         # Validation loop
         model.eval()
@@ -69,7 +69,7 @@ def train(model, train_loader, val_loader, device,
 
                 # Compute loss
                 loss = CRITERION(predictions, batch_pro.y) # y is labels
-                train_loss += loss.item()
+                val_loss += loss.item()
 
             # Compute average validation loss for the epoch
             val_loss /= len(val_loader)
