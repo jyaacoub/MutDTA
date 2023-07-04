@@ -28,12 +28,19 @@ np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
 
 # uses pretrained weights for initialization
-WEIGHTS = 'kiba'
+weight_opt = ['kiba', 'davis', 'random']
+batch_size_opt = [32, 64, 128]
+lr_opt = [0.0001, 0.001, 0.01]
+dropout_opt = [0.1, 0.2, 0.3]
+
+WEIGHTS = 'davis'
 SAVE_RESULTS = False
+media_save_p = 'results/model_media/'
+csv_file = 'results/DGraphDTA_stats.csv'
 
 # Model Hyperparameters
 BATCH_SIZE = 128
-NUM_EPOCHS = 50
+NUM_EPOCHS = 100
 LEARNING_RATE = 0.001
 DROPOUT = 0.2
 MODEL_KEY = f'{WEIGHTS}W_{NUM_EPOCHS}epochs'
@@ -81,8 +88,6 @@ plt.savefig(f'results/model_media/{MODEL_KEY}_loss.png')
 pred, actual = test(model, test_loader, device)
       
 # %%
-media_save_p = 'results/model_media/'
-csv_file = f'{media_save_p}/DGraphDTA_stats.csv'
 get_metrics(pred, actual,
             save_results=SAVE_RESULTS,
             save_path=media_save_p,
