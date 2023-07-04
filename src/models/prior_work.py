@@ -48,7 +48,22 @@ class DGraphDTA(BaseModel):
         self.fc2 = nn.Linear(1024, 512)
         self.out = nn.Linear(512, self.n_output)
 
-    def forward(self, data_mol, data_pro):
+    def forward(self, data_pro, data_mol):
+        """
+        Forward pass of the model.
+
+        Parameters
+        ----------
+        `data_pro` : _type_
+            the protein data
+        `data_mol` : _type_
+            the ligand data
+
+        Returns
+        -------
+        _type_
+            output of the model
+        """
         # get graph input
         mol_x, mol_edge_index, mol_batch = data_mol.x, data_mol.edge_index, data_mol.batch
         # get protein input
