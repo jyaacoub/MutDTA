@@ -20,10 +20,10 @@ from src.models import DGraphDTA
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.protein import get_contact, get_sequence, create_save_cmaps
 
-from src.data_processing.data_loaders import create_dataset_for_test, collate
+from data_processing.datasets import create_dataset_for_test, collate
 
 PDBBIND_STRC = '/home/jyaacoub/projects/data/v2020-other-PL'
-DATA = 'random'
+DATA = 'kiba'
 SET = 'test'
 TRAIN = True
 MODEL_KEY = f'generalTrained_{DATA}_{SET}' if TRAIN else f'pretrained_{DATA}_{SET}'
@@ -32,6 +32,7 @@ SAVE_RESULTS = True
 save_mdl_path = f'results/model_checkpoints/ours/{MODEL_KEY}.mdl'
 np.random.seed(0)
 random.seed(0)
+torch.manual_seed(0)
 
 path = lambda c: f'{PDBBIND_STRC}/{c}/{c}_protein.pdb'
 cmap_p = lambda c: f'{PDBBIND_STRC}/{c}/{c}_cmap_CB_lone.npy'
@@ -71,7 +72,7 @@ pdb_train = df_XY.index.difference(pdb_test)
 # training:
 if TRAIN:
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     criterion = torch.nn.MSELoss()
 
     train_set = pdb_train

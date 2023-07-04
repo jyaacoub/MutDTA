@@ -153,33 +153,37 @@ def get_sequence(pdb_file: str, check_missing=False,
     return seq, return_chain
 
 
-def get_contact(pdb_file: str, CA_only=True, check_missing=False,
-                display=False, title="Residue Contact Map", 
-                largest=True) -> Tuple[np.array, str]:
+def get_contact(residues: OrderedDict, CA_only=True, check_missing=False,
+                display=False, title="Residue Contact Map") -> np.array:
     """
-    Given a pdb file path this will return the residue contact map for that structure.
-    
-    Examples: 1a1e has multiple main structures and so it creates a quadrant, 
-    1o0n is a single structure and doesnt create quadrants
+    Given the residue chain dict this will return the residue contact map for that structure.
+        See: `get_sequence` for details on getting the residue chain dict.
 
-    Args:
-        pdb_file (str): path to .pdb file to process.
-        CA_only (bool, optional): if true only use alpha carbon for calc distance. Otherwise 
-                                follow DGraphDTA definition, using CB for all except glycine.
-        check_missing (bool, optional): Checking to ensure all residues are available. 
-                                Defaults to False.
-        display (bool, optional): if true will display contact map. Defaults to False.
-        title (str, optional): title for plot. Defaults to "Residue Contact Map".
-        largest (bool, optional): If True, we only use the largest chain. Otherwise
-                            we use the first chain. Defaults to True.
-        
-    Returns:
-        Tuple[np.array, str]: residue contact map as a matrix and the sequence of residues.
+    Parameters
+    ----------
+    `residues` : OrderedDict
+        Residue chain dict extracted from pdb file.
+    `CA_only` : bool, optional
+        If true then only use alpha carbon for distance calculation. Otherwise follow DGraphDTA 
+        definition using CB for all except glycine, by default True
+    `check_missing` : bool, optional
+        Checks to ensure no residues are missing, by default False
+    `display` : bool, optional
+        If true will display the contact map, by default False
+    `title` : str, optional
+        Title for cmap plot, by default "Residue Contact Map"
+
+    Returns
+    -------
+    Tuple[np.array, str]
+        residue contact map as a matrix
+
+    Raises
+    ------
+    KeyError
+        KeyError if a non-glycine residue is missing CB atom.
     """
-    # getting sequence and residue dict
-    seq, residues = get_sequence(pdb_file, check_missing=check_missing, 
-                                 select_largest=largest)
-            
+    
     # getting coords from residues
     coords = []
     if CA_only:
@@ -216,7 +220,7 @@ def get_contact(pdb_file: str, CA_only=True, check_missing=False,
         plt.title(title)
         plt.show()
         
-    return m, seq
+    return m
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
@@ -249,13 +253,15 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     """
     seqs = {}
     for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
-        # skipping if already created
-        if os.path.isfile(cmap_p(pdbcode)): continue
-        cmap, seq = get_contact(pdb_p(pdbcode), # pdbcode is index
-                        CA_only=CA_only, # CB is needed by DGraphDTA
-                        check_missing=check_missing)
-        seqs[pdbcode] = seq
-        np.save(cmap_p(pdbcode), cmap)
+        seqs[pdbcode], res = get_sequence(pdb_p(pdbcode), 
+                                check_missing=check_missing, 
+                                select_largest=True)
+        # only get cmap if it doesnt exist
+        if not os.path.isfile(cmap_p(pdbcode)):
+            cmap = get_contact(res,
+                            CA_only=CA_only, # CB is needed by DGraphDTA
+                            check_missing=check_missing)
+            np.save(cmap_p(pdbcode), cmap)
         
     return seqs
         

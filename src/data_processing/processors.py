@@ -52,7 +52,7 @@ class PDBbindProcessor(Processor):
             Iterable of codes to pass on to `dir` to get the path to the sdf file.
         `dir` : Callable[[str], str], optional
             Callable function that returns the path to read sdf (or mol2) files from, 
-            by default lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.sdf'
+            by default lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_ligand.mol2'
 
         Returns
         -------
@@ -61,7 +61,7 @@ class PDBbindProcessor(Processor):
         """
         drug_smi = {}
         RDLogger.DisableLog('rdApp.*') # supress rdkit warnings
-        for id in tqdm(IDs, desc='Extracting SMILE strings from sdf'):
+        for id in tqdm(IDs, desc='Extracting SMILE strings'):
             assert id not in drug_smi, f'duplicate ID: {id}'
             fp = dir(id)
             try:
