@@ -25,11 +25,14 @@ with open(index_file, 'r') as f:
 df = pd.DataFrame.from_dict(data, orient='index', 
                             columns=['uniprot'])
 df.index.name = 'PDBCode'
-# %%
-with open('./unique_uniprotIDs.txt', 'w') as f:
-    for u in df.uniprot.unique():
-        f.write(f'{u}\n')
-# %%
-with open('./missing_uniprotID_pdbcodes.txt', 'w') as f:
-    for u in na:
-        f.write(f'{u}\n')
+
+# df.to_csv('./pdb_uniprotID.csv')
+
+# # %%
+# with open('./unique_uniprotIDs.txt', 'w') as f:
+#     for u in df.uniprot.unique():
+#         f.write(f'{u}\n')
+# # %%
+# with open('./missing_uniprotID_pdbcodes.txt', 'w') as f:
+#     for u in na:
+#         f.write(f'{u}\n')
