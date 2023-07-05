@@ -178,3 +178,34 @@ for mkey in metrics:
             
 
 # %%
+#%% plot bar graph of results by row (comparing vina to DGraphDTA)
+# cols are: run,cindex,pearson,spearman,mse,mae,rmse
+import pandas as pd
+df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv')[-4:]
+
+
+#%%
+
+for col in df_res.columns[1:]:
+    plt.figure()
+    bars = plt.bar(df_res['run'],df_res[col])
+    bars[0].set_color('red')
+    bars[1].set_color('green')
+    bars[-1].set_color('black')
+    plt.title(col)
+    plt.xlabel('run')
+    plt.xticks(rotation=30)
+    # plt.ylim((0.2, 0.8))
+    plt.show()
+# %% plotting histogram for PDBbind dataset 
+# (to see if it's normal or not)
+pkds = np.array([])
+for p,l in pdb_dataset:
+    pkd = p.y.numpy().flatten()
+    pkds = np.append(pkds, pkd)
+
+# %%
+plt.hist(pkds, bins=100)
+plt.title('PDBbind pkd distribution')
+plt.show()
+# %%
