@@ -12,22 +12,30 @@ from src.feature_extraction import ResInfo, one_hot
 ###################### Protein Feature Extraction ######################
 ########################################################################
 # pconsc4 predicted contact map save in data/dataset/pconsc4
-def target_to_graph(target_sequence, contact_map, threshold=10.5):
+def target_to_graph(target_sequence:str, contact_map:str|np.array, 
+                    threshold=10.5, aln_file:str=None):
     """
-    Feature extraction for protein sequence using contact map to generate 
-    edge index and node features
+    Feature extraction for protein sequence using contact map to generate
+    edge index and node features.
 
-    Args:
-        target_sequence (str): sequence of target protein
-        contact_map (str or np.array): file path for contact map or the 
-            actual map itself.
-        threshold (float, optional): Threshold for what defines an edge, 
-            anything under this value is considered an edge. Defaults to 
-            10.5 Angstroms.
+    Parameters
+    ----------
+    `target_sequence` : str
+        Sequence of the target protein.
+    `contact_map` : str | np.array
+        File path for contact map or the actual map itself.
+    `threshold` : float, optional
+        Threshold for what defines an edge, anything under this value 
+        is considered an edge, by default 10.5
+    `aln_file` : str, optional
+        Path to alignment file for PSSM matrix, by default None
 
-    Returns:
-        Tuple(np.array): truple of (target_size, target_feature, target_edge_index)
+    Returns
+    -------
+    Tuple[np.array]
+        truple of (target_size, target_feature, target_edge_index)
     """
+    
     # loading up contact map if it is a file path
     if type(contact_map) == str: contact_map = np.load(contact_map)
     
@@ -48,15 +56,38 @@ def target_to_graph(target_sequence, contact_map, threshold=10.5):
     target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])
     
     # getting node features
-    target_feature = target_to_feature(target_sequence)
+    
+    # aln_dir = 'data/' + dataset + '/aln'
+    pssm = get_pssm(aln_file, target_sequence) #NOTE: DGraphDTA never uses pssm due to logic error (see: https://github.com/jyaacoub/DGraphDTA/commit/ba06f7ece847ba0c806c6a9034748b62cfd2c09a)
+    pro_hot, pro_property = target_to_feature(target_sequence)
+    target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
     return target_size, target_feature, target_edge_index
 
-# target aln file save in data/dataset/aln
-def target_to_feature(target_seq):
-    # aln_dir = 'data/' + dataset + '/aln'
-    pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq))) #NOTE: DGraphDTA never uses pssm due to logic error (see: https://github.com/jyaacoub/DGraphDTA/commit/ba06f7ece847ba0c806c6a9034748b62cfd2c09a)
+def get_pssm(aln_file: str, target_seq: str) -> np.array:
+    # matrix is 21xL where L is the length of the protein
+    # 21 is the number of amino acids + X (unknown)
+    pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
     
+    with open(aln_file, 'r') as f:
+        lines = f.readlines()
+        lc = len(lines)
+        for line in lines:
+            assert len(line) == len(target_seq), \
+                    f'Alignment file is not the same '\
+                    f'length as the protein sequence: '\
+                    f'{len(line)} != {len(target_seq)}'
+            
+            # counting up the amino acids at each position
+            for i, res in enumerate(line):
+                if res in ResInfo.amino_acids:
+                    pssm[ResInfo.amino_acids.index(res), i] += 1
+    # normalizing:
+    pssm = pssm / lc
+    return np.transpose(pssm, (1, 0)) # transpose to match DGraphDTA input
+
+# target aln file save in data/dataset/aln
+def target_to_feature(target_seq):    
     pro_hot = np.zeros((len(target_seq), len(ResInfo.amino_acids)))
     pro_property = np.zeros((len(target_seq), 12))
     for i in range(len(target_seq)):
@@ -65,8 +96,7 @@ def target_to_feature(target_seq):
         pro_hot[i,] = one_hot(target_seq[i], ResInfo.amino_acids)
         pro_property[i,] = residue_features(target_seq[i])
     
-    return np.concatenate((np.transpose(pssm, (1, 0)), 
-                           pro_hot, pro_property), axis=1)
+    return pro_hot, pro_property
 
 def residue_features(residue):
     feats = [residue in ResInfo.aliphatic, residue in ResInfo.aromatic,
@@ -264,7 +294,15 @@ def create_save_cmaps(pdbcodes: Iterable[str],
             np.save(cmap_p(pdbcode), cmap)
         
     return seqs
-        
+
+
+def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
+    """
+    Creates alignment files for all PDBbind structures.
+    
+    df_seq: dataframe with index as PDBcodes and column 'prot_seq' as sequence
+    """
+    raise NotImplementedError("This function is not complete (see yumika)")
 
 
 if __name__ == "__main__":

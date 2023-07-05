@@ -38,5 +38,16 @@ df.index.name = 'PDBCode'
 #         f.write(f'{u}\n')
 
 #%%
-df_seq = pd.read_csv('/home/jyaacoub/projects/data/pytorch_PDBbind/processed/XY.csv')
+df_seq = pd.read_csv('/home/jyaacoub/projects/data/pytorch_PDBbind/processed/XY.csv', index_col=0)
+
+# %%
+out_dir = './'
+
+
+for code in df_seq.index:
+    with open(f'{out_dir}/{code}.fa', 'w') as f:
+        seq = df_seq.loc[code].prot_seq
+        f.write(f'>{code}\n{seq}')
+    break
+    
 # %%

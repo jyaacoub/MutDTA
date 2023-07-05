@@ -30,9 +30,9 @@ class ResInfo():
     }
     code_to_pep = {v: k for k, v in pep_to_code.items()}
     
-    amino_acids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 
-                   'R', 'S', 'T', 'V', 'W', 'Y',
-                    'X']
+    amino_acids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 
+                   'I', 'K', 'L', 'M', 'N', 'P', 'Q', 
+                   'R', 'S', 'T', 'V', 'W', 'Y', 'X']
 
     aliphatic = ['A', 'I', 'L', 'M', 'V']
     aromatic = ['F', 'W', 'Y']

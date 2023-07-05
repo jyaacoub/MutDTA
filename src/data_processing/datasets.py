@@ -5,14 +5,15 @@ from torch_geometric import data as geo_data
 from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
-from src.feature_extraction.protein import create_save_cmaps
+from src.feature_extraction.protein import create_save_cmaps, create_aln_files
 from src.data_processing import PDBbindProcessor
 
 #  See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
     def __init__(self, save_root='../data/pytorch_PDBbind/', 
-                 bind_root='../data/v2020-other-PL',  *args, **kwargs):
+                 bind_root='../data/v2020-other-PL', 
+                 cmap_threshold=8.0, *args, **kwargs):
         """
         Dataset for PDBbind data. This dataset is used to train graph models.
 
@@ -22,9 +23,11 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             Path to processed dir, by default '../data/pytorch_PDBbind/'
         `bind_root` : str, optional
             Path to raw pdbbind files, by default '../data/v2020-other-PL'
+        `cmap_threshold` : float, optional
+            Threshold for contact map creation, by default 8.0
         """
         self.bind_dir = bind_root
-        self.cmap_threshold = 8.0
+        self.cmap_threshold = cmap_threshold
         super(PDBbindDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
         
@@ -69,7 +72,7 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         # filter out readme and index folders
         pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
         # creating contact maps:
-        cmap_p = lambda x: f'{self.bind_dir}/{x}/{x}_cmap_CB_lone.npy'
+        cmap_p = lambda code: f'{self.bind_dir}/{code}/{code}_cmap_CB_lone.npy'
         seqs = create_save_cmaps(pdb_codes,
                           pdb_p=lambda x: f'{self.bind_dir}/{x}/{x}_protein.pdb',
                           cmap_p=cmap_p)
@@ -77,6 +80,11 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
         df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
         df_seq.index.name = 'PDBCode'
+        
+        # creating MSA:
+        aln_p = lambda code: f'{self.bind_dir}/{code}/{code}.aln'
+        create_aln_files(df_seq, aln_p)
+        
         
         # getting ligand sequences:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
@@ -105,7 +113,8 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             label = torch.Tensor([[label]])
             
             pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
-                                                           threshold=self.cmap_threshold)
+                                                           threshold=self.cmap_threshold,
+                                                           aln_file=aln_p(code)) #TODO: complete this
             try:
                 mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
             except ValueError:
