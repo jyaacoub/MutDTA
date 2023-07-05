@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch_geometric.loader import DataLoader
@@ -7,7 +8,7 @@ from torch_geometric.loader import DataLoader
 # Creating data indices for training and validation splits:
 def train_val_test_split(dataset, train_split=.8, val_split=.1, 
                          shuffle_dataset=True, random_seed=None,
-                         batch_size=128):
+                         batch_size=128, use_refined=True):
       
       if random_seed is not None: 
             np.random.seed(random_seed)
@@ -17,10 +18,27 @@ def train_val_test_split(dataset, train_split=.8, val_split=.1,
       indices = list(range(dataset_size))
       if shuffle_dataset:
             np.random.shuffle(indices)
-            
-      # split into train_val and test
-      tv_size = int(np.floor((train_split+val_split) * dataset_size))
-      train_val_indices, test_indices = indices[:tv_size], indices[tv_size:]
+
+      if use_refined:
+            # test set will contain only refined complexes so that we can compare with vina
+            vina_df = pd.read_csv('./results/PDBbind/vina_out/run10.csv', index_col=0)
+            # cols are: PDBCode,vina_deltaG(kcal/mol),vina_kd(uM)
+            test_indices = []
+            train_val_indices = []
+            for i in range(dataset_size):
+                  code = dataset[i][0].code
+                  if code in vina_df.index:
+                        test_indices.append(i)
+                  else:
+                        train_val_indices.append(i)
+                  # break once we have enough test indices to meet the size requirement
+                  if len(test_indices) >= (1-(train_split+val_split))*dataset_size:
+                        train_val_indices += indices[i+1:]
+                        break
+      else:
+            # split into train_val and test
+            tv_size = int(np.floor((train_split+val_split) * dataset_size))
+            train_val_indices, test_indices = indices[:tv_size], indices[tv_size:]
 
       # split train_val into train and val
       t_size = int(np.floor(train_split * dataset_size))

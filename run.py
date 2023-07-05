@@ -1,5 +1,5 @@
 #%%
-import os, random, itertools
+import os, random, itertools, math
 
 from tqdm import tqdm
 import pandas as pd
@@ -35,14 +35,17 @@ DROPOUT = 0.2
 NUM_EPOCHS = 50
 weight_opt = ['kiba', 'davis', 'random']
 WEIGHTS = 'davis'
+
+SAVE_RESULTS = True
+media_save_p = 'results/model_media/figures/'
+csv_file = 'results/model_media/DGraphDTA_stats.csv'
+
 #%% training and testing
 metrics = {}
 for WEIGHTS in weight_opt:
-    SAVE_RESULTS = True
-    media_save_p = 'results/model_media/figures/'
-    csv_file = 'results/model_media/DGraphDTA_stats.csv'
     MODEL_KEY = f'{WEIGHTS}W_{NUM_EPOCHS}E' 
     # {BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}DO are fixed so not included in model key
+    mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
 
     #loading data and splitting into train, val, test
     pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
@@ -50,7 +53,7 @@ for WEIGHTS in weight_opt:
     train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
                         shuffle_dataset=True, random_seed=RAND_SEED, 
-                        batch_size=BATCH_SIZE)
+                        batch_size=BATCH_SIZE, use_refined=True)
 
 
     # loading model:
@@ -68,6 +71,9 @@ for WEIGHTS in weight_opt:
     # training
     logs = train(model, train_loader, val_loader, device, 
             epochs=NUM_EPOCHS, lr=LEARNING_RATE)
+    # saving model checkpoint
+    torch.save(model.state_dict(), mdl_save_p)
+    print(f'Model saved to: {mdl_save_p}')
 
     ax = plt.figure().gca()
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -91,7 +97,6 @@ for WEIGHTS in weight_opt:
                 model_key=MODEL_KEY,
                 csv_file=csv_file
                 )
-    
     metrics[MODEL_KEY] = {'test_loss': loss,
                           'logs': logs}
 
@@ -114,5 +119,62 @@ plt.xlim(0, NUM_EPOCHS)
 plt.ylabel('Loss')
 plt.savefig(f'results/model_media/figures/all_loss.png')
 plt.show()
+
+
+# %%
+test_codes = np.array([])
+test_labels = np.array([])
+for p,l in test_loader:
+    test_codes= np.append(test_codes, p.code)
+    test_labels = np.append(test_labels, p.y.numpy().flatten())
+    
+test_df = pd.DataFrame(test_labels, index=test_codes, columns=['pkd'])
+test_df.index.name = 'PDBCode'
+
+vina_df = pd.read_csv('results/PDBbind/vina_out/run10.csv', index_col=0)
+common = vina_df.merge(test_df, on='PDBCode')
+
+# Test set is chosen to be all from refined set to 100% match vina
+print(len(common), 'codes in common with vina out of', len(test_df), 'test codes')
+
+# %% Calc results on this common test set
+log_y = common['pkd']
+R=0.0019870937 # kcal/Mol*K (gas constant)
+T=273.15       # K
+RT = R*T
+log_z = -np.log(math.e**(common['vina_deltaG(kcal/mol)']/RT)) # TODO: check if this is correct
+
+get_metrics(log_y, log_z,
+            save_results=SAVE_RESULTS,
+            save_path=media_save_p,
+            model_key='10_vina_common',
+            csv_file='results/model_media/DGraphDTA_stats.csv',
+            show=True)
+
+
+# %% displaying models results
+# creating the dataset loader:
+
+for mkey in metrics:
+    model = DGraphDTA()
+    model_file_name = f'results/model_checkpoints/ours/DGraphDTA_{mkey}.model'
+    print(f'\n\n{mkey}')
+    model.load_state_dict(torch.load(model_file_name, map_location=device))
+    model.eval()
+    
+    log_z = np.array([])
+    log_y = np.array([])
+    for prots, ligs in test_loader:
+        pred = model(prots, ligs).detach().cpu().numpy().flatten()
+        log_z = np.append(log_z, pred)
+        log_y = np.append(log_y, prots.y.detach().cpu().numpy().flatten())
+                
+    get_metrics(log_y, log_z,
+                save_results=SAVE_RESULTS,
+                save_path=media_save_p,
+                model_key=mkey,
+                csv_file='results/model_media/DGraphDTA_stats.csv',
+                show=True)
+            
 
 # %%
