@@ -36,3 +36,7 @@ df.index.name = 'PDBCode'
 # with open('./missing_uniprotID_pdbcodes.txt', 'w') as f:
 #     for u in na:
 #         f.write(f'{u}\n')
+
+#%%
+df_seq = pd.read_csv('/home/jyaacoub/projects/data/pytorch_PDBbind/processed/XY.csv')
+# %%
