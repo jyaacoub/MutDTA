@@ -5,7 +5,6 @@ from src.data_processing import PDBbindProcessor
 
 data = {}
 index_file= '../data/v2020-other-PL/index/INDEX_general_PL_name.2020'
-line = '6mu1  2018  P29994  INOSITOL 1,4,5-TRISPHOSPHATE RECEPTOR TYPE 1'
 #%%
 na = []
 with open(index_file, 'r') as f:

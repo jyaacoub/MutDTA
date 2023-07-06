@@ -13,6 +13,7 @@ from src.data_processing import PDBbindProcessor
 class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
     def __init__(self, save_root='../data/pytorch_PDBbind/', 
                  bind_root='../data/v2020-other-PL', 
+                 aln_dir='/mnt/e/work/data/msa/',
                  cmap_threshold=8.0, *args, **kwargs):
         """
         Dataset for PDBbind data. This dataset is used to train graph models.
@@ -26,8 +27,15 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         `cmap_threshold` : float, optional
             Threshold for contact map creation, by default 8.0
         """
+        self.aln_dir =  aln_dir # path to sequence alignments
         self.bind_dir = bind_root
+        
+        self.cmap_p = lambda code: f'{self.bind_dir}/{code}/{code}_cmap_CB_lone.npy'
+        self.aln_p = lambda code: f'{self.aln_dir}/{code}.msa.a3m'
+        
         self.cmap_threshold = cmap_threshold
+        
+        
         super(PDBbindDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
         
@@ -71,20 +79,22 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         pdb_codes = os.listdir(self.bind_dir)
         # filter out readme and index folders
         pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
+        
+        # creating MSA:
+        #NOTE: assuming MSAs are already created, since this would take a long time to do.
+        # create_aln_files(df_seq, self.aln_p)
+        valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
+        # filters out those that do not have aln file #NOTE: TEMPORARY
+        print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
+        
         # creating contact maps:
-        cmap_p = lambda code: f'{self.bind_dir}/{code}/{code}_cmap_CB_lone.npy'
         seqs = create_save_cmaps(pdb_codes,
                           pdb_p=lambda x: f'{self.bind_dir}/{x}/{x}_protein.pdb',
-                          cmap_p=cmap_p)
+                          cmap_p=self.cmap_p)
         
         assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
         df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
         df_seq.index.name = 'PDBCode'
-        
-        # creating MSA:
-        aln_p = lambda code: f'{self.bind_dir}/{code}/{code}.aln'
-        create_aln_files(df_seq, aln_p)
-        
         
         # getting ligand sequences:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
@@ -106,7 +116,7 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         data_list = []
         errors = []
         for code in tqdm(df.index, 'Extracting node features and creating graphs'):
-            cmap = np.load(cmap_p(code))
+            cmap = np.load(self.cmap_p(code))
             pro_seq = df.loc[code]['prot_seq']
             lig_seq = df.loc[code]['SMILE']
             label = df.loc[code]['pkd']
@@ -114,7 +124,7 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             
             pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
                                                            threshold=self.cmap_threshold,
-                                                           aln_file=aln_p(code)) #TODO: complete this
+                                                           aln_file=self.aln_p(code)) #TODO: complete this
             try:
                 mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
             except ValueError:

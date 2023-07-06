@@ -12,7 +12,7 @@ from src.feature_extraction import ResInfo, one_hot
 ###################### Protein Feature Extraction ######################
 ########################################################################
 # pconsc4 predicted contact map save in data/dataset/pconsc4
-def target_to_graph(target_sequence:str, contact_map:str|np.array, 
+def target_to_graph(target_sequence:str, contact_map:str or np.array, 
                     threshold=10.5, aln_file:str=None):
     """
     Feature extraction for protein sequence using contact map to generate
@@ -303,7 +303,6 @@ def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     df_seq: dataframe with index as PDBcodes and column 'prot_seq' as sequence
     """
     raise NotImplementedError("This function is not complete (see yumika)")
-
 
 if __name__ == "__main__":
     from tqdm import tqdm
