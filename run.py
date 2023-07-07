@@ -17,6 +17,8 @@ from src.data_analysis import get_metrics
 
 PDB_RAW_DIR = '../data/v2020-other-PL/'
 PDB_PROCESSED_DIR = '../data/pytorch_PDBbind/'
+#loading data and splitting into train, val, test
+pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
 
 # Dataset Hyperparameters
 TRAIN_SPLIT= .8 # 80% of data for training
@@ -47,14 +49,10 @@ for WEIGHTS in weight_opt:
     # {BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}DO are fixed so not included in model key
     mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
 
-    #loading data and splitting into train, val, test
-    pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
-
     train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
                         shuffle_dataset=True, random_seed=RAND_SEED, 
                         batch_size=BATCH_SIZE, use_refined=True)
-
 
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

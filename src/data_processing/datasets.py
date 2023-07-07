@@ -13,7 +13,7 @@ from src.data_processing import PDBbindProcessor
 class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
     def __init__(self, save_root='../data/pytorch_PDBbind/', 
                  bind_root='../data/v2020-other-PL', 
-                 aln_dir='/mnt/e/work/data/msa/',
+                 aln_dir='/home/jyaacoub/projects/data/msa/outputs/',
                  cmap_threshold=8.0, *args, **kwargs):
         """
         Dataset for PDBbind data. This dataset is used to train graph models.
@@ -86,6 +86,7 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
         # filters out those that do not have aln file #NOTE: TEMPORARY
         print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
+        pdb_codes = valid_codes
         
         # creating contact maps:
         seqs = create_save_cmaps(pdb_codes,

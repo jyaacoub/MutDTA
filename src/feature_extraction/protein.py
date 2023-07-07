@@ -73,6 +73,9 @@ def get_pssm(aln_file: str, target_seq: str) -> np.array:
         lines = f.readlines()
         lc = len(lines)
         for line in lines:
+            if line[0] == '>': 
+                lc -= 1 # skipping lines with no sequence info
+                continue
             assert len(line) == len(target_seq), \
                     f'Alignment file is not the same '\
                     f'length as the protein sequence: '\
@@ -282,7 +285,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         dictionary of sequences for each pdbcode
     """
     seqs = {}
-    for pdbcode in tqdm(pdbcodes, 'Generating contact maps+saving'):
+    for pdbcode in tqdm(pdbcodes, 'Getting Sequences + Contact Maps'):
         seqs[pdbcode], res = get_sequence(pdb_p(pdbcode), 
                                 check_missing=check_missing, 
                                 select_largest=True)
