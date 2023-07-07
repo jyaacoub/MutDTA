@@ -44,8 +44,7 @@ def clean_msa(f_in: str, f_out:str):
                     new_l += c
             f.write(new_l+'\n')
 
-def check_lines(fp='/home/jyaacoub/projects/data/msa/outputs/10gs_final.a3m',
-                limit=None):
+def check_lines(fp:str, limit=None):
     with open(fp, 'r') as f:
         lines = f.readlines()
         seq_len = len(lines[0])
