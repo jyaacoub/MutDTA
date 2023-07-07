@@ -17,6 +17,7 @@ from src.data_analysis import get_metrics
 
 PDB_RAW_DIR = '../data/v2020-other-PL/'
 PDB_PROCESSED_DIR = '../data/PDBbind_data_wmsa/'
+MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 #loading data and splitting into train, val, test
 pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
 
@@ -40,7 +41,6 @@ WEIGHTS = 'davis'
 
 SAVE_RESULTS = True
 media_save_p = 'results/model_media/figures/'
-csv_file = 'results/model_media/DGraphDTA_stats.csv'
 
 #%% training and testing
 model_key = lambda x: f'{x}W_{NUM_EPOCHS}E_msa'
@@ -94,7 +94,7 @@ for WEIGHTS in weight_opt:
                 save_results=SAVE_RESULTS,
                 save_path=media_save_p,
                 model_key=MODEL_KEY,
-                csv_file=csv_file
+                csv_file=MODEL_STATS_CSV
                 )
     metrics[MODEL_KEY] = {'test_loss': loss,
                           'logs': logs}
@@ -144,7 +144,7 @@ get_metrics(log_y, log_z,
             save_results=SAVE_RESULTS,
             save_path=media_save_p,
             model_key='10_vina_common',
-            csv_file='results/model_media/DGraphDTA_stats.csv',
+            csv_file=MODEL_STATS_CSV,
             show=True)
 
 
@@ -169,14 +169,14 @@ for mkey in metrics:
                 save_results=SAVE_RESULTS,
                 save_path=media_save_p,
                 model_key=mkey,
-                csv_file='results/model_media/DGraphDTA_stats.csv',
+                csv_file=MODEL_STATS_CSV,
                 show=True)
             
 
 # %%
 #%% plot bar graph of results by row (comparing vina to DGraphDTA)
 # cols are: run,cindex,pearson,spearman,mse,mae,rmse
-df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv')[-4:]
+df_res = pd.read_csv(MODEL_STATS_CSV)[-4:]
 
 for col in df_res.columns[1:]:
     plt.figure()
@@ -191,7 +191,7 @@ for col in df_res.columns[1:]:
     plt.show()
     
 # %% plot bar graph (comparing to no msa)
-df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv', index_col=0)
+df_res = pd.read_csv(MODEL_STATS_CSV, index_col=0)
 msa = df_res[df_res.index.str.contains('_msa')]
 no_msa = df_res.loc[[i[:-4] for i in msa.index]]
 both = msa.add(no_msa, fill_value=0)
