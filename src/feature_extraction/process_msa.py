@@ -82,8 +82,6 @@ def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
     """
     msas = [f for f in os.listdir(dir_p) if f.endswith(postfix)]
     
-    # suppress os output
-    
     for msa in tqdm(msas, 'Filtering and cleaning MSAs'):
         f_in = f'{dir_p}/{msa}'
         f_out = f'{dir_p}/{msa[:-len(postfix)]}_cleaned.a3m'

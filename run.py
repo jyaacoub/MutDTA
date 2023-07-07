@@ -16,7 +16,7 @@ from src.data_analysis import get_metrics
 
 
 PDB_RAW_DIR = '../data/v2020-other-PL/'
-PDB_PROCESSED_DIR = '../data/pytorch_PDBbind/'
+PDB_PROCESSED_DIR = '../data/PDBbind_data_wmsa/'
 #loading data and splitting into train, val, test
 pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
 

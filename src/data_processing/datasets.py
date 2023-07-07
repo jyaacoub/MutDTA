@@ -31,7 +31,8 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         self.bind_dir = bind_root
         
         self.cmap_p = lambda code: f'{self.bind_dir}/{code}/{code}_cmap_CB_lone.npy'
-        self.aln_p = lambda code: f'{self.aln_dir}/{code}.msa.a3m'
+        # see feature_extraction/process_msa.py for details on how the alignments are cleaned
+        self.aln_p = lambda code: f'{self.aln_dir}/{code}_cleaned.a3m'
         
         self.cmap_threshold = cmap_threshold
         
@@ -74,8 +75,22 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
     #     #                         self.bind_dir)
     #     raise NotImplementedError(
     #         'Download not supported please download the data manually from PDBbind website')
-            
-    def process(self):
+
+    def pre_process(self):
+        """
+        This method is used to create the processed data files for feature extraction.
+        
+        It creates a XY.csv file that contains the binding data and the sequences for 
+        both ligand and proteins. with the following columns: 
+        PDBCode,resolution,release_year,pkd,lig_name
+        
+        It also generates and saves contact maps for each protein in the dataset.
+
+        Returns
+        -------
+        pd.DataFrame
+            The XY.csv dataframe.
+        """
         pdb_codes = os.listdir(self.bind_dir)
         # filter out readme and index folders
         pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
@@ -111,6 +126,16 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         df = df_smi[df_smi.SMILE.notna()].merge(df_binding, on='PDBCode')
         df = df.merge(df_seq, on='PDBCode')
         df.to_csv(self.processed_dir + '/XY.csv')
+        return df
+    
+    
+    def process(self):
+        if not os.path.isfile(self.processed_dir + '/XY.csv'):
+            df = self.pre_process()
+        else:
+            df = pd.read_csv(self.processed_dir + '/XY.csv', index_col='PDBCode')
+            print('XY.csv file found, using it to create the dataset')
+            print(f'Number of codes: {len(df)}')
         
         
         # creating the dataset:
