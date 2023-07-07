@@ -73,13 +73,11 @@ def get_pssm(aln_file: str, target_seq: str) -> np.array:
         lines = f.readlines()
         lc = len(lines)
         for line in lines:
-            if line[0] == '>': 
-                lc -= 1 # skipping lines with no sequence info
-                continue
+            line = line.strip()
             assert len(line) == len(target_seq), \
                     f'Alignment file is not the same '\
-                    f'length as the protein sequence: '\
-                    f'{len(line)} != {len(target_seq)}'
+                    f'length as the protein sequence in {aln_file}: '\
+                    f'{len(line)} != {len(target_seq)}; \n{line}\n{target_seq}'
             
             # counting up the amino acids at each position
             for i, res in enumerate(line):
