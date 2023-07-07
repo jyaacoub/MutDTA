@@ -20,3 +20,5 @@ Improving the precision oncology pipeline by providing binding affinity purtubat
 # AutoDock Vina Procedure
 See [README/VINA_PROCEDURE.md](./docs/VINA_PROCEDURE.MD) for detailed steps
 
+## Contribution
+See: https://gist.github.com/Zekfad/f51cb06ac76e2457f11c80ed705c95a3 for conventional commits cheat sheet.

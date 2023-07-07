@@ -43,9 +43,10 @@ media_save_p = 'results/model_media/figures/'
 csv_file = 'results/model_media/DGraphDTA_stats.csv'
 
 #%% training and testing
+model_key = lambda x: f'{x}W_{NUM_EPOCHS}E_msa'
 metrics = {}
 for WEIGHTS in weight_opt:
-    MODEL_KEY = f'{WEIGHTS}W_{NUM_EPOCHS}E' 
+    MODEL_KEY = model_key(WEIGHTS)
     # {BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}DO are fixed so not included in model key
     mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
 
@@ -101,14 +102,11 @@ for WEIGHTS in weight_opt:
 # %%
 #plotting all model train and val loss together
 index = np.arange(1, NUM_EPOCHS+1)
-c = plt.plot(index, metrics['kibaW_50E']['logs']['train_loss'], label='kiba train')[0].get_color()
-plt.plot(index, metrics['kibaW_50E']['logs']['val_loss'], label='kiba val', color=c, alpha=0.5)
-
-c = plt.plot(index, metrics['davisW_50E']['logs']['train_loss'], label='davis train')[0].get_color()
-plt.plot(index, metrics['davisW_50E']['logs']['val_loss'], label='davis val', color=c, alpha=0.5)
-
-c = plt.plot(index, metrics['randomW_50E']['logs']['train_loss'], label='random train')[0].get_color()
-plt.plot(index, metrics['randomW_50E']['logs']['val_loss'], label='random val', color=c, alpha=0.5)
+for w in weight_opt:
+    c = plt.plot(index, metrics[model_key(w)]['logs']['train_loss'], 
+                 label=f'{w} train')[0].get_color()
+    plt.plot(index, metrics[model_key(w)]['logs']['val_loss'], 
+             label=f'{w} val', color=c, alpha=0.5)
 
 plt.legend()
 plt.title('DGraphDTA Weight Initialization Impact on Loss')
@@ -178,11 +176,7 @@ for mkey in metrics:
 # %%
 #%% plot bar graph of results by row (comparing vina to DGraphDTA)
 # cols are: run,cindex,pearson,spearman,mse,mae,rmse
-import pandas as pd
 df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv')[-4:]
-
-
-#%%
 
 for col in df_res.columns[1:]:
     plt.figure()
@@ -195,15 +189,25 @@ for col in df_res.columns[1:]:
     plt.xticks(rotation=30)
     # plt.ylim((0.2, 0.8))
     plt.show()
-# %% plotting histogram for PDBbind dataset 
-# (to see if it's normal or not)
-pkds = np.array([])
-for p,l in pdb_dataset:
-    pkd = p.y.numpy().flatten()
-    pkds = np.append(pkds, pkd)
+    
+# %% plot bar graph (comparing to no msa)
+df_res = pd.read_csv('results/model_media/DGraphDTA_stats.csv', index_col=0)
+msa = df_res[df_res.index.str.contains('_msa')]
+no_msa = df_res.loc[[i[:-4] for i in msa.index]]
+both = msa.add(no_msa, fill_value=0)
+for col in both.columns:
+    plt.figure()
+    for w in weight_opt:
+        k = model_key(w)
+        c = plt.bar([w], both.loc[k,col], label=w)[0]._original_facecolor
+        k= k[:-4]
+        plt.bar([f'{w}_msa'], both.loc[k,col], color=c, alpha=0.6)
+    
+    plt.title(f'{col} with and without MSA')
+    # for b in bars:
+    # plt.legend()
+    plt.xticks(rotation=30)
+    plt.savefig(f'results/model_media/figures/{col}_msacompare.png')
+    plt.show()
 
-# %%
-plt.hist(pkds, bins=100)
-plt.title('PDBbind pkd distribution')
-plt.show()
 # %%
