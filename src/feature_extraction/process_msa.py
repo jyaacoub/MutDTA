@@ -10,6 +10,7 @@ reformat.pl ./outputs/10gs_filtered.a3m ./outputs/10gs_filtered.fas -r # reforma
 import os, subprocess
 from typing import Iterable, Tuple
 from tqdm import tqdm
+from multiprocessing import Pool
 
 
 def hhblits(bin_path, f_in, f_out):
@@ -57,6 +58,12 @@ def check_lines(fp='/home/jyaacoub/projects/data/msa/outputs/10gs_final.a3m',
                 f'Line length is not consistent at line {i} in {fp}.'
     return True
 
+def process_msa(hhfilter_bin:str, f_in:str, f_out:str):
+    hhfilter(hhfilter_bin, f_in, f_out)
+    # overwrites filtered msa with cleaned msa
+    clean_msa(f_in=f_out, f_out=f_out)
+    check_lines(f_out)
+
 def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
     """
     Processes msas after hhblits has been run:
@@ -80,12 +87,25 @@ def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
     for msa in tqdm(msas, 'Filtering and cleaning MSAs'):
         f_in = f'{dir_p}/{msa}'
         f_out = f'{dir_p}/{msa[:-len(postfix)]}_cleaned.a3m'
-        hhfilter(hhfilter_bin, f_in, f_out)
-        
-        clean_msa(f_in=f_out, f_out=f_out) # overwrites filtered msa with cleaned msa
-        check_lines(f_out)
-        
-        
+        process_msa(hhfilter_bin, f_in, f_out)
+    
+def multi_process_msa_dir(hhfilter_bin:str, dir_p:str, 
+                          postfix:str='.msa.a3m', processes:int=4):
+    # create list of arguments for multiprocessing
+    #   -> tuple of (hhfilter_bin, f_in, f_out)
+    msas = [(hhfilter_bin, f'{dir_p}/{f}', 
+             f'{dir_p}/{f[:-len(postfix)]}_cleaned.a3m') \
+                 for f in os.listdir(dir_p) if f.endswith(postfix)]
+    
+    
+    with Pool(processes=processes) as pool:
+        starargs = lambda args: process_msa(*args)
+        # using tqdm to show progress bar
+        list(tqdm(pool.imap(starargs, msas), 
+                  total=len(msas), 
+                  desc='Filtering and cleaning MSAs'))
+    
+    
 #%%
 if __name__ == '__main__':
     dir_p = '/home/jyaacoub/projects/data/msa/outputs'
