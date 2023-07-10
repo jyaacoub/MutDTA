@@ -3,12 +3,39 @@ import pandas as pd
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch_geometric.loader import DataLoader
+from torch_geometric.data import InMemoryDataset
 
 
 # Creating data indices for training and validation splits:
-def train_val_test_split(dataset, train_split=.8, val_split=.1, 
+def train_val_test_split(dataset: InMemoryDataset, 
+                         train_split=.8, val_split=.1, 
                          shuffle_dataset=True, random_seed=None,
-                         batch_size=128, use_refined=True):
+                         batch_size=128, use_refined=True) -> tuple[DataLoader]:
+      """
+      Splits up InMemoryDataset into train, val, and test loaders.
+
+      Parameters
+      ----------
+      `dataset` : InMemoryDataset
+          The dataset to split
+      `train_split` : float, optional
+          How much goes to just training, by default .8
+      `val_split` : float, optional
+          How much for validation (remainder goes to test), by default .1
+      `shuffle_dataset` : bool, optional
+          self explainatory, by default True
+      `random_seed` : _type_, optional
+          seed for shuffle, by default None
+      `batch_size` : int, optional
+          size of batch, by default 128
+      `use_refined` : bool, optional
+          If true, the test set will only consist of refined samples for PDBbind, by default True
+
+      Returns
+      -------
+      tuple[DataLoader]
+          Train, val, and test loaders
+      """
       
       if random_seed is not None: 
             np.random.seed(random_seed)
