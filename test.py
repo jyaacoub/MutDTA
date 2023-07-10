@@ -111,7 +111,7 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
 print(f'\n{MODEL_KEY}')
     
-model = DGraphDTA(dropout=DROPOUT)
+model = DGraphDTA(num_features_pro=33, dropout=DROPOUT)
 model.to(device)
 
 # training
@@ -145,3 +145,5 @@ get_metrics(pred, actual,
             )
 metrics[MODEL_KEY] = {'test_loss': loss,
                         'logs': logs}
+
+# %%

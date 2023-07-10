@@ -16,6 +16,7 @@ from src.models.general import BaseModel
 ################ DGraphDTA: ################
 class DGraphDTA(BaseModel):
     """
+    ORIGINAL model
     Improves upon GraphDTA by providing contact maps for a better representation of the protein 
     (instead of just a convolution like in DeepDTA)
         See: https://github.com/595693085/DGraphDTA
@@ -145,7 +146,25 @@ class DGraphDTA(BaseModel):
 
         return main_str + '\n\n' + model_summary
     
+
+
+class DGraphDTAImproved(DGraphDTA):
+    """
+    My version of DGraphDTA
     
+    +Shannon
+    +
+    """
+    def __init__(self, n_output=1, num_features_pro=33, 
+                 # changed from 54 -> 33 due to use of shannon entropy instead of full 21XL PSSM matrix
+                 num_features_mol=78, 
+                 output_dim=128, dropout=0.2):
+        super(DGraphDTAImproved, self).__init__(n_output, num_features_pro, 
+                                                num_features_mol, output_dim, 
+                                                dropout)
+    
+    
+
 ############ GraphDTA ############
 # GCN based model
 class GraphDTA(BaseModel):
