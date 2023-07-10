@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.feature_extraction.protein import get_pssm
-from src.models.prior_work import DGraphDTA
+from src.models.prior_work import DGraphDTAImproved
 from src.data_processing import PDBbindDataset, train_val_test_split
 from src.models import train, test
 from src.data_analysis import get_metrics
@@ -91,14 +91,12 @@ LEARNING_RATE = 0.001
 DROPOUT = 0.2
 NUM_EPOCHS = 50
 
-MODEL_KEY = f'randomW_{NUM_EPOCHS}E_shannon'
 SAVE_RESULTS = True
 media_save_p = 'results/model_media/figures/'
 
 metrics = {}
 # {BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}DO are fixed so not included in model key
 
-mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
 
 #%% load data
 train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset, 
@@ -109,9 +107,12 @@ train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset,
 #%% loading model:
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
+MODEL_KEY = f'randomW_{NUM_EPOCHS}E_shannonExtra'
 print(f'\n{MODEL_KEY}')
+mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
     
-model = DGraphDTA(num_features_pro=33, dropout=DROPOUT)
+model = DGraphDTAImproved(num_features_pro=34, output_dim=512,
+                          dropout=DROPOUT)
 model.to(device)
 
 # training
