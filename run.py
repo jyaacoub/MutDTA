@@ -16,10 +16,13 @@ from src.data_analysis import get_metrics
 
 
 PDB_RAW_DIR = '../data/v2020-other-PL/'
-PDB_PROCESSED_DIR = '../data/PDBbind_data_wmsa/'
+PDB_PROCESSED_DIR = '../data//PDBbindDataset/msa/' #NOTE: type of dataset specified here 
+ALN_DIR = '../data/msa/outputs/'
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 #loading data and splitting into train, val, test
-pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
+pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR, ALN_DIR,
+                             cmap_threshold=8.0,
+                             shannon=False)
 
 # Dataset Hyperparameters
 TRAIN_SPLIT= .8 # 80% of data for training
