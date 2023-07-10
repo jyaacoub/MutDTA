@@ -62,17 +62,27 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     
     # aln_dir = 'data/' + dataset + '/aln'
     if aln_file is not None:
-        pssm = get_pssm(aln_file, target_sequence) 
+        pssm, lc = get_pssm(aln_file, target_sequence)
     else:
         #NOTE: DGraphDTA never uses pssm due to logic error 
         # (see: https://github.com/595693085/DGraphDTA/issues/16)
         pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
     
     if shannon:
-        pssm = np.apply_along_axis(calculate_shannon, 0, pssm)
+        def entropy(col):
+            ent = 0.0
+            for base in np.where(col > 0)[0]: # all bases being used
+                n_i = col[base]
+                P_i = n_i/lc # number of res of type i/ total res in col
+                ent -= P_i*(math.log(P_i,2))
+            return ent
+            
+        pssm = np.apply_along_axis(entropy, axis=0, arr=pssm)
+        pssm = pssm.reshape((len(target_sequence),1))
         #TODO: *1 if max prob matches target seq node *-1 otherwise
-        
-    pssm = pssm.T # transpose so that seq is along axis 1 (rows) (shape=Lx21 or Lx1 if shannon)
+    else:
+        pssm /= lc # normalize pssm matrix by line count
+        pssm = pssm.T # transpose so that seq is along axis 1 (rows) (shape=Lx21 or Lx1 if shannon)
     
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
@@ -99,14 +109,7 @@ def get_pssm(aln_file: str, target_seq: str) -> np.array:
             for i, res in enumerate(line):
                 if res in ResInfo.amino_acids:
                     pssm[ResInfo.amino_acids.index(res), i] += 1
-    
-    # normalize
-    pssm /= lc
-    
-    # apply softmax so that they sum to 1.0
-    exp = np.exp(pssm)
-    
-    return exp / np.sum(exp, axis=0)
+    return pssm, lc
 
 # target aln file save in data/dataset/aln
 def target_to_feature(target_seq):    
@@ -317,24 +320,6 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         
     return seqs
 
-def calculate_shannon(array_prob:np.array, base=2) -> float:    
-    """
-    Calculate Shannon's Entropy given probability values
-                __ M               
-        H =  - \         P ,log ,P 
-               /__ i = 1  i    2  i
-        M is # of values
-        p_i is the prob at index i
-        
-        This is basically the expected value of pP (-logP)
-    """
-    ent = 0.
-    
-    # Compute entropy
-    for i in array_prob:
-        ent -= i * math.log(i, base)
-
-    return ent
 
 def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     """

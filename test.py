@@ -15,13 +15,57 @@ from src.data_processing import PDBbindDataset, train_val_test_split
 from src.models import train, test
 from src.data_analysis import get_metrics
 
-aln_p = '../data/msa/outputs/5klt_cleaned.a3m'
-seq = 'GTVNWSVEDIVKGINSNNLESQLQATQAARKLLSREKQPPIDNIIRAGLIPKFVSFLGKTDCSPIQFESAWALTNIASGTSEQTKAVVDGGAIPAFISLLASPHAHISEQAVWALGNIAGDGSAFRDLVIKHGAIDPLLALLAVPDLSTLACGYLRNLTWTLSNLCRNKNPAPPLDAVEQILPTLVRLLHHNDPEVLADSCWAISYLTDGPNERIEMVVKKGVVPQLVKLLGATELPIVTPALRAIGNIVTGTDEQTQKVIDAGALAVFPLLTNPKTNIQKEATWTMSNITAGRQDQIQQVVNHGLVPFLVGVLSKADFKTQKEAAWAITNYTSGGTVEQIVYLVHCGIIEPLMNLLSAKDTKIIQVILDAISNIFQAAEKLGETEKLSIMIEECGGLDKIEALQRHENESVYKASLNLIEKYFS'
-pssm = get_pssm(aln_p, seq)
+# code = '5klt' # 10gs
+# aln_p = f'../data/msa/outputs/{code}_cleaned.a3m'
+# seq = open(aln_p, 'r').readline().strip()
+# pssm, lc = get_pssm(aln_p, seq)
+
+# pssm_norm = pssm / lc
+# exp = np.exp(pssm_norm)
+# shan1 = np.apply_along_axis(calculate_shannon, axis=0, arr=exp / np.sum(exp, axis=0))
+# print(shan1[0])
+##%% alternate shannon calc
+# def entropy2(col):
+#     ent = 0.0
+#     for base in np.where(col > 0)[0]: # all bases being used
+#         n_i = col[base]
+#         P_i = n_i/float(lc) # number of res of type i/ total res in col
+#         ent -= P_i*(math.log(P_i,2))
+#     return ent
+    
+# shan2 = np.apply_along_axis(entropy2, axis=0, arr=pssm)
+# print(shan2[0])
+
+# #%% alt shannon
+# def shannon_entropy(list_input):
+#     """Calculate Shannon's Entropy per column of the alignment (H=-\sum_{i=1}^{M} P_i\,log_2\,P_i)"""
+
+#     import math
+#     unique_base = set(list_input)
+#     sh_entropy = 0.0
+#     # Number of residues in column
+#     for base in unique_base:
+#         if base not in ResInfo.amino_acids: continue
+#         n_i = list_input.count(base) # Number of residues of type i
+#         P_i = n_i/float(lc) # n_i(Number of residues of type i) / M(Number of residues in column)
+#         sh_entropy -= P_i*(math.log(P_i,2))
+
+#     return sh_entropy
+
+# from Bio import AlignIO
+# alignment = AlignIO.read(f'/home/jyaacoub/projects/data/msa/{code}_filtered.msa.fas', 'fasta')
+# shan3 = np.zeros(len(list(alignment[0])))
+# for col_no in range(len(list(alignment[0]))):
+#     list_input = list(alignment[:, col_no])
+#     shan3[col_no] = shannon_entropy(list_input)
+# print(shan3[0])
+# plt.plot(range(len(shan1)), shan1, label='shan1')
+# plt.plot(range(len(shan2)), shan2, label='shan2')
+# plt.plot(range(len(shan3)), shan3, label='shan3')
+# plt.legend()
+# plt.show()
 
 #%%
-
-
 PDB_RAW_DIR = '../data/v2020-other-PL/'
 PDB_PROCESSED_DIR = '../data/PDBbindDataset/shannon/' #NOTE: type of dataset specified here 
 ALN_DIR = '../data/msa/outputs/'
