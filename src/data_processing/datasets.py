@@ -11,11 +11,12 @@ from src.data_processing import PDBbindProcessor
 #  See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
-    def __init__(self, save_root='../data/pytorch_PDBbind/', 
+    def __init__(self, save_root='../data/PDBbindDataset/msa', 
                  bind_root='../data/v2020-other-PL', 
-                 aln_dir='/home/jyaacoub/projects/data/msa/outputs/',
-                 cmap_threshold=8.0, *args, **kwargs):
+                 aln_dir=None,
+                 cmap_threshold=8.0, shannon=False, *args, **kwargs):
         """
+        Subclass of `torch_geometric.data.InMemoryDataset`.
         Dataset for PDBbind data. This dataset is used to train graph models.
 
         Parameters
@@ -24,17 +25,32 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             Path to processed dir, by default '../data/pytorch_PDBbind/'
         `bind_root` : str, optional
             Path to raw pdbbind files, by default '../data/v2020-other-PL'
+        `aln_dir` : str, optional
+            Path to sequence alignment directory with files of the name 
+            '{code}_cleaned.a3m'. If set to None then no PSSM calculation is 
+            done and is set to zeros, by default None.
         `cmap_threshold` : float, optional
             Threshold for contact map creation, by default 8.0
+        `shannon` : bool, optional
+            If True, shannon entropy instead of PSSM matrix is used for 
+            protein features, by default False.
+            
+        *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.aln_dir =  aln_dir # path to sequence alignments
         self.bind_dir = bind_root
         
         self.cmap_p = lambda code: f'{self.bind_dir}/{code}/{code}_cmap_CB_lone.npy'
         # see feature_extraction/process_msa.py for details on how the alignments are cleaned
-        self.aln_p = lambda code: f'{self.aln_dir}/{code}_cleaned.a3m'
+        
+        if self.aln_dir is None: 
+            # dont use aln if none provided (will set to zeros)
+            self.aln_p = lambda code: None
+        else:
+            self.aln_p = lambda code: f'{self.aln_dir}/{code}_cleaned.a3m'
         
         self.cmap_threshold = cmap_threshold
+        self.shannon = shannon
         
         
         super(PDBbindDataset, self).__init__(save_root, *args, **kwargs)
@@ -98,10 +114,13 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         # creating MSA:
         #NOTE: assuming MSAs are already created, since this would take a long time to do.
         # create_aln_files(df_seq, self.aln_p)
-        valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
-        # filters out those that do not have aln file #NOTE: TEMPORARY
-        print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
-        pdb_codes = valid_codes
+        if self.aln_dir is not None:
+            valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
+            # filters out those that do not have aln file #NOTE: TEMPORARY
+            print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
+            pdb_codes = valid_codes
+        
+        assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
         
         # creating contact maps:
         seqs = create_save_cmaps(pdb_codes,
@@ -150,7 +169,8 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             
             pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
                                                            threshold=self.cmap_threshold,
-                                                           aln_file=self.aln_p(code)) #TODO: complete this
+                                                           aln_file=self.aln_p(code),
+                                                           shannon=self.shannon)
             try:
                 mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
             except ValueError:

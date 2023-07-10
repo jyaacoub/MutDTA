@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from collections import OrderedDict
 from tqdm import tqdm
 
-import os
+import os, math
 import pandas as pd
 from src.feature_extraction import ResInfo, one_hot
 
@@ -13,7 +13,7 @@ from src.feature_extraction import ResInfo, one_hot
 ########################################################################
 # pconsc4 predicted contact map save in data/dataset/pconsc4
 def target_to_graph(target_sequence:str, contact_map:str or np.array, 
-                    threshold=10.5, aln_file:str=None):
+                    threshold=10.5, aln_file:str=None, shannon=False):
     """
     Feature extraction for protein sequence using contact map to generate
     edge index and node features.
@@ -29,6 +29,9 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         is considered an edge, by default 10.5
     `aln_file` : str, optional
         Path to alignment file for PSSM matrix, by default None
+    `shannon` : bool, optional
+        If True, shannon entropy instead of PSSM matrix is used for 
+        protein features, by default False.
 
     Returns
     -------
@@ -58,20 +61,33 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     # getting node features
     
     # aln_dir = 'data/' + dataset + '/aln'
-    pssm = get_pssm(aln_file, target_sequence) #NOTE: DGraphDTA never uses pssm due to logic error (see: https://github.com/jyaacoub/DGraphDTA/commit/ba06f7ece847ba0c806c6a9034748b62cfd2c09a)
-    pro_hot, pro_property = target_to_feature(target_sequence)
+    if aln_file is not None:
+        pssm = get_pssm(aln_file, target_sequence) 
+    else:
+        #NOTE: DGraphDTA never uses pssm due to logic error 
+        # (see: https://github.com/595693085/DGraphDTA/issues/16)
+        pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
+    
+    if shannon:
+        pssm = np.apply_along_axis(calculate_shannon, 0, pssm)
+        #TODO: *1 if max prob matches target seq node *-1 otherwise
+        
+    pssm = pssm.T # transpose so that seq is along axis 1 (rows) (shape=Lx21 or Lx1 if shannon)
+    
+    pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
     return target_size, target_feature, target_edge_index
 
 def get_pssm(aln_file: str, target_seq: str) -> np.array:
+    """ Returns prob distribution of amino acids based on MSA for each node in sequence"""
     # matrix is 21xL where L is the length of the protein
     # 21 is the number of amino acids + X (unknown)
-    pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
     
     with open(aln_file, 'r') as f:
         lines = f.readlines()
         lc = len(lines)
+        pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
         for line in lines:
             line = line.strip()
             assert len(line) == len(target_seq), \
@@ -83,9 +99,14 @@ def get_pssm(aln_file: str, target_seq: str) -> np.array:
             for i, res in enumerate(line):
                 if res in ResInfo.amino_acids:
                     pssm[ResInfo.amino_acids.index(res), i] += 1
-    # normalizing:
-    pssm = pssm / lc
-    return np.transpose(pssm, (1, 0)) # transpose to match DGraphDTA input
+    
+    # normalize
+    pssm /= lc
+    
+    # apply softmax so that they sum to 1.0
+    exp = np.exp(pssm)
+    
+    return exp / np.sum(exp, axis=0)
 
 # target aln file save in data/dataset/aln
 def target_to_feature(target_seq):    
@@ -296,6 +317,24 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         
     return seqs
 
+def calculate_shannon(array_prob:np.array, base=2) -> float:    
+    """
+    Calculate Shannon's Entropy given probability values
+                __ M               
+        H =  - \         P ,log ,P 
+               /__ i = 1  i    2  i
+        M is # of values
+        p_i is the prob at index i
+        
+        This is basically the expected value of pP (-logP)
+    """
+    ent = 0.
+    
+    # Compute entropy
+    for i in array_prob:
+        ent -= i * math.log(i, base)
+
+    return ent
 
 def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     """
