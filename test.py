@@ -86,7 +86,7 @@ np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
 
 # Tune Hyperparameters after grid search
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 LEARNING_RATE = 0.001
 DROPOUT = 0.2
 NUM_EPOCHS = 50
@@ -107,7 +107,7 @@ train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset,
 #%% loading model:
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
-MODEL_KEY = f'randomW_{NUM_EPOCHS}E_shannonExtra'
+MODEL_KEY = f'randomW_{BATCH_SIZE}B_{NUM_EPOCHS}E_shannonExtra'
 print(f'\n{MODEL_KEY}')
 mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
     

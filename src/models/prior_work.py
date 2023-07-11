@@ -167,8 +167,15 @@ class DGraphDTAImproved(DGraphDTA):
                                                 num_features_mol, output_dim, 
                                                 dropout)
         
-        self.pro_conv4 = GCNConv(num_features_pro * 4, num_features_pro * 8)
-        self.pro_fc_g0 = nn.Linear(num_features_pro * 8, num_features_pro*4)    
+        prev_feat = 54 # previous size was 54
+        self.pro_conv1 = GCNConv(num_features_pro, prev_feat)
+        self.pro_conv2 = GCNConv(prev_feat, prev_feat * 2)
+        self.pro_conv3 = GCNConv(prev_feat * 2, prev_feat * 4)
+        self.pro_conv4 = GCNConv(prev_feat * 4, prev_feat * 8)
+        
+        self.pro_fc_g0 = nn.Linear(prev_feat * 8, prev_feat*4)
+        self.pro_fc_g1 = nn.Linear(prev_feat * 4, 1024)
+        self.pro_fc_g2 = nn.Linear(1024, output_dim)    
     
     def forward_pro(self, data_pro):
         # get protein input
