@@ -11,7 +11,7 @@ from torch_geometric.utils import dropout_adj
 from torch_geometric.nn import summary
 from torch_geometric import data as geo_data
 
-from src.models.general import BaseModel
+from src.models.utils import BaseModel
 
 ################ DGraphDTA: ################
 class DGraphDTA(BaseModel):
