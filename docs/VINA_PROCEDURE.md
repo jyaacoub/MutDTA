@@ -164,7 +164,7 @@ For those wishing to run this on a cluster, I have also created some sbatch scri
 The following steps are labeled **A** if you are running this for the first time, and **B** if this is the second time you are running this (i.e. you have already prepared the PDBQT files).
 
 ## 0. Setup for Multiprocessing
-If you dont want to parallelize just make sure to modify the SLURM `--array` option in the `multi_*.sh` scripts.
+If you dont want to parallelize just make sure to modify the SLURM `--array` option in the `multi_*.sh` scripts to be a single array.
 ### 0.1 Split csv
 Create a directory splitting a shortlist file into partitions to run docking over using `src/docking/bash_scripts/split_csv.sh`. Shortlist file can be any file as long as the first column contains the pdbcodes you are interested in docking. For help run `split_csv.sh` with no arguments.
 ```
