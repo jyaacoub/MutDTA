@@ -12,7 +12,7 @@ from matplotlib.ticker import MaxNLocator
 from src.feature_extraction.protein import get_pssm
 from src.models.prior_work import DGraphDTAImproved
 from src.data_processing import PDBbindDataset, train_val_test_split
-from src.models import train, test
+from src.models import train, test, CheckpointSaver
 from src.data_analysis import get_metrics
 
 # code = '5klt' # 10gs
@@ -109,18 +109,19 @@ device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
 MODEL_KEY = f'randomW_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_shannonExtra'
 print(f'\n{MODEL_KEY}')
-mdl_save_p = f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model'
-    
+
 model = DGraphDTAImproved(num_features_pro=34, output_dim=512,
                           dropout=DROPOUT)
 model.to(device)
+saver = CheckpointSaver(model, 
+                        save_path=f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model', 
+                        train_all=True,
+                        patience=5, min_delta=0.05)
 
 # training
 logs = train(model, train_loader, val_loader, device, 
-        epochs=NUM_EPOCHS, lr=LEARNING_RATE)
-# saving model checkpoint
-torch.save(model.state_dict(), mdl_save_p)
-print(f'Model saved to: {mdl_save_p}')
+        epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=saver)
+saver.save()
 
 ax = plt.figure().gca()
 ax.xaxis.set_major_locator(MaxNLocator(integer=True))
