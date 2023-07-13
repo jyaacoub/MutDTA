@@ -1,7 +1,7 @@
 """
-This file contains functions for evaluating docking and affinity prediction model results. 
+This file contains functions for evaluating docking and affinity prediction model results.
 """
-#%%
+# %%
 import os
 from typing import Tuple
 from numbers import Number
@@ -11,12 +11,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
+
 def pdb_wRMSD(pdb_file: str, pred_file: str) -> Number:
     """
-    "An important extension of the RMSD measure, the weighted RMSD (wRMSD), 
-    allows focusing on selected atomic subsets, for example, downplaying the 
+    "An important extension of the RMSD measure, the weighted RMSD (wRMSD),
+    allows focusing on selected atomic subsets, for example, downplaying the
     regions known to be inherently unstructured."
-        \- https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4321859/
+        
+        - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4321859/
     """
     raise NotImplementedError
 
@@ -45,7 +47,7 @@ def pdb_RMSD(pdb_file: str, pred_file: str) -> Number:
         The RMSD between the two structures.
     """
     raise NotImplementedError 
-#%%
+# %%
 def concordance_index(y_true, y_pred): #TODO: make this faster
     """
     Calculates the concordance index (CI) between two arrays of affinity values.
@@ -65,12 +67,13 @@ def concordance_index(y_true, y_pred): #TODO: make this faster
                 sum +=  1* (y_pred[i] > y_pred[j]) + 0.5 * (y_pred[i] == y_pred[j])
     return sum/num_pairs if num_pairs > 0 else 0
     
+    
 try:
     from lifelines.utils import concordance_index # faster implementation
 except:
     pass
 
-def get_metrics(log_y:np.array, log_z:np.array, save_results=True, 
+def get_metrics(log_y: np.array, log_z: np.array, save_results=True, 
                 save_path='results/model_media',
                 model_key='trained_davis_test',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
@@ -104,7 +107,7 @@ def get_metrics(log_y:np.array, log_z:np.array, save_results=True,
     Tuple[Number]
         Tuple for the stats (c_index, p_corr, s_corr, mse, mae, rmse)
     """
-    
+    plt.clf()
     plt.hist(log_y, bins=10, alpha=0.5)
     plt.hist(log_z, bins=10, alpha=0.5)
     plt.legend(['Experimental', model_key])
