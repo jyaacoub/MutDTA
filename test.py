@@ -89,7 +89,7 @@ torch.manual_seed(RAND_SEED)
 BATCH_SIZE = 32
 LEARNING_RATE = 0.0001
 DROPOUT = 0.4
-NUM_EPOCHS = 200
+NUM_EPOCHS = 2000
 
 SAVE_RESULTS = True
 media_save_p = 'results/model_media/figures/'
