@@ -9,6 +9,7 @@ from torch_geometric import data as geo_data
 from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
+from src.feature_extraction.process_msa import check_aln_lines
 from src.feature_extraction.protein import create_save_cmaps, create_aln_files
 from src.data_processing import PDBbindProcessor
 
@@ -287,7 +288,7 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
         path = self.processed_dir if path is None else path
         self._data_pro = torch.load(path + '/data_pro.pt')
         self._data_mol = torch.load(path + '/data_mol.pt')
-        
+    
     def pre_process(self):
         """
         This method is used to create the processed data files for feature extraction.
@@ -305,23 +306,6 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
         """
         prot_seq = json.load(open(f'{self.data_root}/proteins.txt', 'r'), object_hook=OrderedDict)
         codes = list(prot_seq.keys())
-        
-        # checking alignment files present for each code:
-        if self.aln_dir is not None:
-            valid_codes =  [c for c in codes if os.path.isfile(self.aln_p(c))]
-            # filters out those that do not have aln file
-            print(f'Number of codes with aln files: {len(valid_codes)} out of {len(codes)}')
-            codes = valid_codes
-        
-        assert len(codes) > 0, 'Too few codes, need at least 1...'
-        
-        # Checking that contact maps are present for each code:
-        valid_codes = [c for c in codes if os.path.isfile(self.cmap_p(c))]
-        print(f'Number of codes with cmap files: {len(valid_codes)} out of {len(codes)}')
-        codes = valid_codes
-        
-        # filters out those that do not have cmap file
-        prot_seq = {c: prot_seq[c] for c in codes}
         prot_seq = list(prot_seq.values())
         
         # get ligand sequences (order is important since they are indexed by row in affinity matrix):
@@ -333,6 +317,23 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
         affinity_mat = pickle.load(open(f'{self.data_root}/Y', 'rb'), encoding='latin1')
         lig_r, prot_c = np.where(~np.isnan(affinity_mat)) # index values corresponding to non-nan values
         
+        # checking alignment files present for each code:
+        no_aln = []
+        if self.aln_dir is not None:
+            no_aln = [c for c in codes if (not check_aln_lines(self.aln_p(c)))]
+                    
+            # filters out those that do not have aln file
+            print(f'Number of codes with invalid aln files: {len(no_aln)} out of {len(codes)}')
+            
+        # Checking that contact maps are present for each code:
+        no_cmap = [c for c in codes if not os.path.isfile(self.cmap_p(c))]
+        print(f'Number of codes without cmap files: {len(no_cmap)} out of {len(codes)}')
+        
+        invalid_codes = set(no_aln + no_cmap)
+        # filtering out invalid codes:
+        lig_r = [r for i,r in enumerate(lig_r) if codes[prot_c[i]] not in invalid_codes]
+        prot_c = [c for c in prot_c if codes[c] not in invalid_codes]
+        
         # creating binding dataframe:
         #code,SMILE,pkd,prot_seq
         df = pd.DataFrame({
@@ -340,13 +341,13 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
            'SMILE': [ligand_seq[r] for r in lig_r],
            'prot_seq': [prot_seq[c] for c in prot_c]
         })
+        # adding binding data:
         if 'davis' in re.split(r'/+',self.data_root)[-2:]:
             print('davis dataset, taking -log10 of pkd')
             # davis affinity values are in nM, so we take -log10(*1e-9) to get pKd
             df['pkd'] = [-np.log10(y*1e-9) for y in affinity_mat[lig_r, prot_c]]
         else:
             df['pkd'] = affinity_mat[lig_r, prot_c]
-            
         df.to_csv(self.processed_dir + '/XY.csv')
         return df
     
@@ -356,7 +357,7 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
         else:
             df = pd.read_csv(self.processed_dir + '/XY.csv')
             print('XY.csv file found, using it to create the dataset')
-            print(f'Number of codes: {len(df)}')
+        print(f'Number of codes: {len(df)}')
         
         
         # creating the dataset:

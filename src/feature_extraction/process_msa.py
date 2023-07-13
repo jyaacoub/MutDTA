@@ -44,17 +44,17 @@ def clean_msa(f_in: str, f_out:str):
                     new_l += c
             f.write(new_l+'\n')
 
-def check_lines(fp:str, limit=None):
+def check_aln_lines(fp:str, limit=None):
+    if not os.path.isfile(fp): return False
+    
     with open(fp, 'r') as f:
         lines = f.readlines()
         seq_len = len(lines[0])
         limit = len(lines) if limit is None else limit
         
         for i,l in enumerate(lines[:limit]):
-            assert l[0] != '>', \
-                f'File {fp} not properly formatted. Found \'>\' at line {i}.'
-            assert len(l) == seq_len, \
-                f'Line length is not consistent at line {i} in {fp}.'
+            if l[0] == '>' or len(l) != seq_len:
+                return False
     return True
 
 def process_msa(hhfilter_bin:str, f_in:str, f_out:str):
