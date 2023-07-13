@@ -98,13 +98,13 @@ metrics = {}
 # {BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}DO are fixed so not included in model key
 
 
-#%% load data
+# %% load data
 train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset, 
                     train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
                     shuffle_dataset=True, random_seed=RAND_SEED, 
                     batch_size=BATCH_SIZE, use_refined=True)
 
-#%% loading model:
+# %% loading model:
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f'Device: {device}')
 MODEL_KEY = f'randomW_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_shannonExtra'
@@ -118,7 +118,7 @@ saver = CheckpointSaver(model,
                         train_all=True,
                         patience=5, min_delta=0.05)
 
-# training
+# %% training
 logs = train(model, train_loader, val_loader, device, 
         epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=saver)
 saver.save()
@@ -137,7 +137,7 @@ plt.ylabel('Loss')
 if SAVE_RESULTS: plt.savefig(f'results/model_media/figures/{MODEL_KEY}_loss.png')
 plt.show()
 
-#  testing
+# %% testing
 loss, pred, actual = test(model, test_loader, device)
 get_metrics(pred, actual,
             save_results=SAVE_RESULTS,
