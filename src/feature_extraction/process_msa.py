@@ -11,6 +11,7 @@ import os, subprocess
 from typing import Iterable, Tuple
 from tqdm import tqdm
 from multiprocessing import Pool
+from src.feature_extraction.protein import get_pfm
 
 
 def hhblits(bin_path, f_in, f_out):
@@ -61,7 +62,7 @@ def process_msa(hhfilter_bin:str, f_in:str, f_out:str):
     hhfilter(hhfilter_bin, f_in, f_out)
     # overwrites filtered msa with cleaned msa
     clean_msa(f_in=f_out, f_out=f_out)
-    check_lines(f_out)
+    check_aln_lines(f_out)
 
 def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
     """
@@ -102,11 +103,28 @@ def multi_process_msa_dir(hhfilter_bin:str, dir_p:str,
                   total=len(msas), 
                   desc='Filtering and cleaning MSAs'))
     
+def create_pfm_np_files(aln_dir):
+    """
+    Creates a .npy file for each MSA in the given directory.
+    """
+    files = [f for f in os.listdir(aln_dir) if f.endswith('.a3m') or f.endswith('.aln')]
+    # adding directory path to file names
+    files = [f'{aln_dir}/{f}' for f in files]
+    
+    with Pool(processes=8) as pool:
+        # using tqdm to show progress bar
+        list(tqdm(pool.imap(get_pfm, files), 
+                  total=len(files), 
+                  desc='Creating PFM files'))
+    
     
 #%%
 if __name__ == '__main__':
-    dir_p = '/home/jyaacoub/projects/data/msa/outputs'
-    hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
-    postfix = '.msa.a3m'
-    process_msa_dir(hhfilter_bin, dir_p, postfix)
+    # dir_p = '/home/jyaacoub/projects/data/msa/outputs'
+    # hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
+    # postfix = '.msa.a3m'
+    # process_msa_dir(hhfilter_bin, dir_p, postfix)
+    dir_p = '/home/jyaacoub/projects/data/davis_kiba/kiba/aln/'
+    
+    create_pfm_np_files(dir_p)
 # %%

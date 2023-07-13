@@ -49,7 +49,9 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     target_size = len(target_sequence)
     assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
     # its ok if it is smaller, but not larger (due to missing residues in pdb)
-    assert contact_map.shape[0] == target_size, 'contact map size does not match target sequence size'
+    assert contact_map.shape[0] == target_size, \
+            f'contact map size does not match target sequence size,'+\
+            f'{contact_map.shape[0]} != {target_size}'
     
     
     # adding self loop then thresholding
@@ -68,11 +70,12 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     
     # aln_dir = 'data/' + dataset + '/aln'
     if aln_file is not None:
-        pssm, lc = get_pssm(aln_file, target_sequence)
+        pfm, lc = get_pfm(aln_file, target_sequence)
     else:
         #NOTE: DGraphDTA never uses pssm due to logic error 
         # (see: https://github.com/595693085/DGraphDTA/issues/16)
-        pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
+        # returns Lx21 matrix of amino acid distribution for each node
+        pfm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
     
     if shannon:
         def entropy(col):
@@ -83,39 +86,49 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
                 ent -= P_i*(math.log(P_i,2))
             return ent
             
-        pssm = np.apply_along_axis(entropy, axis=0, arr=pssm)
-        pssm = pssm.reshape((len(target_sequence),1))
+        pfm = np.apply_along_axis(entropy, axis=1, arr=pfm)
+        pfm = pfm.reshape((len(target_sequence),1))
         #TODO: *1 if max prob matches target seq node *-1 otherwise
     else:
-        pssm /= lc # normalize pssm matrix by line count
-        pssm = pssm.T # transpose so that seq is along axis 1 (rows) (shape=Lx21 or Lx1 if shannon)
+        pfm /= lc # normalize pssm matrix by line count
     
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
-    target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
+    target_feature = np.concatenate((pfm, pro_hot, pro_property), axis=1)
     
     return target_size, target_feature, target_edge_index
 
-def get_pssm(aln_file: str, target_seq: str) -> np.array:
-    """ Returns prob distribution of amino acids based on MSA for each node in sequence"""
+def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
+    """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
     # matrix is 21xL where L is the length of the protein
-    # 21 is the number of amino acids + X (unknown)
-    
+    # 21 is the number of amino acids + X (unknown) 
     with open(aln_file, 'r') as f:
         lines = f.readlines()
-        lc = len(lines)
-        pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
-        for line in lines:
-            line = line.strip()
-            assert len(line) == len(target_seq), \
-                    f'Alignment file is not the same '\
-                    f'length as the protein sequence in {aln_file}: '\
-                    f'{len(line)} != {len(target_seq)}; \n{line}\n{target_seq}'
+        
+    # first line is target seq
+    target_seq = lines[0].strip() if target_seq is None else target_seq 
+        
+    save_p = aln_file+'.pfm.npy'
+    if not overwrite and os.path.isfile(save_p):
+        return np.load(save_p), len(lines)
+    
+    # initializing matrix and counting up amino acids
+    pfm = np.zeros((len(target_seq), len(ResInfo.amino_acids)), dtype=np.int64)
+    for line in lines:
+        line = line.strip()
+        # assert len(line) == len(target_seq), \
+        #         f'Alignment file is not the same '\
+        #         f'length as the protein sequence in {aln_file}: '\
+        #         f'{len(line)} != {len(target_seq)}; \n{line}\n{target_seq}'
+        
+        # counting up the amino acids at each position
+        res_indices = np.array([ResInfo.res_to_i.get(res, -1) for res in line])
+        valid_indices = res_indices != -1
+        pfm[np.where(valid_indices), res_indices[valid_indices]] += 1
             
-            # counting up the amino acids at each position
-            for i, res in enumerate(line):
-                if res in ResInfo.amino_acids:
-                    pssm[ResInfo.amino_acids.index(res), i] += 1
-    return pssm, lc
+    # saving as numpy array
+    np.save(save_p, pfm)
+    
+    return pfm, len(lines)
 
 # target aln file save in data/dataset/aln
 def target_to_feature(target_seq):    
