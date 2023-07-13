@@ -26,7 +26,10 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         File path for contact map or the actual map itself.
     `threshold` : float, optional
         Threshold for what defines an edge, anything under this value 
-        is considered an edge, by default 10.5
+        is considered an edge. Passing in a negative value will flip 
+        this to be anything **above** the value (useful for when the cmap 
+        is probability based, anything above 0.5 is considered in contact),
+        by default 10.5
     `aln_file` : str, optional
         Path to alignment file for PSSM matrix, by default None
     `shannon` : bool, optional
@@ -52,7 +55,10 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     # adding self loop then thresholding
     # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
     # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
-    index_row, index_col = np.where(contact_map <= threshold)
+    if threshold >= 0.0:
+        index_row, index_col = np.where(contact_map <= threshold)
+    else: # negative threshold flips the sign
+        index_row, index_col = np.where(contact_map >= abs(threshold))
     assert index_row.max() < target_size and index_col.max() < target_size, 'contact map size does not match target sequence size'
     
     # converting edge matrix to edge index for pytorch geometric
