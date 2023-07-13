@@ -5,42 +5,51 @@ import numpy as np
 
 from src.data_processing.utils import train_val_test_split
 from src.models.prior_work import DGraphDTA
+from src.models.utils import BaseModel, CheckpointSaver
+from torch_geometric.loader import DataLoader
 
-def train(model, train_loader, val_loader, device,
-          epochs=10, lr=0.001, **kwargs) -> dict:
+
+def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader, 
+          device: torch.device, epochs=10, lr=0.001, 
+          saver: CheckpointSaver=None, **kwargs) -> dict:
     """
     Training loop for graph models.
     Note that **kwargs is used to pass any additional arguments to the optimizer.
 
     Parameters
     ----------
-    `model` : _type_
+    `model` : BaseModel
         Model to be trained.
-    `train_loader` : _type_
+    `train_loader` : DataLoader
         Data loader for training set.
-    `val_loader` : _type_
+    `val_loader` : DataLoader
         Data loader for validation set.
-    `device` : _type_
+    `device` : torch.device
         Device to train on.
     `epochs` : int, optional
         number of epochs, by default 10
     `lr` : float, optional
         learning rate, by default 0.001
+    `saver` : CheckpointSaver, optional
+        CheckpointSaver object that decides when to stop training and saves checkpoint 
+        of best performant version of the model if none provided then will train for 
+        all epochs, by default None
         
     Returns
     -------
     dict
         Dictionary containing training and validation loss for each epoch.
     """
+    saver = saver or CheckpointSaver(model, train_all=True)
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr, **kwargs)
 
     logs = {'train_loss': [], 'val_loss': []}
     
-    for epoch in range(epochs):
+    for epoch in range(1, epochs+1):
         # Training loop
         with tqdm(total=len(train_loader), 
-                  desc=f"Epoch {epoch+1}/{epochs}", 
+                  desc=f"Epoch {epoch}/{epochs}", 
                   unit="batch") as progress_bar:
             model.train()
             train_loss = 0.0
@@ -86,9 +95,13 @@ def train(model, train_loader, val_loader, device,
             val_loss /= len(val_loader)
 
         # Print training and validation loss for the epoch
-        print(f"Epoch {epoch+1}/{epochs}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
+        
+        if saver.early_stop(val_loss, epoch):
+            print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
+            break    
     return logs
 
 

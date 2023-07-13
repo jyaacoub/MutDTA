@@ -11,15 +11,18 @@ from matplotlib.ticker import MaxNLocator
 
 from src.models.prior_work import DGraphDTA
 from src.data_processing import PDBbindDataset, train_val_test_split
-from src.models import train, test
+from src.models import train, test, CheckpointSaver
 from src.data_analysis import get_metrics
 
 
 PDB_RAW_DIR = '../data/v2020-other-PL/'
-PDB_PROCESSED_DIR = '../data/PDBbind_data_wmsa/'
+PDB_PROCESSED_DIR = '../data//PDBbindDataset/msa/' #NOTE: type of dataset specified here 
+ALN_DIR = '../data/msa/outputs/'
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 #loading data and splitting into train, val, test
-pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR)
+pdb_dataset = PDBbindDataset(PDB_PROCESSED_DIR, PDB_RAW_DIR, ALN_DIR,
+                             cmap_threshold=8.0,
+                             shannon=False)
 
 # Dataset Hyperparameters
 TRAIN_SPLIT= .8 # 80% of data for training
@@ -66,13 +69,17 @@ for WEIGHTS in weight_opt:
     if WEIGHTS != 'random':
         model_file_name = f'results/model_checkpoints/prior_work/DGraphDTA_{WEIGHTS}_t2.model'
         model.load_state_dict(torch.load(model_file_name, map_location=device))
+    
+    #Creating a saver object to save the best model during training
+    saver = CheckpointSaver(model, 
+                            save_path=f'results/model_checkpoints/ours/DGraphDTA_{MODEL_KEY}.model', 
+                            train_all=True,
+                            patience=5, min_delta=0.05)
 
     # training
     logs = train(model, train_loader, val_loader, device, 
-            epochs=NUM_EPOCHS, lr=LEARNING_RATE)
-    # saving model checkpoint
-    torch.save(model.state_dict(), mdl_save_p)
-    print(f'Model saved to: {mdl_save_p}')
+            epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=saver)
+    saver.save()
 
     ax = plt.figure().gca()
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))

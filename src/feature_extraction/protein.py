@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from collections import OrderedDict
 from tqdm import tqdm
 
-import os
+import os, math
 import pandas as pd
 from src.feature_extraction import ResInfo, one_hot
 
@@ -13,7 +13,7 @@ from src.feature_extraction import ResInfo, one_hot
 ########################################################################
 # pconsc4 predicted contact map save in data/dataset/pconsc4
 def target_to_graph(target_sequence:str, contact_map:str or np.array, 
-                    threshold=10.5, aln_file:str=None):
+                    threshold=10.5, aln_file:str=None, shannon=False):
     """
     Feature extraction for protein sequence using contact map to generate
     edge index and node features.
@@ -29,6 +29,9 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         is considered an edge, by default 10.5
     `aln_file` : str, optional
         Path to alignment file for PSSM matrix, by default None
+    `shannon` : bool, optional
+        If True, shannon entropy instead of PSSM matrix is used for 
+        protein features, by default False.
 
     Returns
     -------
@@ -58,20 +61,43 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     # getting node features
     
     # aln_dir = 'data/' + dataset + '/aln'
-    pssm = get_pssm(aln_file, target_sequence) #NOTE: DGraphDTA never uses pssm due to logic error (see: https://github.com/jyaacoub/DGraphDTA/commit/ba06f7ece847ba0c806c6a9034748b62cfd2c09a)
-    pro_hot, pro_property = target_to_feature(target_sequence)
+    if aln_file is not None:
+        pssm, lc = get_pssm(aln_file, target_sequence)
+    else:
+        #NOTE: DGraphDTA never uses pssm due to logic error 
+        # (see: https://github.com/595693085/DGraphDTA/issues/16)
+        pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
+    
+    if shannon:
+        def entropy(col):
+            ent = 0.0
+            for base in np.where(col > 0)[0]: # all bases being used
+                n_i = col[base]
+                P_i = n_i/lc # number of res of type i/ total res in col
+                ent -= P_i*(math.log(P_i,2))
+            return ent
+            
+        pssm = np.apply_along_axis(entropy, axis=0, arr=pssm)
+        pssm = pssm.reshape((len(target_sequence),1))
+        #TODO: *1 if max prob matches target seq node *-1 otherwise
+    else:
+        pssm /= lc # normalize pssm matrix by line count
+        pssm = pssm.T # transpose so that seq is along axis 1 (rows) (shape=Lx21 or Lx1 if shannon)
+    
+    pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
     return target_size, target_feature, target_edge_index
 
 def get_pssm(aln_file: str, target_seq: str) -> np.array:
+    """ Returns prob distribution of amino acids based on MSA for each node in sequence"""
     # matrix is 21xL where L is the length of the protein
     # 21 is the number of amino acids + X (unknown)
-    pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
     
     with open(aln_file, 'r') as f:
         lines = f.readlines()
         lc = len(lines)
+        pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
         for line in lines:
             line = line.strip()
             assert len(line) == len(target_seq), \
@@ -83,9 +109,7 @@ def get_pssm(aln_file: str, target_seq: str) -> np.array:
             for i, res in enumerate(line):
                 if res in ResInfo.amino_acids:
                     pssm[ResInfo.amino_acids.index(res), i] += 1
-    # normalizing:
-    pssm = pssm / lc
-    return np.transpose(pssm, (1, 0)) # transpose to match DGraphDTA input
+    return pssm, lc
 
 # target aln file save in data/dataset/aln
 def target_to_feature(target_seq):    

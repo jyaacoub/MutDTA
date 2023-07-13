@@ -9,7 +9,7 @@ if __name__ == '__main__':
     from scipy.stats import pearsonr, spearmanr
     import pandas as pd
     import numpy as np
-    import random
+    import random, os
     from src.data_analysis.metrics import get_metrics
 
 
