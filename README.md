@@ -1,4 +1,4 @@
-# MutDTA
+# MutDTA [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-31011/) ![Python Tests](https://github.com/jyaacoub/MutDTA/actions/workflows/python-app.yml/badge.svg?branch=main) 
 Improving the precision oncology pipeline by providing binding affinity purtubations predictions on a pirori identified cancer driver genes.
 
 # Current Progress
