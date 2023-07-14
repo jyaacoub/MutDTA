@@ -35,14 +35,6 @@ class ResInfo():
                    'R', 'S', 'T', 'V', 'W', 'Y', 'X']
     
     res_to_i = {k:i for i,k in enumerate(amino_acids)}
-    
-    def create_hot(res_to_i):
-        hot = {}
-        for k in res_to_i:
-            hot[k] = np.eye(len(res_to_i), dtype=bool)[res_to_i[k]]
-        return hot
-    
-    res_to_hot = create_hot(res_to_i)
 
     aliphatic = ['A', 'I', 'L', 'M', 'V']
     aromatic = ['F', 'W', 'Y']

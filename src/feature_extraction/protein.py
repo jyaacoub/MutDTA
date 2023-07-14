@@ -70,30 +70,31 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     
     # aln_dir = 'data/' + dataset + '/aln'
     if aln_file is not None:
-        pfm, lc = get_pfm(aln_file, target_sequence)
+        pssm, line_count = get_pfm(aln_file, target_sequence)
     else:
         #NOTE: DGraphDTA never uses pssm due to logic error 
         # (see: https://github.com/595693085/DGraphDTA/issues/16)
         # returns Lx21 matrix of amino acid distribution for each node
-        pfm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
+        pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
     
     if shannon:
         def entropy(col):
             ent = 0.0
             for base in np.where(col > 0)[0]: # all bases being used
                 n_i = col[base]
-                P_i = n_i/lc # number of res of type i/ total res in col
+                P_i = n_i/line_count # number of res of type i/ total res in col
                 ent -= P_i*(math.log(P_i,2))
             return ent
             
-        pfm = np.apply_along_axis(entropy, axis=1, arr=pfm)
-        pfm = pfm.reshape((len(target_sequence),1))
+        pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
+        pssm = pssm.reshape((len(target_sequence),1))
         #TODO: *1 if max prob matches target seq node *-1 otherwise
     else:
-        pfm /= lc # normalize pssm matrix by line count
+        pseudocount = 0.8
+        pssm = (pssm + pseudocount / 4) / (float(line_count) + pseudocount)
     
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
-    target_feature = np.concatenate((pfm, pro_hot, pro_property), axis=1)
+    target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
     return target_size, target_feature, target_edge_index
 

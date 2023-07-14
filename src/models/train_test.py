@@ -95,7 +95,9 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
             val_loss /= len(val_loader)
 
         # Print training and validation loss for the epoch
-        print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
+                f"Val Loss: {val_loss:.4f}, "+\
+                f"Best Val Loss: {saver.best_loss:.4f} @ Epoch {saver.best_epoch}")
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
         

@@ -24,7 +24,7 @@ class BaseModel(nn.Module):
     
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-    def __init__(self, model, save_path=None, train_all=False, patience=5, min_delta=0.01):
+    def __init__(self, model, save_path=None, train_all=False, patience=5, min_delta=0.03):
         """
         Early stopping and checkpoint saving class.
 
@@ -41,7 +41,7 @@ class CheckpointSaver:
             Number of epochs to wait for before stopping, by default 5
         `min_delta` : float, optional
             The minimum change in val loss to be considered a significant degradation, 
-            by default 0.01
+            by default 0.03
         """
         self.model = model
         self.save_path = save_path
