@@ -372,12 +372,12 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
             label = df.loc[idx]['pkd']
             label = torch.Tensor([[label]])
             
-            pro_size, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
-                                                           threshold=self.cmap_threshold,
-                                                           aln_file=self.aln_p(code),
-                                                           shannon=self.shannon)
+            _, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
+                                                    threshold=self.cmap_threshold,
+                                                    aln_file=self.aln_p(code),
+                                                    shannon=self.shannon)
             try:
-                mol_size, mol_feat, mol_edge = smile_to_graph(lig_seq)
+                _, mol_feat, mol_edge = smile_to_graph(lig_seq)
             except ValueError:
                 errors.append(code)
                 continue
