@@ -3,9 +3,9 @@ from collections import OrderedDict
 import json, pickle, re, os
 
 import torch
+import torch_geometric as torchg
 import numpy as np
 import pandas as pd
-from torch_geometric import data as geo_data
 from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
@@ -15,7 +15,7 @@ from src.data_processing import PDBbindProcessor
 
 #  See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
-class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
+class PDBbindDataset(torchg.data.InMemoryDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
     def __init__(self, save_root='../data/PDBbindDataset/msa', 
                  bind_root='../data/v2020-other-PL', 
                  aln_dir=None,
@@ -175,11 +175,11 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
                 errors.append(code)
                 continue
             
-            pro = geo_data.Data(x=torch.Tensor(pro_feat),
+            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                 y=label,
                                 code=code)
-            lig = geo_data.Data(x=torch.Tensor(mol_feat),
+            lig = torchg.data.Data(x=torch.Tensor(mol_feat),
                                 edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
                                 y=label,
                                 code=code)
@@ -193,8 +193,8 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
             data_list = [self.pre_transform(data) for data in data_list]
             
         def collate(data_list):
-            batchA = geo_data.Batch.from_data_list([data[0] for data in data_list])
-            batchB = geo_data.Batch.from_data_list([data[1] for data in data_list])
+            batchA = torchg.data.Batch.from_data_list([data[0] for data in data_list])
+            batchB = torchg.data.Batch.from_data_list([data[1] for data in data_list])
             return batchA, batchB
         
         self._data_pro, self._data_mol = collate(data_list)
@@ -209,7 +209,7 @@ class PDBbindDataset(geo_data.InMemoryDataset): # InMemoryDataset is used if the
         return self._data_pro[idx], self._data_mol[idx]
     
     
-class DavisKibaDataset(geo_data.InMemoryDataset):
+class DavisKibaDataset(torchg.data.InMemoryDataset):
     def __init__(self, save_root='../data/DavisKibaDataset/', 
                  data_root='../data/davis_kiba/davis/', 
                  aln_dir='../data/davis_kiba/davis/aln/',
@@ -382,11 +382,11 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
                 errors.append(code)
                 continue
             
-            pro = geo_data.Data(x=torch.Tensor(pro_feat),
+            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                 y=label,
                                 code=code)
-            lig = geo_data.Data(x=torch.Tensor(mol_feat),
+            lig = torchg.data.Data(x=torch.Tensor(mol_feat),
                                 edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
                                 y=label,
                                 code=code)
@@ -400,12 +400,13 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
             data_list = [self.pre_transform(data) for data in data_list]
             
         def collate(data_list):
-            batchA = geo_data.Batch.from_data_list([data[0] for data in data_list])
-            batchB = geo_data.Batch.from_data_list([data[1] for data in data_list])
+            batchA = torchg.data.Batch.from_data_list([data[0] for data in data_list])
+            batchB = torchg.data.Batch.from_data_list([data[1] for data in data_list])
             return batchA, batchB
         
         self._data_pro, self._data_mol = collate(data_list)
         
+        print('Saving...')
         torch.save(self._data_pro, self.processed_dir + '/data_pro.pt')
         torch.save(self._data_mol, self.processed_dir + '/data_mol.pt')
 
