@@ -358,6 +358,7 @@ class DavisKibaDataset(geo_data.InMemoryDataset):
             df = pd.read_csv(self.processed_dir + '/XY.csv')
             print('XY.csv file found, using it to create the dataset')
         print(f'Number of codes: {len(df)}')
+        df = df.loc[:30_000] # cap dataset size (due to memory constraints)
         
         
         # creating the dataset:

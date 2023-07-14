@@ -33,10 +33,11 @@ class DGraphDTA(BaseModel):
         self.mol_fc_g1 = nn.Linear(num_features_mol * 4, 1024)
         self.mol_fc_g2 = nn.Linear(1024, output_dim)
 
-        self.pro_conv1 = GCNConv(num_features_pro, num_features_pro)
-        self.pro_conv2 = GCNConv(num_features_pro, num_features_pro * 2)
-        self.pro_conv3 = GCNConv(num_features_pro * 2, num_features_pro * 4)
-        self.pro_fc_g1 = nn.Linear(num_features_pro * 4, 1024)
+        emb_feat= 54 # to ensure constant embedding size regardless of input size (for fair comparison)
+        self.pro_conv1 = GCNConv(num_features_pro, emb_feat)
+        self.pro_conv2 = GCNConv(emb_feat, emb_feat * 2)
+        self.pro_conv3 = GCNConv(emb_feat * 2, emb_feat * 4)
+        self.pro_fc_g1 = nn.Linear(emb_feat * 4, 1024)
         self.pro_fc_g2 = nn.Linear(1024, output_dim)
 
         self.relu = nn.ReLU()

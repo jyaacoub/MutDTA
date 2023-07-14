@@ -54,18 +54,18 @@ class CheckpointSaver:
         self.stop_epoch = -1
         
         self.counter = 0
-        self.min_validation_loss = np.inf
+        self.min_val_loss = np.inf
 
     def early_stop(self, validation_loss, curr_epoch):
         # save model if validation loss is lower than previous best
-        if validation_loss < self.min_validation_loss:
-            self.min_validation_loss = validation_loss
+        if validation_loss < self.min_val_loss:
+            self.min_val_loss = validation_loss
             self.counter = 0
             self.best_model_dict = self.model.state_dict()
             self.best_epoch = curr_epoch
         # early stopping if validation loss doesnt improve for `patience` epochs
         elif (not self.train_all) and \
-            (validation_loss > (self.min_validation_loss + self.min_delta)):
+            (validation_loss > (self.min_val_loss + self.min_delta)):
             self.counter += 1
             if self.counter >= self.patience:
                 self.stop_epoch = curr_epoch
@@ -80,7 +80,7 @@ class CheckpointSaver:
         
     def __repr__(self) -> str:
         return f'save path: {self.save_path}'+ \
-               f'min val loss: {self.min_validation_loss}'+ \
+               f'min val loss: {self.min_val_loss}'+ \
                f'stop epoch: {self.stop_epoch}'+ \
                f'best epoch: {self.best_epoch}'
     
