@@ -59,7 +59,7 @@ def concordance_index(y_true, y_pred): #TODO: make this faster
     
     # calculating concordance index
     sum = 0
-    num_pairs = 0
+    num_pairs = 0 # number of pairs of samples that can be compared
     for i in range(len(y_true)):
         for j in range(i): # only need to loop through j < i
             if (y_true[i] > y_true[j]): # y[i] > y[j] is implied
@@ -131,7 +131,13 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
 
 
     # Stats
-    c_index = concordance_index(y_true, y_pred)
+    try:
+        # cindex throws zero division error if all values are the same
+        c_index = concordance_index(y_true, y_pred)
+    except ZeroDivisionError:
+        c_index = -1
+        print('ZeroDivisionError: cindex set to -1')
+        
     p_corr = pearsonr(y_true, y_pred)
     s_corr = spearmanr(y_true, y_pred)
 
