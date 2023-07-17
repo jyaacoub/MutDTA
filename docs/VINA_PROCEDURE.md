@@ -213,3 +213,45 @@ Same as **2.2A** but change `conf_dir` in `src/docking/sbatch/multi_dock.sh` to 
 
 ## 3. Data analysis
 Follow the same steps as in [**5. Data analysis**](#5-data-analysis) above.
+
+
+# Flexible Docking
+For flexible docking we need to also run `prepare_flexreceptor4.py` during our preparation stage [**3. Prepare receptor**](#3-preparing-receptor-and-ligand-pdbqt-files). 
+
+Format for -s param:
+```python
+>>> rec = Read('/cluster/projects/kumargroup/jean/data/refined-set/10gs/10gs_protein.pdbqt')
+>>> rec[0].name
+'10gs_protein'
+>>> rec[0].chains[0].name
+'A'
+>>> rec[0].chains[0].residues[0].name
+'PRO2'
+>>> "10gs_protein:A:PRO2"
+'10gs_protein:A:PRO2'
+```
+
+So if the binding pocket only has one chain A the format will look somthing like this:
+```
+10gs_protein:A:TYR7_PHE8
+```
+
+```
+Usage: prepare_flexreceptor4.py -r receptor_filename -s list_of_names_of_residues_to_move
+    Description of command...
+         -r     receptor_filename (.pdbqt)
+         -s     specification for flex residues
+                Use underscores to separate residue names:
+                  ARG8_ILE84  
+                Use commas to separate 'full names' which uniquely identify residues:
+                  hsg1:A:ARG8_ILE84,hsg1:B:THR4 
+                [syntax is molname:chainid:resname]
+    Optional parameters:
+        [-v]    verbose output
+        [-N]    type(s) of bonds to disallow: 
+        [-M]    interactive mode (automatic is default)
+        [-P]    pairs of atom names bonds between which to disallow: hsg1:A:ARG8:CA_CB,CB_CG;hsg1:B:ARG8:CA_CB
+        [-g pdbqt_filename] (rigid output filename)
+        [-x pdbqt_filename] (flexible output filename)
+```
+For this I have created `PDBbind_prepareflex.sh` that does the same thing
