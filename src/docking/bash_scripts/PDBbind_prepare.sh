@@ -24,6 +24,8 @@ function usage {
   echo "              Doesn't matter what the file is as long as the first column contains the pdbcodes."
   echo "       -cd --config-dir: path to store new configurations in."
   echo "              Default is to store it with the prepared receptor as <PDBCode>_conf.txt"
+  echo "       -f --flex: optional, runs prepare_flexreceptor4.py with all residues in <code>_pocket.pdb"
+  echo "              as flexible."
   exit 1
 }
 
@@ -40,11 +42,11 @@ prep_confpy=${bash_scripts}/../python_helpers/prep_conf.py
 PDBbind=$(realpath $1)
 ADT="$2"
 prep_receptor="${ADT}/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
+prep_flexreceptor="${ADT}/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_flexreceptor4.py"
 template="$3"
 shortlist=""
 config_dir=""
-
-echo -e "\n\t PARSING OPTIONAL ARGS:"
+flexible=false
 
 # Parse the options
 while [[ $# -gt 3 ]]; do
@@ -58,6 +60,10 @@ while [[ $# -gt 3 ]]; do
       config_dir="$5"
       shift 2
       ;;
+    -f|--flex)
+      flexible=true
+      shift 1
+      ;;
     *)
       echo "Unknown option: $key"
       usage
@@ -66,15 +72,19 @@ while [[ $# -gt 3 ]]; do
 done
 
 # Print the parsed arguments
-echo "Path: $PDBbind"
-echo "ADT Path: $ADT"
-echo "Template: $template"
+echo "ARGS"
+echo -e "\tPath: $PDBbind"
+echo -e "\tADT Path: $ADT"
+echo -e "\tTemplate: $template"
+echo "OPTIONAL ARGS:"
 if [[ -n "$shortlist" ]]; then
-  echo "Shortlist: $shortlist"
+  echo -e "\tShortlist: $shortlist"
 fi
 if [[ -n "$config_dir" ]]; then
-  echo "Config Dir: $config_dir"
+  echo -e "\tConfig Dir: $config_dir"
 fi
+echo -e "\tFlexible: $flexible\n"
+exit
 
 #<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
@@ -95,6 +105,12 @@ fi
 # Checking if prepare_receptor4.py exists (part of MGLTools)
 if [[ ! -f $prep_receptor ]]; then
   echo "prepare_receptor4.py does not exist in the specified location: $prep_receptor"
+  exit 1
+fi
+
+# Checking if prepare_flexreceptor4.py exists (part of MGLTools)
+if [[ ! -f $prep_flexreceptor ]]; then
+  echo "prepare_flexreceptor4.py does not exist in the specified location: $prep_flexreceptor"
   exit 1
 fi
 
@@ -142,8 +158,8 @@ fi
 #>>>>>>>>>>>>>>>>> MAIN LOOP >>>>>>>>>>>>>>>>>>>>>
 count=0
 errors=0
-# reset pdb_error.txt
-echo "" > pdb_error_NEW.txt
+# divider for errors
+echo -e "\n------------------------------------------------------------\n" >> prep_pdb_error.txt
 for dir in $dirs; do
   code=$(basename "$dir")
   echo -e "Processing $code \t: $((++count)) / $total \t: $((errors)) errors"
@@ -180,6 +196,31 @@ for dir in $dirs; do
     # skip this code
     exit 1
   fi
+
+  # running flex receptor if toggled
+  if $flexible; then
+    # getting
+    # -s     specification for flex residues
+    #             Use underscores to separate residue names:
+    #               ARG8_ILE84  
+    #             Use commas to separate 'full names' which uniquely identify residues:
+    #               hsg1:A:ARG8_ILE84,hsg1:B:THR4 
+    #             [syntax is molname:chainid:resname]
+    
+
+    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -s
+    
+    # Checking error code
+    if [ $? -ne 0 ]; then
+      echo "prepare_flexreceptor4.py failed to prepare receptor for $code"
+      # saving code to error file
+      echo "$code" >> prep_pdb_error.txt
+      ((errors++))
+      # skip this code
+      exit 1
+    fi
+  fi
+
 
   # running obabel to convert ligand sdf to pdbqt
   ligand_p="${dir}/${code}_ligand"

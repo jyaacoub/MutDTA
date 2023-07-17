@@ -103,7 +103,7 @@ def multi_process_msa_dir(hhfilter_bin:str, dir_p:str,
                   total=len(msas), 
                   desc='Filtering and cleaning MSAs'))
     
-def create_pfm_np_files(aln_dir):
+def create_pfm_np_files(aln_dir, processes=4):
     """
     Creates a .npy file for each MSA in the given directory.
     """
@@ -111,7 +111,7 @@ def create_pfm_np_files(aln_dir):
     # adding directory path to file names
     files = [f'{aln_dir}/{f}' for f in files]
     
-    with Pool(processes=8) as pool:
+    with Pool(processes=processes) as pool:
         # using tqdm to show progress bar
         list(tqdm(pool.imap(get_pfm, files), 
                   total=len(files), 
@@ -124,7 +124,7 @@ if __name__ == '__main__':
     # hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
     # postfix = '.msa.a3m'
     # process_msa_dir(hhfilter_bin, dir_p, postfix)
-    dir_p = '/home/jyaacoub/projects/data/davis_kiba/kiba/aln/'
+    dir_p = '/cluster/home/t122995uhn/projects/data'
     
     create_pfm_np_files(dir_p)
 # %%
