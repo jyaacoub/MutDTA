@@ -16,7 +16,7 @@ from src.models import train, test, CheckpointSaver
 from src.data_analysis import get_metrics
 
 # %%
-data_opt = ['kiba']
+data_opt = ['davis', 'kiba']
 FEATURE_opt = ['msa', 'shannon']
 OG_MODEL_opt = [True, False]
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
@@ -32,19 +32,25 @@ np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
 
 # Tune Hyperparameters after grid search
-BATCH_SIZE = 32
-LEARNING_RATE = 0.001
-DROPOUT = 0.2
-NUM_EPOCHS = 200
+BATCH_SIZE = 64
+LEARNING_RATE = 0.0001
+DROPOUT = 0.4
+NUM_EPOCHS = 2000
 
 SAVE_RESULTS = True
 SHOW_PLOTS = False
 media_save_p = 'results/model_media/davis_kiba/'
+cp_saver = CheckpointSaver(model=None, 
+                            save_path=None, 
+                            train_all=False,
+                            patience=5, min_delta=0.05)
 
 
 # %% Training loop
 metrics = {}
+
 for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL_opt):
+    print(f'({data}, {FEATURE}, {OG_MODEL}):')
     # loading data
     DATA_ROOT = f'../data/davis_kiba/{data}/' # where to get data from
     dataset = DavisKibaDataset(
@@ -71,15 +77,21 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
                             dropout=DROPOUT)
     MODEL_KEY = f'randomW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
     print(f'\n{MODEL_KEY}')
-    model.to(device)
-
+    
+    cp_saver.new_model(model, save_path=f'{media_save_p}/{MODEL_KEY}.model')
+    
+    # check if model has already been trained:
+    if os.path.exists(cp_saver.save_path):
+        print('Model already trained')
+        continue
+    else:
+        # create file so that other processes know that this model is being trained
+        open(cp_saver.save_path, 'a').close()
+    
     # training
-    cp_saver = CheckpointSaver(model, 
-                            save_path=f'results/model_checkpoints/ours/{MODEL_KEY}.model', 
-                            train_all=True,
-                            patience=5, min_delta=0.05)
+    model.to(device)
     logs = train(model, train_loader, val_loader, device, 
-            epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
+                epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
     cp_saver.save()
 
     ax = plt.figure().gca()
@@ -96,10 +108,12 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
     if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_loss.png')
     if SHOW_PLOTS: plt.show()
     plt.clf()
-
+    
     # testing
+    model.load_state_dict(cp_saver.best_model_dict)
+    
     loss, pred, actual = test(model, test_loader, device)
-    get_metrics(pred, actual,
+    get_metrics(actual, pred,
                 save_results=SAVE_RESULTS,
                 save_path=media_save_p,
                 model_key=MODEL_KEY,
@@ -112,5 +126,5 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
     
 
 # save metrics
-with open(f'{media_save_p}/metrics.json', 'w') as f:
+with open(f'{media_save_p}/metrics.json', 'a') as f:
     json.dump(metrics, f, indent=4)
