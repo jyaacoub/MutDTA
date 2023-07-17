@@ -15,6 +15,17 @@ from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test
 from src.models import train, test, CheckpointSaver
 from src.data_analysis import get_metrics
 
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+prop = torch.cuda.get_device_properties(device)
+r = torch.cuda.memory_reserved(device)
+a = torch.cuda.memory_allocated(device)
+f = r-a  # free inside reserved
+print(f'Device: {device} ({prop.name})')
+print(f'v{prop.major}.{prop.minor} ({prop.multi_processor_count} SMs)')
+print(f'\ttotal:     {prop.total_memory/1e9:<10.3f}GB')
+print(f'\treserved:  {r/1e6:<10.3f}MB')
+print(f'\tallocated: {a/1e6:<10.3f}MB')
+
 # %%
 data_opt = ['davis', 'kiba']
 FEATURE_opt = ['msa', 'shannon']
@@ -40,6 +51,7 @@ NUM_EPOCHS = 2000
 SAVE_RESULTS = True
 SHOW_PLOTS = False
 media_save_p = 'results/model_media/davis_kiba/'
+model_save_p = 'results/model_checkpoints/ours/'
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False,
@@ -78,7 +90,7 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
     MODEL_KEY = f'randomW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
     print(f'\n{MODEL_KEY}')
     
-    cp_saver.new_model(model, save_path=f'{media_save_p}/{MODEL_KEY}.model')
+    cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
     
     # check if model has already been trained:
     if os.path.exists(cp_saver.save_path):
