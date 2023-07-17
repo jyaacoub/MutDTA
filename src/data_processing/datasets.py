@@ -52,7 +52,7 @@ class BaseDataset(torchg.data.InMemoryDataset):
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
-        
+    
     def cmap_p(self, code):
         return f'{self.data_root}/pconsc4/{code}.npy'
     
@@ -91,7 +91,7 @@ class BaseDataset(torchg.data.InMemoryDataset):
         print(f'Number of codes: {len(df)}')
         
         # creating the dataset:
-        data_list = []
+        data_pro, data_mol = [], []
         errors = []
         for idx in tqdm(df.index, 'Extracting node features and creating graphs'):
             code = df.loc[idx]['code']
@@ -115,25 +115,24 @@ class BaseDataset(torchg.data.InMemoryDataset):
                                 edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                 y=label,
                                 code=code)
+            data_pro.append(pro)
             lig = torchg.data.Data(x=torch.Tensor(mol_feat),
                                 edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
                                 y=label,
                                 code=code)
-            data_list.append([pro, lig])
+            data_mol.append(lig)
             
         print(f'{len(errors)} codes failed to create graphs')
 
         if self.pre_filter is not None:
-            data_list = [data for data in data_list if self.pre_filter(data)]
+            data_pro, data_mol = self.pre_filter(data_pro, data_mol)
         if self.pre_transform is not None:
-            data_list = [self.pre_transform(data) for data in data_list]
-            
-        def collate(data_list):
-            batchA = torchg.data.Batch.from_data_list([data[0] for data in data_list])
-            batchB = torchg.data.Batch.from_data_list([data[1] for data in data_list])
-            return batchA, batchB
+            data_pro, data_mol = self.pre_transform(data_pro, data_mol)
         
-        self._data_pro, self._data_mol = collate(data_list)
+        # collate_fn is used to merge the list of Data objects into a single Data object
+        # this is important since saving a huge list of Data objects is very slow
+        # see: https://pytorch-geometric.readthedocs.io/en/latest/notes/introduction.html#mini-batches
+        self._data_pro, self._data_mol = self.collate(data_pro), self.collate(data_mol)
         
         print('Saving...')
         torch.save(self._data_pro, self.processed_paths[1])
