@@ -24,7 +24,8 @@ class BaseModel(nn.Module):
     
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-    def __init__(self, model, save_path=None, train_all=False, patience=5, min_delta=0.03):
+    def __init__(self, model:BaseModel, save_path=None, train_all=False, 
+                 patience=5, min_delta=0.03):
         """
         Early stopping and checkpoint saving class.
 
@@ -43,20 +44,31 @@ class CheckpointSaver:
             The minimum change in val loss to be considered a significant degradation, 
             by default 0.03
         """
-        self.model = model
-        self.save_path = save_path
         self.train_all = train_all 
         self.patience = patience
         self.min_delta = min_delta 
         
-        self.best_model_dict = model.state_dict()
+        self.new_model(model, save_path)
+    
+    def new_model(self, model:BaseModel, save_path:str):
+        """Updates internal model and resets internal state"""
+        self.set_model(model)
+        self.set_save_path(save_path)
         self.best_epoch = 0
         self.stop_epoch = -1
-        
         self.counter = 0
         self.min_val_loss = np.inf
+    
+    def set_save_path(self, save_path:str):
+        self.save_path = save_path
+        
+    def set_model(self, model:BaseModel):
+        self.model = model
+        if model is not None:
+            self.best_model_dict = model.state_dict()
 
     def early_stop(self, validation_loss, curr_epoch):
+        assert self.model is not None, 'model is None, please set model first'
         # save model if validation loss is lower than previous best
         if validation_loss < self.min_val_loss:
             self.min_val_loss = validation_loss
@@ -73,6 +85,7 @@ class CheckpointSaver:
         return False
 
     def save(self):
+        # save model default path is model class name + best epoch
         self.save_path = self.save_path or \
             f'./{self.model.__class__.__name__}_{self.best_epoch}E.model'
         torch.save(self.best_model_dict, self.save_path)
