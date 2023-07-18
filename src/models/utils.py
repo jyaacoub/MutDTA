@@ -25,7 +25,7 @@ class BaseModel(nn.Module):
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
     def __init__(self, model:BaseModel, save_path=None, train_all=False, 
-                 patience=5, min_delta=0.03):
+                 patience=5, min_delta=0.03, save_freq:int=50):
         """
         Early stopping and checkpoint saving class.
 
@@ -43,10 +43,14 @@ class CheckpointSaver:
         `min_delta` : float, optional
             The minimum change in val loss to be considered a significant degradation, 
             by default 0.03
+        `save_freq` : int, optional
+            Number of epochs between saving checkpoints. Set to None to stop this behaviour, 
+            by default 50.
         """
         self.train_all = train_all 
         self.patience = patience
         self.min_delta = min_delta 
+        self.save_freq = save_freq
         
         self.new_model(model, save_path)
     
@@ -56,7 +60,7 @@ class CheckpointSaver:
         self.set_save_path(save_path)
         self.best_epoch = 0
         self.stop_epoch = -1
-        self.counter = 0
+        self._counter = 0
         self.min_val_loss = np.inf
     
     def set_save_path(self, save_path:str):
@@ -68,28 +72,33 @@ class CheckpointSaver:
             self.best_model_dict = model.state_dict()
 
     def early_stop(self, validation_loss, curr_epoch):
+        """Check if early stopping condition is met. Call after each epoch."""
         assert self.model is not None, 'model is None, please set model first'
         # save model if validation loss is lower than previous best
         if validation_loss < self.min_val_loss:
             self.min_val_loss = validation_loss
-            self.counter = 0
+            self._counter = 0
             self.best_model_dict = self.model.state_dict()
             self.best_epoch = curr_epoch
+        
         # early stopping if validation loss doesnt improve for `patience` epochs
         elif (not self.train_all) and \
             (validation_loss > (self.min_val_loss + self.min_delta)):
-            self.counter += 1
-            if self.counter >= self.patience:
+            self._counter += 1
+            if self._counter >= self.patience:
                 self.stop_epoch = curr_epoch
                 return True
+            
+        if curr_epoch % self.save_freq == 0:
+            self.save()
         return False
 
-    def save(self):
+    def save(self, silent=False):
         # save model default path is model class name + best epoch
         self.save_path = self.save_path or \
             f'./{self.model.__class__.__name__}_{self.best_epoch}E.model'
         torch.save(self.best_model_dict, self.save_path)
-        print(f'Model saved to: {self.save_path}')
+        if not silent: print(f'Model saved to: {self.save_path}')
         
     def __repr__(self) -> str:
         return f'save path: {self.save_path}'+ \
