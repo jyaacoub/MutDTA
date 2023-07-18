@@ -57,9 +57,9 @@ class CheckpointSaver:
     @property
     def save_path(self):
         return self._save_path or \
-            f'./{self._model.__class__.__name__}_{self.best_epoch}E.model'
+            f'./{self.model.__class__.__name__}_{self.best_epoch}E.model'
             
-    @property.setter
+    @save_path.setter
     def save_path(self, save_path:str):
         self._save_path = save_path
     
@@ -67,7 +67,7 @@ class CheckpointSaver:
     def model(self):
         return self._model
     
-    @property.setter
+    @save_path.setter
     def model(self, model:BaseModel):
         self._model = model
         if model is not None:
@@ -75,8 +75,8 @@ class CheckpointSaver:
 
     def new_model(self, model:BaseModel, save_path:str):
         """Updates internal model and resets internal state"""
-        self._model = model
-        self._save_path = save_path
+        self.model = model
+        self.save_path = save_path
         self.best_epoch = 0
         self.stop_epoch = -1
         self._counter = 0
@@ -84,7 +84,7 @@ class CheckpointSaver:
         
     def early_stop(self, validation_loss, curr_epoch):
         """Check if early stopping condition is met. Call after each epoch."""
-        assert self._model is not None, 'model is None, please set model first'
+        assert self.model is not None, 'model is None, please set model first'
         # save model if validation loss is lower than previous best
         if validation_loss < self.min_val_loss:
             self.min_val_loss = validation_loss
