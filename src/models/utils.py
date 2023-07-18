@@ -54,31 +54,42 @@ class CheckpointSaver:
         
         self.new_model(model, save_path)
     
+    @property
+    def save_path(self):
+        return self._save_path or \
+            f'./{self._model.__class__.__name__}_{self.best_epoch}E.model'
+            
+    @property.setter
+    def save_path(self, save_path:str):
+        self._save_path = save_path
+    
+    @property
+    def model(self):
+        return self._model
+    
+    @property.setter
+    def model(self, model:BaseModel):
+        self._model = model
+        if model is not None:
+            self.best_model_dict = model.state_dict()
+
     def new_model(self, model:BaseModel, save_path:str):
         """Updates internal model and resets internal state"""
-        self.set_model(model)
-        self.set_save_path(save_path)
+        self._model = model
+        self._save_path = save_path
         self.best_epoch = 0
         self.stop_epoch = -1
         self._counter = 0
         self.min_val_loss = np.inf
-    
-    def set_save_path(self, save_path:str):
-        self.save_path = save_path
         
-    def set_model(self, model:BaseModel):
-        self.model = model
-        if model is not None:
-            self.best_model_dict = model.state_dict()
-
     def early_stop(self, validation_loss, curr_epoch):
         """Check if early stopping condition is met. Call after each epoch."""
-        assert self.model is not None, 'model is None, please set model first'
+        assert self._model is not None, 'model is None, please set model first'
         # save model if validation loss is lower than previous best
         if validation_loss < self.min_val_loss:
             self.min_val_loss = validation_loss
             self._counter = 0
-            self.best_model_dict = self.model.state_dict()
+            self.best_model_dict = self._model.state_dict()
             self.best_epoch = curr_epoch
         
         # early stopping if validation loss doesnt improve for `patience` epochs
@@ -90,15 +101,14 @@ class CheckpointSaver:
                 return True
             
         if curr_epoch % self.save_freq == 0:
-            self.save()
+            self.save(f'{self.save_path}_tmp')
         return False
 
-    def save(self, silent=False):
+    def save(self, path:str=None, silent=False):
+        path = path or self.save_path   
         # save model default path is model class name + best epoch
-        self.save_path = self.save_path or \
-            f'./{self.model.__class__.__name__}_{self.best_epoch}E.model'
-        torch.save(self.best_model_dict, self.save_path)
-        if not silent: print(f'Model saved to: {self.save_path}')
+        torch.save(self.best_model_dict, path)
+        if not silent: print(f'Model saved to: {path}')
         
     def __repr__(self) -> str:
         return f'save path: {self.save_path}'+ \
