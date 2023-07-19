@@ -1,5 +1,6 @@
 import os
 import sys
+import itertools
 
 # Add the project root directory to Python path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -10,12 +11,12 @@ from src.feature_extraction.process_msa import create_pfm_np_files
 from src.data_processing import DavisKibaDataset
 
 if __name__ == "__main__":
-    data = ['kiba', 'davis'][1]
-    FEATUREs = ['nomsa']
-    DATA_ROOT = f'/cluster/home/t122995uhn/projects/data/{data}/'
-    create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
+    datas = ['davis', 'kiba']
+    FEATUREs = ['nomsa', 'msa', 'shannon']
 
-    for FEATURE in FEATUREs:
+    for data, FEATURE in itertools.product(datas, FEATUREs):
+        DATA_ROOT = f'/home/jyaacoub/projects/data/davis_kiba/{data}/'
+        create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
         print(data, FEATURE)
         if FEATURE == 'nomsa':
             dataset = DavisKibaDataset(
@@ -29,4 +30,6 @@ if __name__ == "__main__":
                     data_root=DATA_ROOT,
                     aln_dir=f'{DATA_ROOT}/aln/',
                     cmap_threshold=-0.5, shannon=FEATURE=='shannon')
+        del dataset # free up memory
+        input('Press enter to continue...')
                         
