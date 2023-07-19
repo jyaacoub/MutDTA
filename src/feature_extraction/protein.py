@@ -100,8 +100,6 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
 
 def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
     """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
-    # matrix is 21xL where L is the length of the protein
-    # 21 is the number of amino acids + X (unknown) 
     with open(aln_file, 'r') as f:
         lines = f.readlines()
         
@@ -113,13 +111,11 @@ def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.ar
         return np.load(save_p), len(lines)
     
     # initializing matrix and counting up amino acids
+    # matrix is Lx21 where L is the length of the protein
+    # 21 is the number of amino acids + X (unknown) 
     pfm = np.zeros((len(target_seq), len(ResInfo.amino_acids)), dtype=np.int64)
     for line in lines:
         line = line.strip()
-        # assert len(line) == len(target_seq), \
-        #         f'Alignment file is not the same '\
-        #         f'length as the protein sequence in {aln_file}: '\
-        #         f'{len(line)} != {len(target_seq)}; \n{line}\n{target_seq}'
         
         # counting up the amino acids at each position
         res_indices = np.array([ResInfo.res_to_i.get(res, -1) for res in line])
