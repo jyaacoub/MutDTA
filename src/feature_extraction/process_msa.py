@@ -11,6 +11,7 @@ import os, subprocess
 from typing import Iterable, Tuple
 from tqdm import tqdm
 from multiprocessing import Pool
+from src.feature_extraction.protein import get_pfm
 
 
 def hhblits(bin_path, f_in, f_out):
@@ -44,24 +45,24 @@ def clean_msa(f_in: str, f_out:str):
                     new_l += c
             f.write(new_l+'\n')
 
-def check_lines(fp:str, limit=None):
+def check_aln_lines(fp:str, limit=None):
+    if not os.path.isfile(fp): return False
+    
     with open(fp, 'r') as f:
         lines = f.readlines()
         seq_len = len(lines[0])
         limit = len(lines) if limit is None else limit
         
         for i,l in enumerate(lines[:limit]):
-            assert l[0] != '>', \
-                f'File {fp} not properly formatted. Found \'>\' at line {i}.'
-            assert len(l) == seq_len, \
-                f'Line length is not consistent at line {i} in {fp}.'
+            if l[0] == '>' or len(l) != seq_len:
+                return False
     return True
 
 def process_msa(hhfilter_bin:str, f_in:str, f_out:str):
     hhfilter(hhfilter_bin, f_in, f_out)
     # overwrites filtered msa with cleaned msa
     clean_msa(f_in=f_out, f_out=f_out)
-    check_lines(f_out)
+    check_aln_lines(f_out)
 
 def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
     """
@@ -102,11 +103,28 @@ def multi_process_msa_dir(hhfilter_bin:str, dir_p:str,
                   total=len(msas), 
                   desc='Filtering and cleaning MSAs'))
     
+def create_pfm_np_files(aln_dir, processes=4):
+    """
+    Creates a .npy file for each MSA in the given directory.
+    """
+    files = [f for f in os.listdir(aln_dir) if f.endswith('.a3m') or f.endswith('.aln')]
+    # adding directory path to file names
+    files = [f'{aln_dir}/{f}' for f in files]
+    
+    with Pool(processes=processes) as pool:
+        # using tqdm to show progress bar
+        list(tqdm(pool.imap(get_pfm, files), 
+                  total=len(files), 
+                  desc='Creating PFM files'))
+    
     
 #%%
 if __name__ == '__main__':
-    dir_p = '/home/jyaacoub/projects/data/msa/outputs'
-    hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
-    postfix = '.msa.a3m'
-    process_msa_dir(hhfilter_bin, dir_p, postfix)
+    # dir_p = '/home/jyaacoub/projects/data/msa/outputs'
+    # hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
+    # postfix = '.msa.a3m'
+    # process_msa_dir(hhfilter_bin, dir_p, postfix)
+    dir_p = '/cluster/home/t122995uhn/projects/data'
+    
+    create_pfm_np_files(dir_p)
 # %%

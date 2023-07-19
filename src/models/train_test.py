@@ -1,4 +1,5 @@
 import itertools
+from typing import Tuple
 from tqdm import tqdm
 import torch
 import numpy as np
@@ -94,18 +95,38 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
             # Compute average validation loss for the epoch
             val_loss /= len(val_loader)
 
-        # Print training and validation loss for the epoch
-        print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
         
         if saver.early_stop(val_loss, epoch):
             print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
-            break    
+            break
+        
+        # Print training and validation loss for the epoch
+        print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
+                f"Val Loss: {val_loss:.4f}, "+\
+                f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
     return logs
 
 
-def test(model, test_loader, device):
+def test(model, test_loader, device) -> Tuple[float, np.ndarray, np.ndarray]:
+    """
+    Run inference on the test set.
+
+    Parameters
+    ----------
+    `model` : BaseModel
+        The model to run inference on.
+    `test_loader` : DataLoader
+        The test set data loader.
+    `device` : torch.device
+        Device to run inference on.
+
+    Returns
+    -------
+    Tuple[float, np.ndarray, np.ndarray]
+        Tuple of test loss, predictions, and actual labels.
+    """
     # After training, you can evaluate the model on the test set if needed
     model.eval()
     test_loss = 0.0

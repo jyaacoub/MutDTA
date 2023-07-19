@@ -26,7 +26,10 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         File path for contact map or the actual map itself.
     `threshold` : float, optional
         Threshold for what defines an edge, anything under this value 
-        is considered an edge, by default 10.5
+        is considered an edge. Passing in a negative value will flip 
+        this to be anything **above** the value (useful for when the cmap 
+        is probability based, anything above 0.5 is considered in contact),
+        by default 10.5
     `aln_file` : str, optional
         Path to alignment file for PSSM matrix, by default None
     `shannon` : bool, optional
@@ -46,13 +49,18 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     target_size = len(target_sequence)
     assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
     # its ok if it is smaller, but not larger (due to missing residues in pdb)
-    assert contact_map.shape[0] == target_size, 'contact map size does not match target sequence size'
+    assert contact_map.shape[0] == target_size, \
+            f'contact map size does not match target sequence size,'+\
+            f'{contact_map.shape[0]} != {target_size}'
     
     
     # adding self loop then thresholding
     # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
     # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
-    index_row, index_col = np.where(contact_map <= threshold)
+    if threshold >= 0.0:
+        index_row, index_col = np.where(contact_map <= threshold)
+    else: # negative threshold flips the sign
+        index_row, index_col = np.where(contact_map >= abs(threshold))
     assert index_row.max() < target_size and index_col.max() < target_size, 'contact map size does not match target sequence size'
     
     # converting edge matrix to edge index for pytorch geometric
@@ -62,54 +70,63 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     
     # aln_dir = 'data/' + dataset + '/aln'
     if aln_file is not None:
-        pssm, lc = get_pssm(aln_file, target_sequence)
+        pssm, line_count = get_pfm(aln_file, target_sequence)
     else:
         #NOTE: DGraphDTA never uses pssm due to logic error 
         # (see: https://github.com/595693085/DGraphDTA/issues/16)
-        pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
+        # returns Lx21 matrix of amino acid distribution for each node
+        pssm = np.zeros((len(target_sequence), len(ResInfo.amino_acids)))
+        line_count = 1
     
     if shannon:
         def entropy(col):
             ent = 0.0
             for base in np.where(col > 0)[0]: # all bases being used
                 n_i = col[base]
-                P_i = n_i/lc # number of res of type i/ total res in col
+                P_i = n_i/line_count # number of res of type i/ total res in col
                 ent -= P_i*(math.log(P_i,2))
             return ent
             
-        pssm = np.apply_along_axis(entropy, axis=0, arr=pssm)
+        pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
         pssm = pssm.reshape((len(target_sequence),1))
         #TODO: *1 if max prob matches target seq node *-1 otherwise
     else:
-        pssm /= lc # normalize pssm matrix by line count
-        pssm = pssm.T # transpose so that seq is along axis 1 (rows) (shape=Lx21 or Lx1 if shannon)
+        pseudocount = 0.8
+        pssm = (pssm + pseudocount / 4) / (float(line_count) + pseudocount)
     
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
     return target_size, target_feature, target_edge_index
 
-def get_pssm(aln_file: str, target_seq: str) -> np.array:
-    """ Returns prob distribution of amino acids based on MSA for each node in sequence"""
-    # matrix is 21xL where L is the length of the protein
-    # 21 is the number of amino acids + X (unknown)
-    
+def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
+    """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
     with open(aln_file, 'r') as f:
         lines = f.readlines()
-        lc = len(lines)
-        pssm = np.zeros((len(ResInfo.amino_acids), len(target_seq)))
-        for line in lines:
-            line = line.strip()
-            assert len(line) == len(target_seq), \
-                    f'Alignment file is not the same '\
-                    f'length as the protein sequence in {aln_file}: '\
-                    f'{len(line)} != {len(target_seq)}; \n{line}\n{target_seq}'
+        
+    # first line is target seq
+    target_seq = lines[0].strip() if target_seq is None else target_seq 
+        
+    save_p = aln_file+'.pfm.npy'
+    if not overwrite and os.path.isfile(save_p):
+        return np.load(save_p), len(lines)
+    
+    # initializing matrix and counting up amino acids
+    # matrix is Lx21 where L is the length of the protein
+    # 21 is the number of amino acids + X (unknown) 
+    pfm = np.zeros((len(target_seq), len(ResInfo.amino_acids)), dtype=np.int64)
+    for line in lines:
+        line = line.strip()
+        
+        # counting up the amino acids at each position
+        res_indices = np.array([ResInfo.res_to_i.get(res, -1) for res in line])
+        valid_indices = res_indices != -1
+        pfm[np.where(valid_indices), res_indices[valid_indices]] += 1
             
-            # counting up the amino acids at each position
-            for i, res in enumerate(line):
-                if res in ResInfo.amino_acids:
-                    pssm[ResInfo.amino_acids.index(res), i] += 1
-    return pssm, lc
+    # saving as numpy array
+    np.save(save_p, pfm)
+    
+    return pfm, len(lines)
 
 # target aln file save in data/dataset/aln
 def target_to_feature(target_seq):    
@@ -351,7 +368,6 @@ if __name__ == "__main__":
                 raise e
             # np.save(cmap_p(code), cmap)
             
-
     #%% Displaying:
     r,c = 10,10
     f, ax = plt.subplots(r,c, figsize=(15, 15))

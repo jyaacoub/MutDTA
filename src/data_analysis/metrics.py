@@ -59,7 +59,7 @@ def concordance_index(y_true, y_pred): #TODO: make this faster
     
     # calculating concordance index
     sum = 0
-    num_pairs = 0
+    num_pairs = 0 # number of pairs of samples that can be compared
     for i in range(len(y_true)):
         for j in range(i): # only need to loop through j < i
             if (y_true[i] > y_true[j]): # y[i] > y[j] is implied
@@ -73,7 +73,7 @@ try:
 except:
     pass
 
-def get_metrics(log_y: np.array, log_z: np.array, save_results=True, 
+def get_metrics(y_true: np.array, y_pred: np.array, save_results=True, 
                 save_path='results/model_media',
                 model_key='trained_davis_test',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
@@ -84,9 +84,9 @@ def get_metrics(log_y: np.array, log_z: np.array, save_results=True,
 
     Parameters
     ----------
-    `log_y` : np.array
+    `y_true` : np.array
         The actual pkd values
-    `log_z` : np.array
+    `y_pred` : np.array
         Predicted pkd values
     `save_results` : bool, optional
         If Fase dont save anything, by default True
@@ -108,8 +108,8 @@ def get_metrics(log_y: np.array, log_z: np.array, save_results=True,
         Tuple for the stats (c_index, p_corr, s_corr, mse, mae, rmse)
     """
     plt.clf()
-    plt.hist(log_y, bins=10, alpha=0.5)
-    plt.hist(log_z, bins=10, alpha=0.5)
+    plt.hist(y_true, bins=10, alpha=0.5)
+    plt.hist(y_pred, bins=10, alpha=0.5)
     plt.legend(['Experimental', model_key])
     plt.title(f'{title_prefix}Histogram of affinity values (pkd)')
     if save_results: plt.savefig(f'{save_path}/{model_key}_his.png')
@@ -118,9 +118,9 @@ def get_metrics(log_y: np.array, log_z: np.array, save_results=True,
 
     # scatter plot of affinity values
     # fitting a line
-    m, b = np.polyfit(log_y, log_z, 1)
-    plt.scatter(log_y, log_z, alpha=0.5)
-    plt.plot(log_y, m*log_y + b, color='black', alpha=0.8)
+    m, b = np.polyfit(y_true, y_pred, 1)
+    plt.scatter(y_true, y_pred, alpha=0.5)
+    plt.plot(y_true, m*y_true + b, color='black', alpha=0.8)
     plt.xlabel('Experimental affinity value')
     plt.ylabel(f'{model_key} prediction')
     plt.title(f'{title_prefix}Scatter plot of affinity values (pkd)')
@@ -131,13 +131,19 @@ def get_metrics(log_y: np.array, log_z: np.array, save_results=True,
 
 
     # Stats
-    c_index = concordance_index(log_y, log_z)
-    p_corr = pearsonr(log_y, log_z)
-    s_corr = spearmanr(log_y, log_z)
+    try:
+        # cindex throws zero division error if all values are the same
+        c_index = concordance_index(y_true, y_pred)
+    except ZeroDivisionError:
+        c_index = -1
+        print('ZeroDivisionError: cindex set to -1')
+        
+    p_corr = pearsonr(y_true, y_pred)
+    s_corr = spearmanr(y_true, y_pred)
 
     # error
-    mse = np.mean((log_y-log_z)**2)
-    mae = np.mean(np.abs(log_y-log_z))
+    mse = np.mean((y_true-y_pred)**2)
+    mae = np.mean(np.abs(y_true-y_pred))
     rmse = np.sqrt(mse)
     
     if show:
@@ -151,14 +157,14 @@ def get_metrics(log_y: np.array, log_z: np.array, save_results=True,
         print(f"RMSE: {rmse:.3f}")
 
     # saving to csv file
-    # creating stats csv if it doesnt exist
-    if not os.path.exists(csv_file): 
-        stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-        stats.set_index('run', inplace=True)
-        stats.to_csv(csv_file)
-
-    # replacing existing record if run_num already exists
     if save_results:
+        # creating stats csv if it doesnt exist
+        if not os.path.exists(csv_file): 
+            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+            stats.set_index('run', inplace=True)
+            stats.to_csv(csv_file)
+
+        # replacing existing record if run_num already exists
         stats = pd.read_csv(csv_file, index_col=0)
         stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
         stats.to_csv(csv_file)
