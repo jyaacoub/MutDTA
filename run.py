@@ -12,7 +12,11 @@ from matplotlib.ticker import MaxNLocator
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
 from src.models import train, test, CheckpointSaver
+from src.models.utils import print_device_info
 from src.data_analysis import get_metrics
+
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print_device_info(device)
 
 #/randomW_kiba_32B_0.001LR_0.2D_200E_msaF_DGraphDTAImproved.model
 #randomW_davis_64B_0.0001LR_0.4D_200E_msaF_DGraphDTA.model
