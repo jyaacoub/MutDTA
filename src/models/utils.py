@@ -116,3 +116,15 @@ class CheckpointSaver:
                f'stop epoch: {self.stop_epoch}'+ \
                f'best epoch: {self.best_epoch}'
     
+def print_device_info(device:torch.device) -> torch.cuda.device:
+    prop = torch.cuda.get_device_properties(device)
+    r = torch.cuda.memory_reserved(device)
+    a = torch.cuda.memory_allocated(device)
+    f = r-a  # free inside reserved
+    print(f'Device: {device} ({prop.name})')
+    print(f'v{prop.major}.{prop.minor} ({prop.multi_processor_count} SMs)')
+    print(f'\ttotal:     {prop.total_memory/1e9:<10.3f}GB')
+    print(f'\treserved:  {r/1e6:<10.3f}MB')
+    print(f'\tallocated: {a/1e6:<10.3f}MB')
+    
+    return prop
