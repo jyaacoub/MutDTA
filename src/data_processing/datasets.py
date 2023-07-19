@@ -114,11 +114,13 @@ class BaseDataset(torchg.data.InMemoryDataset):
             pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                 y=label,
-                                code=code)
+                                code=code,
+                                prot_id=df.loc[idx]['prot_id'])
             lig = torchg.data.Data(x=torch.Tensor(mol_feat),
                                 edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
                                 y=label,
-                                code=code)
+                                code=code,
+                                prot_id=df.loc[idx]['prot_id'])
             data_list.append([pro, lig])
             
         print(f'{len(errors)} codes failed to create graphs')
@@ -237,12 +239,23 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_smi.index.name = 'PDBCode'
         
         # Get binding data:
-        df_binding = PDBbindProcessor.get_binding_data(f'{self.bind_dir}/index/INDEX_general_PL_data.2020')
+        df_binding = PDBbindProcessor.get_binding_data(self.raw_file_names[0])
         df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
         
+        # Get prot ids data:
+        df_pid = PDBbindProcessor.get_name_data(self.raw_file_names[1])
+        df_pid.drop(columns=['release_year','prot_name'], inplace=True)
+        # contains col: prot_id
+        
+        
         # merging dataframes:
+        df_binding.merge(df_pid, on='PDBCode')
+        
         df = df_smi[df_smi.SMILE.notna()].merge(df_binding, on='PDBCode')
         df = df.merge(df_seq, on='PDBCode')
+        
+        # changing index name to code (to match with super class):
+        df.index.name = 'code'
         df.to_csv(self.processed_paths[0])
         return df
     
@@ -361,6 +374,11 @@ class DavisKibaDataset(BaseDataset):
             df['pkd'] = [-np.log10(y*1e-9) for y in affinity_mat[lig_r, prot_c]]
         else:
             df['pkd'] = affinity_mat[lig_r, prot_c]
+            
+        # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id)
+        # Note: this means the code is not unique (unlike pdbbind)
+        df['prot_id'] = df['code']
+        
         df.to_csv(self.processed_paths[0])
         return df
     
