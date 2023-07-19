@@ -75,7 +75,8 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         #NOTE: DGraphDTA never uses pssm due to logic error 
         # (see: https://github.com/595693085/DGraphDTA/issues/16)
         # returns Lx21 matrix of amino acid distribution for each node
-        pssm = np.zeros((len(ResInfo.amino_acids), len(target_sequence)))
+        pssm = np.zeros((len(target_sequence), len(ResInfo.amino_acids)))
+        line_count = 1
     
     if shannon:
         def entropy(col):
