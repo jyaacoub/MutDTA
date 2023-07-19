@@ -10,15 +10,23 @@ from src.feature_extraction.process_msa import create_pfm_np_files
 from src.data_processing import DavisKibaDataset
 
 if __name__ == "__main__":
-        data = ['kiba', 'davis'][0]
-        FEATUREs = ['shannon', 'msa']
-        DATA_ROOT = f'/cluster/home/t122995uhn/projects/data/{data}/'
-        create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
+    data = ['kiba', 'davis'][1]
+    FEATUREs = ['nomsa']
+    DATA_ROOT = f'/cluster/home/t122995uhn/projects/data/{data}/'
+    create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
 
-        for FEATURE in FEATUREs:
-                print(data, FEATURE)
-                dataset = DavisKibaDataset(
-                        save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
-                        data_root=DATA_ROOT,
-                        aln_dir=f'{DATA_ROOT}/aln/',
-                        cmap_threshold=-0.5, shannon=FEATURE=='shannon')
+    for FEATURE in FEATUREs:
+        print(data, FEATURE)
+        if FEATURE == 'nomsa':
+            dataset = DavisKibaDataset(
+                    save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
+                    data_root=DATA_ROOT,
+                    aln_dir=None,
+                    cmap_threshold=-0.5, shannon=False)
+        else:
+            dataset = DavisKibaDataset(
+                    save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
+                    data_root=DATA_ROOT,
+                    aln_dir=f'{DATA_ROOT}/aln/',
+                    cmap_threshold=-0.5, shannon=FEATURE=='shannon')
+                        
