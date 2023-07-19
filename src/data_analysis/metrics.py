@@ -157,14 +157,14 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
         print(f"RMSE: {rmse:.3f}")
 
     # saving to csv file
-    # creating stats csv if it doesnt exist
-    if not os.path.exists(csv_file): 
-        stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-        stats.set_index('run', inplace=True)
-        stats.to_csv(csv_file)
-
-    # replacing existing record if run_num already exists
     if save_results:
+        # creating stats csv if it doesnt exist
+        if not os.path.exists(csv_file): 
+            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+            stats.set_index('run', inplace=True)
+            stats.to_csv(csv_file)
+
+        # replacing existing record if run_num already exists
         stats = pd.read_csv(csv_file, index_col=0)
         stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
         stats.to_csv(csv_file)
