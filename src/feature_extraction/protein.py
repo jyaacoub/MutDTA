@@ -368,7 +368,6 @@ if __name__ == "__main__":
                 raise e
             # np.save(cmap_p(code), cmap)
             
-
     #%% Displaying:
     r,c = 10,10
     f, ax = plt.subplots(r,c, figsize=(15, 15))
