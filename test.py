@@ -27,9 +27,9 @@ print(f'\treserved:  {r/1e6:<10.3f}MB')
 print(f'\tallocated: {a/1e6:<10.3f}MB')
 
 # %%
-data_opt = ['davis', 'kiba']
-FEATURE_opt = ['msa', 'shannon']
-OG_MODEL_opt = [True, False]
+data_opt = ['davis']
+FEATURE_opt = ['nomsa']
+OG_MODEL_opt = [False]
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 
 # Dataset Hyperparameters
@@ -81,7 +81,7 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'Device: {device}')
 
-    num_feat_pro = 54 if FEATURE == 'msa' else 34
+    num_feat_pro = 54 if 'msa' in FEATURE else 34
     if OG_MODEL:
         model = DGraphDTA(num_features_pro=num_feat_pro,dropout=DROPOUT)
     else:
