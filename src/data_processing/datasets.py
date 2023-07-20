@@ -16,7 +16,9 @@ from src.data_processing import PDBbindProcessor
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, shannon=True,  *args, **kwargs):
+                 cmap_threshold:float, shannon=True, 
+                 batch_size_gen:int=512, batch_save_freq:int=10,
+                 *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -41,11 +43,17 @@ class BaseDataset(torchg.data.InMemoryDataset):
         `shannon` : bool, optional
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
+        `batch_size_gen` : int, optional
+            Batch size for data generator, by default 512.
+        `batch_save_freq` : int, optional
+            Frequency to save the data, by default 10.
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.data_root = data_root
         self.aln_dir =  aln_dir # path to sequence alignments
+        self.batch_size_gen = batch_size_gen
+        self.batch_save_freq = batch_save_freq
         
         self.cmap_threshold = cmap_threshold
         self.shannon = shannon
@@ -79,6 +87,81 @@ class BaseDataset(torchg.data.InMemoryDataset):
     def __getitem__(self, idx):
         return self._data_pro[idx], self._data_mol[idx]
     
+    def _data_generator(self, df, batch_size=32):
+        start_idx = 0
+        self.errors = []
+        while start_idx < len(df):
+            batch_data = []
+            for idx in range(start_idx, min(start_idx + batch_size, len(df))):
+                code = df.loc[idx]['code']
+                cmap = np.load(self.cmap_p(code))
+                pro_seq = df.loc[idx]['prot_seq']
+                lig_seq = df.loc[idx]['SMILE']
+                label = df.loc[idx]['pkd']
+                label = torch.Tensor([[label]])
+                
+                _, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
+                                                        threshold=self.cmap_threshold,
+                                                        aln_file=self.aln_p(code),
+                                                        shannon=self.shannon)
+                try:
+                    _, mol_feat, mol_edge = smile_to_graph(lig_seq)
+                except ValueError:
+                    self.errors.append(code)
+                    continue
+                
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+                                    y=label,
+                                    code=code,
+                                    prot_id=df.loc[idx]['prot_id'])
+                lig = torchg.data.Data(x=torch.Tensor(mol_feat),
+                                    edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+                                    y=label,
+                                    code=code,
+                                    prot_id=df.loc[idx]['prot_id'])
+                batch_data.append([pro, lig])
+            start_idx += batch_size
+            yield batch_data
+    
+    @staticmethod
+    def _cat_batch(batch1: torchg.data.Batch, batch2: torchg.data.Batch):
+        # adjust batch and ptr so that they are correct after concatenation:
+        batch_2 = batch2.batch + batch1.batch[-1] + 1
+        ptr_2 = batch2.ptr[1:] + batch1.ptr[-1]
+        
+        temp = torchg.data.Batch(
+            x=torch.cat([batch1.x, batch2.x], axis=0),
+            edge_index=torch.cat([batch1.edge_index, batch2.edge_index], axis=1),
+            y=torch.cat([batch1.y, batch2.y], axis=0),
+            
+            code=batch1.code + batch2.code,
+            prot_id=batch1.prot_id + batch2.prot_id,
+            
+            batch=torch.cat([batch1.batch, batch_2], axis=0),
+            ptr=torch.cat([batch1.ptr, ptr_2], axis=0)
+        )
+        #Adding _slices and _incs to temp:
+        temp._slice_dict = batch1._slice_dict.copy()
+        for k,v in batch2._slice_dict.items():
+            # skip first 0 element
+            inc_v = v[1:] + temp._slice_dict[k][-1] # increment appropriately
+            
+            temp._slice_dict[k] = torch.cat([temp._slice_dict[k], inc_v], axis=0)
+
+        temp._inc_dict = batch1._inc_dict.copy()
+        for k,v in batch2._inc_dict.items():
+            if v is None: continue
+            if k == 'edge_index':
+                last_inc_size = batch1[len(batch1)-1].x.shape[0]
+            else:
+                last_inc_size = 0
+            inc_v = v + temp._inc_dict[k][-1] + last_inc_size # increment appropriately
+            
+            temp._inc_dict [k] = torch.cat([temp._inc_dict [k], inc_v], axis=0)
+            
+        return temp
+    
     def process(self):
         """
         This method is used to create the processed data files after feature extraction.
@@ -91,53 +174,29 @@ class BaseDataset(torchg.data.InMemoryDataset):
         print(f'Number of codes: {len(df)}')
         
         # creating the dataset:
-        data_list = []
-        errors = []
-        for idx in tqdm(df.index, 'Extracting node features and creating graphs'):
-            code = df.loc[idx]['code']
-            cmap = np.load(self.cmap_p(code))
-            pro_seq = df.loc[idx]['prot_seq']
-            lig_seq = df.loc[idx]['SMILE']
-            label = df.loc[idx]['pkd']
-            label = torch.Tensor([[label]])
+        data_gen = self._data_generator(df, batch_size=self.batch_size_gen)
+        self._data_pro = None              
+        self._data_mol = None
+        for i, batch_data in tqdm(enumerate(data_gen), total=len(df)//self.batch_size_gen,
+                                  desc='Extracting node features and creating graphs'):
+            batchpro = torchg.data.Batch.from_data_list([data[0] for data in batch_data])
+            batchmol = torchg.data.Batch.from_data_list([data[1] for data in batch_data])
             
-            _, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
-                                                    threshold=self.cmap_threshold,
-                                                    aln_file=self.aln_p(code),
-                                                    shannon=self.shannon)
-            try:
-                _, mol_feat, mol_edge = smile_to_graph(lig_seq)
-            except ValueError:
-                errors.append(code)
-                continue
+            if self._data_pro is None:
+                self._data_pro = batchpro
+                self._data_mol = batchmol
+            else:
+                self._data_pro = self._cat_batch(self._data_pro, batchpro)
+                self._data_mol = self._cat_batch(self._data_mol, batchmol)
             
-            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
-                                y=label,
-                                code=code,
-                                prot_id=df.loc[idx]['prot_id'])
-            lig = torchg.data.Data(x=torch.Tensor(mol_feat),
-                                edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
-                                y=label,
-                                code=code,
-                                prot_id=df.loc[idx]['prot_id'])
-            data_list.append([pro, lig])
+            # save every 100 batches just in case
+            if i % self.batch_save_freq == 0:
+                torch.save(self._data_pro, self.processed_paths[1])
+                torch.save(self._data_mol, self.processed_paths[2])
+                
             
-        print(f'{len(errors)} codes failed to create graphs')
-
-        if self.pre_filter is not None:
-            data_list = [data for data in data_list if self.pre_filter(data)]
-        if self.pre_transform is not None:
-            data_list = [self.pre_transform(data) for data in data_list]
-            
-        def collate(data_list):
-            batchA = torchg.data.Batch.from_data_list([data[0] for data in data_list])
-            batchB = torchg.data.Batch.from_data_list([data[1] for data in data_list])
-            return batchA, batchB
-        
-        self._data_pro, self._data_mol = collate(data_list)
-        
-        print('Saving...')
+        print(f'{len(self.errors)} codes failed to create graphs')
+        print('Saving final graphs...')
         torch.save(self._data_pro, self.processed_paths[1])
         torch.save(self._data_mol, self.processed_paths[2])
 
