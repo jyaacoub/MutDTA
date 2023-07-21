@@ -12,6 +12,50 @@ from src.feature_extraction import ResInfo, one_hot
 ###################### Protein Feature Extraction ######################
 ########################################################################
 # pconsc4 predicted contact map save in data/dataset/pconsc4
+def get_target_edge_index(target_sequence:str, contact_map:str or np.array,
+                          threshold=10.5):
+    """
+    Returns edge index for target sequence given a contact map.
+
+    Parameters
+    ----------
+    `target_sequence` : str
+        Sequence of the target protein.
+    `contact_map` : strornp.array
+        File path for contact map or the actual map itself.
+    `threshold` : float, optional
+        Threshold for what defines an edge, by default 10.5
+        
+    Returns
+    -------
+    np.array
+        edge index for target sequence.
+    """
+    # loading up contact map if it is a file path
+    if type(contact_map) == str: contact_map = np.load(contact_map)
+    
+    target_size = len(target_sequence)
+    assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
+    # its ok if it is smaller, but not larger (due to missing residues in pdb)
+    assert contact_map.shape[0] == target_size, \
+            f'contact map size does not match target sequence size,'+\
+            f'{contact_map.shape[0]} != {target_size}'
+    
+    
+    # adding self loop then thresholding
+    # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
+    # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
+    if threshold >= 0.0:
+        index_row, index_col = np.where(contact_map <= threshold)
+    else: # negative threshold flips the sign
+        index_row, index_col = np.where(contact_map >= abs(threshold))
+    assert index_row.max() < target_size and index_col.max() < target_size, \
+        'contact map size does not match target sequence size'
+    
+    # converting edge matrix to edge index for pytorch geometric
+    target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])
+    return target_edge_index
+
 def target_to_graph(target_sequence:str, contact_map:str or np.array, 
                     threshold=10.5, aln_file:str=None, shannon=False):
     """
@@ -39,33 +83,9 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     Returns
     -------
     Tuple[np.array]
-        truple of (target_size, target_feature, target_edge_index)
+        tuple of (target_feature, target_edge_index)
     """
-    
-    # loading up contact map if it is a file path
-    if type(contact_map) == str: contact_map = np.load(contact_map)
-    
-    
-    target_size = len(target_sequence)
-    assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
-    # its ok if it is smaller, but not larger (due to missing residues in pdb)
-    assert contact_map.shape[0] == target_size, \
-            f'contact map size does not match target sequence size,'+\
-            f'{contact_map.shape[0]} != {target_size}'
-    
-    
-    # adding self loop then thresholding
-    # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
-    # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
-    if threshold >= 0.0:
-        index_row, index_col = np.where(contact_map <= threshold)
-    else: # negative threshold flips the sign
-        index_row, index_col = np.where(contact_map >= abs(threshold))
-    assert index_row.max() < target_size and index_col.max() < target_size, 'contact map size does not match target sequence size'
-    
-    # converting edge matrix to edge index for pytorch geometric
-    target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])
-    
+    target_edge_index = get_target_edge_index(target_sequence, contact_map, threshold)
     # getting node features
     
     # aln_dir = 'data/' + dataset + '/aln'
@@ -97,7 +117,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
-    return target_size, target_feature, target_edge_index
+    return target_feature, target_edge_index
 
 def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
     """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
