@@ -11,7 +11,7 @@ from src.feature_extraction.process_msa import create_pfm_np_files
 from src.data_processing import DavisKibaDataset
 
 if __name__ == "__main__":
-    datas = ['davis', 'kiba']
+    datas = ['davis']
     FEATUREs = ['nomsa', 'msa', 'shannon']
 
     for data, FEATURE in itertools.product(datas, FEATUREs):
@@ -31,5 +31,4 @@ if __name__ == "__main__":
                     aln_dir=f'{DATA_ROOT}/aln/',
                     cmap_threshold=-0.5, shannon=FEATURE=='shannon')
         del dataset # free up memory
-        input('Press enter to continue...')
                         

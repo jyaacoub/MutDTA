@@ -101,12 +101,12 @@ class BaseDataset(torchg.data.InMemoryDataset):
             label = df.loc[idx]['pkd']
             label = torch.Tensor([[label]])
             
-            _, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
+            pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
                                                     threshold=self.cmap_threshold,
                                                     aln_file=self.aln_p(code),
                                                     shannon=self.shannon)
             try:
-                _, mol_feat, mol_edge = smile_to_graph(lig_seq)
+                mol_feat, mol_edge = smile_to_graph(lig_seq)
             except ValueError:
                 errors.append(code)
                 continue
