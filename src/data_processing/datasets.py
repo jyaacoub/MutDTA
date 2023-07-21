@@ -87,12 +87,13 @@ class BaseDataset(torchg.data.InMemoryDataset):
     def __getitem__(self, idx):
         return self._data_pro[idx], self._data_mol[idx]
     
-    def _data_generator(self, df, batch_size=32):
-        start_idx = 0
+    def _data_generator(self, df, batch_size=32, pbar=None):
+        self._gen_idx = 0
         self.errors = []
-        while start_idx < len(df):
+        while self._gen_idx < len(df):
             batch_data = []
-            for idx in range(start_idx, min(start_idx + batch_size, len(df))):
+            for idx in range(self._gen_idx, min(self._gen_idx + batch_size, len(df))):
+                if pbar is not None: pbar.update(1)
                 code = df.loc[idx]['code']
                 cmap = np.load(self.cmap_p(code))
                 pro_seq = df.loc[idx]['prot_seq']
@@ -121,7 +122,7 @@ class BaseDataset(torchg.data.InMemoryDataset):
                                     code=code,
                                     prot_id=df.loc[idx]['prot_id'])
                 batch_data.append([pro, lig])
-            start_idx += batch_size
+            self._gen_idx += batch_size
             yield batch_data
     
     @staticmethod
@@ -174,31 +175,56 @@ class BaseDataset(torchg.data.InMemoryDataset):
         print(f'Number of codes: {len(df)}')
         
         # creating the dataset:
-        data_gen = self._data_generator(df, batch_size=self.batch_size_gen)
-        self._data_pro = None              
-        self._data_mol = None
-        for i, batch_data in tqdm(enumerate(data_gen), total=len(df)//self.batch_size_gen,
-                                  desc='Extracting node features and creating graphs'):
-            batchpro = torchg.data.Batch.from_data_list([data[0] for data in batch_data])
-            batchmol = torchg.data.Batch.from_data_list([data[1] for data in batch_data])
-            
-            if self._data_pro is None:
-                self._data_pro = batchpro
-                self._data_mol = batchmol
-            else:
-                self._data_pro = self._cat_batch(self._data_pro, batchpro)
-                self._data_mol = self._cat_batch(self._data_mol, batchmol)
-            
-            # save every 100 batches just in case
-            if i % self.batch_save_freq == 0:
-                torch.save(self._data_pro, self.processed_paths[1])
-                torch.save(self._data_mol, self.processed_paths[2])
-                
-            
+        with tqdm(total=len(df), desc='Creating batches') as pbar:
+            data_gen = self._data_generator(df, batch_size=self.batch_size_gen,
+                                            pbar=pbar)
+            os.makedirs(f'{self.processed_dir}/batches/', exist_ok=True)
+            self.errors = []
+            self._gen_idx = 0
+            while self._gen_idx <= len(df):
+                i = self._gen_idx//self.batch_size_gen
+                if not os.path.isfile(f'{self.processed_dir}/batches/pro_{i}.pt'):
+                    batch_data = next(data_gen)
+                    batchpro = torchg.data.Batch.from_data_list([data[0] for data in batch_data])
+                    batchmol = torchg.data.Batch.from_data_list([data[1] for data in batch_data])
+                    
+                    torch.save(batchpro, f'{self.processed_dir}/batches/pro_{i}.pt')
+                    torch.save(batchmol, f'{self.processed_dir}/batches/mol_{i}.pt')
+                    del batchpro, batchmol
+                else:
+                    self._gen_idx += self.batch_size_gen
+                    # min is used in case the dataset size is not divisible by batch_size_gen
+                    # final batch will be smaller than batch_size_gen...
+                    pbar.update(min(self.batch_size_gen, len(df) - pbar.n))
+        
         print(f'{len(self.errors)} codes failed to create graphs')
-        print('Saving final graphs...')
-        torch.save(self._data_pro, self.processed_paths[1])
-        torch.save(self._data_mol, self.processed_paths[2])
+        
+        # Combining batches into one:
+        with tqdm(total=len(df)*2//self.batch_size_gen, desc='Combining batches') as pbar:
+            # Done separately to save memory:
+            i=0
+            pbar.set_postfix_str('Protein data', refresh=True)
+            self._data_pro = torch.load(f'{self.processed_dir}/batches/pro_0.pt')
+            while os.path.isfile(f'{self.processed_dir}/batches/pro_{i}.pt'):
+                self._data_pro = self._cat_batch(self._data_pro,
+                                        torch.load(f'{self.processed_dir}/batches/pro_{i}.pt'))
+                pbar.update(1)
+                i+=1
+            
+            pbar.set_postfix_str('Saving protein data', refresh=True)
+            torch.save(self._data_pro, self.processed_paths[1])
+            
+            i=0
+            pbar.set_postfix_str('Molec data', refresh=True)
+            self._data_mol = torch.load(f'{self.processed_dir}/batches/mol_0.pt')
+            while os.path.isfile(f'{self.processed_dir}/batches/mol_{i}.pt'):
+                self._data_mol = self._cat_batch(self._data_mol,
+                                        torch.load(f'{self.processed_dir}/batches/mol_{i}.pt'))
+                pbar.update(1)
+                i+=1
+            
+            pbar.set_postfix_str('Saving mol data', refresh=True)
+            torch.save(self._data_mol, self.processed_paths[2])
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
