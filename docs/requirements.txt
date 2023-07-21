@@ -11,6 +11,8 @@ lifelines # used for concordance index calc
 # model building
 torch
 torch_geometric
+torch_scatter # for optimized scatter and segment ops
+transformers # huggingface needed for esm
 
 # optional:
 torchsummary 
