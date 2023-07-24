@@ -18,8 +18,8 @@ from src.data_processing import PDBbindProcessor
 class BaseDataset(torchg.data.InMemoryDataset):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, shannon=True, 
-                 esm_mdl:str='facebook/esm2_t6_8M_UR50D',
-                 esm_only:bool=True, *args, **kwargs):
+                 esm_mdl:str=None,
+                 esm_only:bool=False, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -46,21 +46,26 @@ class BaseDataset(torchg.data.InMemoryDataset):
             protein features, by default False.
         `esm_mdl` : str, optional
             If not None, then ESM embeddings are appended to protein features,
-            by default 'facebook/esm2_t6_8M_UR50D'.
+            by default None.
         `esm_only` : bool, optional
-            If True, only ESM embeddings are used for protein features,
-            by default True.
+            If True, only ESM embeddings are used for protein features. This will set the 
+            esm_mdl to 'facebook/esm2_t6_8M_UR50D' if not already set, by default False.
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.data_root = data_root
         self.aln_dir =  aln_dir # path to sequence alignments
         
-        self.esm_mdl = esm_mdl
-        if esm_mdl is not None:
+        self.esm_mdl = None
+        self.esm_only = esm_only
+        
+        if esm_mdl is None and esm_only:
+            esm_mdl = 'facebook/esm2_t6_8M_UR50D'
             self.esm_tok = AutoTokenizer.from_pretrained(esm_mdl)
             self.esm_mdl = EsmModel.from_pretrained(esm_mdl)
-        self.esm_only = esm_only
+        elif esm_mdl is not None:
+            self.esm_tok = AutoTokenizer.from_pretrained(esm_mdl)
+            self.esm_mdl = EsmModel.from_pretrained(esm_mdl)        
             
         self.cmap_threshold = cmap_threshold
         self.shannon = shannon

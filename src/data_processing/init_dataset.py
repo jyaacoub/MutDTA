@@ -12,7 +12,7 @@ from src.data_processing import DavisKibaDataset
 
 if __name__ == "__main__":
     datas = ['davis']
-    FEATUREs = ['nomsa', 'msa', 'shannon']
+    FEATUREs = ['esm', 'nomsa', 'msa', 'shannon']
 
     for data, FEATURE in itertools.product(datas, FEATUREs):
         DATA_ROOT = f'/home/jyaacoub/projects/data/davis_kiba/{data}/'
@@ -22,13 +22,17 @@ if __name__ == "__main__":
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
                     data_root=DATA_ROOT,
-                    aln_dir=None,
-                    cmap_threshold=-0.5, shannon=False)
+                    aln_dir=None, # set to none == no msa provided
+                    cmap_threshold=-0.5, 
+                    shannon=False)
         else:
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
                     data_root=DATA_ROOT,
-                    aln_dir=f'{DATA_ROOT}/aln/',
-                    cmap_threshold=-0.5, shannon=FEATURE=='shannon')
+                    aln_dir=f'{DATA_ROOT}/aln/', 
+                    cmap_threshold=-0.5, 
+                    shannon=FEATURE=='shannon',
+                    esm_only=FEATURE=='esm') # override shannon if esm_only
+            
         del dataset # free up memory
                         
