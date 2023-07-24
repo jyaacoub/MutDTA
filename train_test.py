@@ -1,5 +1,59 @@
+import argparse
+
+# Define the options for data_opt and FEATURE_opt
+data_opt_choices = ['davis', 'kiba']
+feature_opt_choices = ['nomsa', 'msa', 'shannon']
+og_model_opt_choices = [True, False]
+
+# Create the argument parser
+parser = argparse.ArgumentParser(description="Argument parser for selecting options.")
+
+# Add the argument for data_opt
+parser.add_argument(
+    '--data_opt',
+    choices=data_opt_choices,
+    nargs='+',  # Allows accepting multiple arguments
+    # default=data_opt_choices[0],
+    required=True,
+    help=f'Select one of {data_opt_choices} (default: {data_opt_choices[0]}).'
+)
+
+# Add the argument for FEATURE_opt
+parser.add_argument(
+    '--feature_opt',
+    choices=feature_opt_choices,
+    nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
+    required=True,
+    help=f'Select one or more from {feature_opt_choices}.'
+)
+
+# Add the argument for FEATURE_opt
+parser.add_argument(
+    '--og_model_opt',
+    choices=og_model_opt_choices,
+    nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
+    default=og_model_opt_choices,
+    required=False,
+    help=f'Select one or more from {og_model_opt_choices}.'
+)
+
+# Parse the arguments from the command line
+args = parser.parse_args()
+# %%
+# Access the selected options
+data_opt = args.data_opt
+feature_opt = args.feature_opt
+og_model_opt = args.og_model_opt
+
+# Now you can use the selected options in your code as needed
+print(f"Selected data_opt: {data_opt}")
+print(f"Selected feature_opt list: {feature_opt}")
+print(f"Selected og_model_opt: {og_model_opt}")
+
 #%%
-import os, random, itertools, math, json
+import os, random, itertools, math, json, argparse
+import config
+
 
 from tqdm import tqdm
 import pandas as pd
@@ -16,13 +70,10 @@ from src.models import train, test, CheckpointSaver
 from src.models.utils import print_device_info
 from src.data_analysis import get_metrics
 
+
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print_device_info(device)
 
-# %%
-data_opt = ['davis']
-FEATURE_opt = ['nomsa']
-OG_MODEL_opt = [False]
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 
 # Dataset Hyperparameters
@@ -54,7 +105,7 @@ cp_saver = CheckpointSaver(model=None,
 # %% Training loop
 metrics = {}
 
-for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL_opt):
+for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model_opt):
     print(f'({data}, {FEATURE}, {OG_MODEL}):')
     # loading data
     DATA_ROOT = f'../data/davis_kiba/{data}/' # where to get data from
@@ -80,7 +131,7 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
     else:
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
                             dropout=DROPOUT)
-    MODEL_KEY = f'randomW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
+    MODEL_KEY = f'randW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
     print(f'\n{MODEL_KEY}')
     
     cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
@@ -89,9 +140,6 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, FEATURE_opt, OG_MODEL
     if os.path.exists(cp_saver.save_path):
         print('Model already trained')
         continue
-    else:
-        # create file so that other processes know that this model is being trained
-        open(cp_saver.save_path, 'a').close()
     
     # training
     model.to(device)
