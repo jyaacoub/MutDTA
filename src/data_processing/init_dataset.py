@@ -15,9 +15,10 @@ if __name__ == "__main__":
     FEATUREs = ['nomsa', 'msa', 'shannon']
 
     for data, FEATURE in itertools.product(datas, FEATUREs):
-        DATA_ROOT = f'/home/jyaacoub/projects/data/davis_kiba/{data}/'
+        # DATA_ROOT = f'/home/jyaacoub/projects/data/davis_kiba/{data}/'
+        DATA_ROOT = f'/cluster/home/t122995uhn/projects/data/{data}/'
         create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
-        print(data, FEATURE)
+        print('\n', data, FEATURE)
         if FEATURE == 'nomsa':
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',

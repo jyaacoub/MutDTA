@@ -9,7 +9,7 @@ og_model_opt_choices = [True, False]
 parser = argparse.ArgumentParser(description="Argument parser for selecting options.")
 
 # Add the argument for data_opt
-parser.add_argument(
+parser.add_argument('-d'
     '--data_opt',
     choices=data_opt_choices,
     nargs='+',  # Allows accepting multiple arguments
@@ -19,7 +19,7 @@ parser.add_argument(
 )
 
 # Add the argument for FEATURE_opt
-parser.add_argument(
+parser.add_argument('-f'
     '--feature_opt',
     choices=feature_opt_choices,
     nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
@@ -28,7 +28,7 @@ parser.add_argument(
 )
 
 # Add the argument for FEATURE_opt
-parser.add_argument(
+parser.add_argument('-m'
     '--og_model_opt',
     choices=og_model_opt_choices,
     nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
@@ -41,9 +41,9 @@ parser.add_argument(
 args = parser.parse_args()
 # %%
 # Access the selected options
-data_opt = args.data_opt
-feature_opt = args.feature_opt
-og_model_opt = args.og_model_opt
+data_opt = args.d
+feature_opt = args.f
+og_model_opt = args.m
 
 # Now you can use the selected options in your code as needed
 print(f"Selected data_opt: {data_opt}")
