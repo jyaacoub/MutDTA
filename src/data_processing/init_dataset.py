@@ -11,8 +11,8 @@ from src.feature_extraction.process_msa import create_pfm_np_files
 from src.data_processing import DavisKibaDataset
 
 if __name__ == "__main__":
-    datas = ['davis']
-    FEATUREs = ['esm', 'nomsa', 'msa', 'shannon']
+    datas = ['davis', 'kiba']
+    FEATUREs = ['nomsa', 'msa', 'shannon']
 
     for data, FEATURE in itertools.product(datas, FEATUREs):
         DATA_ROOT = f'/home/jyaacoub/projects/data/davis_kiba/{data}/'
