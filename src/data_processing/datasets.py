@@ -108,7 +108,7 @@ class BaseDataset(torchg.data.InMemoryDataset):
         return Counter(self.df['prot_id'])
         
     def load(self):
-        self.df = pd.read_csv(self.processed_paths[0], index_col='code')
+        self.df = pd.read_csv(self.processed_paths[0], index_col=0)
         self._indices = self.df.index
         self._data_pro = torch.load(self.processed_paths[1])
         self._data_mol = torch.load(self.processed_paths[2])
@@ -132,22 +132,20 @@ class BaseDataset(torchg.data.InMemoryDataset):
         This method is used to create the processed data files after feature extraction.
         """
         if not os.path.isfile(self.processed_paths[0]):
-            df = self.pre_process()
+            self.df = self.pre_process()
         else:
-            df = pd.read_csv(self.processed_paths[0])
+            self.df = pd.read_csv(self.processed_paths[0])
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
-        print(f'Number of codes: {len(df)}')
+        print(f'Number of codes: {len(self.df)}')
         
         # creating the dataset:
         processed_prots = {}
-        processed_ligs = {}
         errors = []
-        for idx in tqdm(df.index, 'Creating prot and lig graphs'):
-            code = df.loc[idx]['code']
-            pro_seq = df.loc[idx]['prot_seq']
-            prot_id = df.loc[idx]['prot_id']
-            lig_seq = df.loc[idx]['SMILE']
-            
+        unique_df = self.df[['prot_id', 'prot_seq']].drop_duplicates()
+        for code, (prot_id, pro_seq) in tqdm(
+                        unique_df.iterrows(), 
+                        desc='Creating protein graphs',
+                        total=len(unique_df)):
             if prot_id not in processed_prots:
                 pro_feat = torch.Tensor()
                 if self.esm_mdl is not None:
@@ -174,12 +172,16 @@ class BaseDataset(torchg.data.InMemoryDataset):
                                     edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                     prot_id=prot_id)
                 processed_prots[prot_id] = pro
+        
+        processed_ligs = {}
+        for lig_seq in tqdm(self.df['SMILE'].unique(), 
+                            desc='Creating ligand graphs'):
                 
             if lig_seq not in processed_ligs:
                 try:
                     mol_feat, mol_edge = smile_to_graph(lig_seq)
                 except ValueError:
-                    errors.append(code)
+                    errors.append(f'L-{lig_seq}')
                     continue
                 
                 lig = torchg.data.Data(x=torch.Tensor(mol_feat),
@@ -430,6 +432,8 @@ class DavisKibaDataset(BaseDataset):
         # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id)
         # Note: this means the code is not unique (unlike pdbbind)
         df['prot_id'] = df['code']
+        df.set_index('code', inplace=True,
+                     verify_integrity=False)
         
         df.to_csv(self.processed_paths[0])
         return df
