@@ -3,20 +3,23 @@ import json, pickle, re, os
 
 import torch
 import torch_geometric as torchg
+from transformers import AutoTokenizer, EsmModel
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.process_msa import check_aln_lines
-from src.feature_extraction.protein import create_save_cmaps
+from src.feature_extraction.protein import create_save_cmaps, get_target_edge_index
 from src.data_processing import PDBbindProcessor
 
 #  See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, shannon=True,  *args, **kwargs):
+                 cmap_threshold:float, shannon=True, 
+                 esm_mdl:str='facebook/esm2_t6_8M_UR50D',
+                 esm_only:bool=True, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -41,12 +44,24 @@ class BaseDataset(torchg.data.InMemoryDataset):
         `shannon` : bool, optional
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
+        `esm_mdl` : str, optional
+            If not None, then ESM embeddings are appended to protein features,
+            by default 'facebook/esm2_t6_8M_UR50D'.
+        `esm_only` : bool, optional
+            If True, only ESM embeddings are used for protein features,
+            by default True.
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.data_root = data_root
         self.aln_dir =  aln_dir # path to sequence alignments
         
+        self.esm_mdl = esm_mdl
+        if esm_mdl is not None:
+            self.esm_tok = AutoTokenizer.from_pretrained(esm_mdl)
+            self.esm_mdl = EsmModel.from_pretrained(esm_mdl)
+        self.esm_only = esm_only
+            
         self.cmap_threshold = cmap_threshold
         self.shannon = shannon
         
@@ -129,10 +144,27 @@ class BaseDataset(torchg.data.InMemoryDataset):
             lig_seq = df.loc[idx]['SMILE']
             
             if prot_id not in processed_prots:
-                pro_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
+                pro_feat = torch.Tensor()
+                if self.esm_mdl is not None:
+                    esm_tok = self.esm_tok(pro_seq, return_tensors='pt')['input_ids']
+                    # remove <cls> and <sep> tokens
+                    esm_tok = esm_tok[0][1:-1].unsqueeze(0)
+                    esm_out = self.esm_mdl(esm_tok, 
+                                        torch.ones_like(esm_tok, dtype=torch.int8))
+                    pro_feat = esm_out.last_hidden_state.squeeze() # L x emb_dim
+                
+                # getting edge index and extra features:
+                if self.esm_only:
+                    pro_edge = get_target_edge_index(pro_seq, np.load(self.cmap_p(code)), 
+                                                     threshold=self.cmap_threshold)
+                else:
+                    # extra_feat is Lx54 or Lx34 (if shannon=True)
+                    extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
                                                     threshold=self.cmap_threshold,
                                                     aln_file=self.aln_p(code),
                                                     shannon=self.shannon)
+                    pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
+                    
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                     edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                     prot_id=prot_id)
@@ -182,8 +214,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
             
-        *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
-        """        
+        *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
+        """   
         super(PDBbindDataset, self).__init__(save_root, data_root=bind_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              shannon=shannon, *args, **kwargs)
@@ -301,7 +333,7 @@ class DavisKibaDataset(BaseDataset):
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
             
-        *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
+        *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
