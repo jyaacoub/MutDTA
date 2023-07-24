@@ -1,22 +1,25 @@
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 import json, pickle, re, os
 
 import torch
 import torch_geometric as torchg
+from transformers import AutoTokenizer, EsmModel
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.process_msa import check_aln_lines
-from src.feature_extraction.protein import create_save_cmaps
+from src.feature_extraction.protein import create_save_cmaps, get_target_edge_index
 from src.data_processing import PDBbindProcessor
 
 #  See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, shannon=True,  *args, **kwargs):
+                 cmap_threshold:float, shannon=True, 
+                 esm_mdl:str=None,
+                 esm_only:bool=False, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -41,12 +44,29 @@ class BaseDataset(torchg.data.InMemoryDataset):
         `shannon` : bool, optional
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
+        `esm_mdl` : str, optional
+            If not None, then ESM embeddings are appended to protein features,
+            by default None.
+        `esm_only` : bool, optional
+            If True, only ESM embeddings are used for protein features. This will set the 
+            esm_mdl to 'facebook/esm2_t6_8M_UR50D' if not already set, by default False.
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.data_root = data_root
         self.aln_dir =  aln_dir # path to sequence alignments
         
+        self.esm_mdl = None
+        self.esm_only = esm_only
+        
+        if esm_mdl is None and esm_only:
+            esm_mdl = 'facebook/esm2_t6_8M_UR50D'
+            self.esm_tok = AutoTokenizer.from_pretrained(esm_mdl)
+            self.esm_mdl = EsmModel.from_pretrained(esm_mdl)
+        elif esm_mdl is not None:
+            self.esm_tok = AutoTokenizer.from_pretrained(esm_mdl)
+            self.esm_mdl = EsmModel.from_pretrained(esm_mdl)        
+            
         self.cmap_threshold = cmap_threshold
         self.shannon = shannon
         
@@ -69,77 +89,111 @@ class BaseDataset(torchg.data.InMemoryDataset):
         # XY is created in pre_process
         return ['XY.csv','data_pro.pt','data_mol.pt']
     
+    @property
+    def index(self):
+        return self._indices
+    
+    @property
+    def ligands(self):
+        # returns unique ligands in dataset
+        return self.df['SMILE'].unique()
+    
+    @property
+    def proteins(self):
+        # returns unique proteins in dataset
+        return self.df['prot_id'].unique()
+    
+    def get_protein_counts(self) -> Counter:
+        # returns dict of protein counts
+        return Counter(self.df['prot_id'])
+        
     def load(self):
+        self.df = pd.read_csv(self.processed_paths[0], index_col=0)
+        self._indices = self.df.index
         self._data_pro = torch.load(self.processed_paths[1])
         self._data_mol = torch.load(self.processed_paths[2])
         
     def __len__(self):
-        return len(self._data_mol)
+        return len(self.df)
     
-    def __getitem__(self, idx):
-        return self._data_pro[idx], self._data_mol[idx]
+    def __getitem__(self, idx) -> dict:
+        row = self.df.iloc[idx]
+        code = row.name
+        prot_id = row['prot_id']
+        lig_seq = row['SMILE']
+        
+        return {'code': code, 'prot_id': prot_id, 
+                'y': row['pkd'],
+                'protein': self._data_pro[prot_id],
+                'ligand': self._data_mol[lig_seq]}
     
     def process(self):
         """
         This method is used to create the processed data files after feature extraction.
         """
         if not os.path.isfile(self.processed_paths[0]):
-            df = self.pre_process()
+            self.df = self.pre_process()
         else:
-            df = pd.read_csv(self.processed_paths[0])
+            self.df = pd.read_csv(self.processed_paths[0])
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
-        print(f'Number of codes: {len(df)}')
+        print(f'Number of codes: {len(self.df)}')
         
         # creating the dataset:
-        data_list = []
+        processed_prots = {}
         errors = []
-        for idx in tqdm(df.index, 'Extracting node features and creating graphs'):
-            code = df.loc[idx]['code']
-            cmap = np.load(self.cmap_p(code))
-            pro_seq = df.loc[idx]['prot_seq']
-            lig_seq = df.loc[idx]['SMILE']
-            label = df.loc[idx]['pkd']
-            label = torch.Tensor([[label]])
-            
-            _, pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
+        unique_df = self.df[['prot_id', 'prot_seq']].drop_duplicates()
+        for code, (prot_id, pro_seq) in tqdm(
+                        unique_df.iterrows(), 
+                        desc='Creating protein graphs',
+                        total=len(unique_df)):
+            if prot_id not in processed_prots:
+                pro_feat = torch.Tensor()
+                if self.esm_mdl is not None:
+                    esm_tok = self.esm_tok(pro_seq, return_tensors='pt')['input_ids']
+                    # remove <cls> and <sep> tokens
+                    esm_tok = esm_tok[0][1:-1].unsqueeze(0)
+                    esm_out = self.esm_mdl(esm_tok, 
+                                        torch.ones_like(esm_tok, dtype=torch.int8))
+                    pro_feat = esm_out.last_hidden_state.squeeze() # L x emb_dim
+                
+                # getting edge index and extra features:
+                if self.esm_only:
+                    pro_edge = get_target_edge_index(pro_seq, np.load(self.cmap_p(code)), 
+                                                     threshold=self.cmap_threshold)
+                else:
+                    # extra_feat is Lx54 or Lx34 (if shannon=True)
+                    extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
                                                     threshold=self.cmap_threshold,
                                                     aln_file=self.aln_p(code),
                                                     shannon=self.shannon)
-            try:
-                _, mol_feat, mol_edge = smile_to_graph(lig_seq)
-            except ValueError:
-                errors.append(code)
-                continue
-            
-            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
-                                y=label,
-                                code=code,
-                                prot_id=df.loc[idx]['prot_id'])
-            lig = torchg.data.Data(x=torch.Tensor(mol_feat),
-                                edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
-                                y=label,
-                                code=code,
-                                prot_id=df.loc[idx]['prot_id'])
-            data_list.append([pro, lig])
+                    pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
+                    
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+                                    prot_id=prot_id)
+                processed_prots[prot_id] = pro
+        
+        processed_ligs = {}
+        for lig_seq in tqdm(self.df['SMILE'].unique(), 
+                            desc='Creating ligand graphs'):
+                
+            if lig_seq not in processed_ligs:
+                try:
+                    mol_feat, mol_edge = smile_to_graph(lig_seq)
+                except ValueError:
+                    errors.append(f'L-{lig_seq}')
+                    continue
+                
+                lig = torchg.data.Data(x=torch.Tensor(mol_feat),
+                                    edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+                                    lig_seq=lig_seq)
+                processed_ligs[lig_seq] = lig
             
         print(f'{len(errors)} codes failed to create graphs')
-
-        if self.pre_filter is not None:
-            data_list = [data for data in data_list if self.pre_filter(data)]
-        if self.pre_transform is not None:
-            data_list = [self.pre_transform(data) for data in data_list]
-            
-        def collate(data_list):
-            batchA = torchg.data.Batch.from_data_list([data[0] for data in data_list])
-            batchB = torchg.data.Batch.from_data_list([data[1] for data in data_list])
-            return batchA, batchB
-        
-        self._data_pro, self._data_mol = collate(data_list)
         
         print('Saving...')
-        torch.save(self._data_pro, self.processed_paths[1])
-        torch.save(self._data_mol, self.processed_paths[2])
+        torch.save(processed_prots, self.processed_paths[1])
+        torch.save(processed_ligs, self.processed_paths[2])
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
@@ -167,8 +221,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
             
-        *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
-        """        
+        *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
+        """   
         super(PDBbindDataset, self).__init__(save_root, data_root=bind_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              shannon=shannon, *args, **kwargs)
@@ -286,7 +340,7 @@ class DavisKibaDataset(BaseDataset):
             If True, shannon entropy instead of PSSM matrix is used for 
             protein features, by default False.
             
-        *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
+        *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
@@ -378,6 +432,8 @@ class DavisKibaDataset(BaseDataset):
         # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id)
         # Note: this means the code is not unique (unlike pdbbind)
         df['prot_id'] = df['code']
+        df.set_index('code', inplace=True,
+                     verify_integrity=False)
         
         df.to_csv(self.processed_paths[0])
         return df
