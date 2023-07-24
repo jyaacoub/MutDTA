@@ -97,6 +97,7 @@ class BaseDataset(torchg.data.InMemoryDataset):
             code = df.loc[idx]['code']
             cmap = np.load(self.cmap_p(code))
             pro_seq = df.loc[idx]['prot_seq']
+            prot_id = df.loc[idx]['prot_id']
             lig_seq = df.loc[idx]['SMILE']
             label = df.loc[idx]['pkd']
             label = torch.Tensor([[label]])
@@ -115,12 +116,11 @@ class BaseDataset(torchg.data.InMemoryDataset):
                                 edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
                                 y=label,
                                 code=code,
-                                prot_id=df.loc[idx]['prot_id'])
+                                prot_id=prot_id)
             lig = torchg.data.Data(x=torch.Tensor(mol_feat),
                                 edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
                                 y=label,
-                                code=code,
-                                prot_id=df.loc[idx]['prot_id'])
+                                code=code)
             data_list.append([pro, lig])
             
         print(f'{len(errors)} codes failed to create graphs')
