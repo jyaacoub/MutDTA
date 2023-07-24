@@ -60,7 +60,7 @@ def train_val_test_split(dataset: InMemoryDataset,
         test_indices = []
         train_val_indices = []
         for i in range(dataset_size):
-            code = dataset[i][0].code
+            code = dataset[i]['code']
             if code in vina_df.index:
                 test_indices.append(i)
             else:
@@ -74,7 +74,7 @@ def train_val_test_split(dataset: InMemoryDataset,
         train_indices, val_indices = indices[:tr_size], indices[tr_size:]
         
     elif split_by_prot:
-        prot_counts = Counter(dataset._data_pro.code) # O(n)
+        prot_counts = dataset.get_protein_counts()
         prots = list(prot_counts.keys())
         np.random.shuffle(prots)
         
@@ -95,7 +95,7 @@ def train_val_test_split(dataset: InMemoryDataset,
         train_indices = []
         val_test_indices = []
         for i in range(dataset_size): # O(n)
-            if dataset._data_pro[i].code in selected:
+            if dataset[i]['prot_id'] in selected:
                 train_indices.append(i)
             else:
                 val_test_indices.append(i)

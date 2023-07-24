@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 import json, pickle, re, os
 
 import torch
@@ -69,15 +69,43 @@ class BaseDataset(torchg.data.InMemoryDataset):
         # XY is created in pre_process
         return ['XY.csv','data_pro.pt','data_mol.pt']
     
+    @property
+    def index(self):
+        return self._indices
+    
+    @property
+    def ligands(self):
+        # returns unique ligands in dataset
+        return self.df['SMILE'].unique()
+    
+    @property
+    def proteins(self):
+        # returns unique proteins in dataset
+        return self.df['prot_id'].unique()
+    
+    def get_protein_counts(self) -> Counter:
+        # returns dict of protein counts
+        return Counter(self.df['prot_id'])
+        
     def load(self):
+        self.df = pd.read_csv(self.processed_paths[0], index_col='code')
+        self._indices = self.df.index
         self._data_pro = torch.load(self.processed_paths[1])
         self._data_mol = torch.load(self.processed_paths[2])
         
     def __len__(self):
-        return len(self._data_mol)
+        return len(self.df)
     
-    def __getitem__(self, idx):
-        return self._data_pro[idx], self._data_mol[idx]
+    def __getitem__(self, idx) -> dict:
+        row = self.df.iloc[idx]
+        code = row.name
+        prot_id = row['prot_id']
+        lig_seq = row['SMILE']
+        
+        return {'code': code, 'prot_id': prot_id, 
+                'y': row['pkd'],
+                'protein': self._data_pro[prot_id],
+                'ligand': self._data_mol[lig_seq]}
     
     def process(self):
         """
@@ -91,55 +119,42 @@ class BaseDataset(torchg.data.InMemoryDataset):
         print(f'Number of codes: {len(df)}')
         
         # creating the dataset:
-        data_list = []
+        processed_prots = {}
+        processed_ligs = {}
         errors = []
-        for idx in tqdm(df.index, 'Extracting node features and creating graphs'):
+        for idx in tqdm(df.index, 'Creating prot and lig graphs'):
             code = df.loc[idx]['code']
-            cmap = np.load(self.cmap_p(code))
             pro_seq = df.loc[idx]['prot_seq']
             prot_id = df.loc[idx]['prot_id']
             lig_seq = df.loc[idx]['SMILE']
-            label = df.loc[idx]['pkd']
-            label = torch.Tensor([[label]])
             
-            pro_feat, pro_edge = target_to_graph(pro_seq, cmap, 
+            if prot_id not in processed_prots:
+                pro_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
                                                     threshold=self.cmap_threshold,
                                                     aln_file=self.aln_p(code),
                                                     shannon=self.shannon)
-            try:
-                mol_feat, mol_edge = smile_to_graph(lig_seq)
-            except ValueError:
-                errors.append(code)
-                continue
-            
-            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
-                                y=label,
-                                code=code,
-                                prot_id=prot_id)
-            lig = torchg.data.Data(x=torch.Tensor(mol_feat),
-                                edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
-                                y=label,
-                                code=code)
-            data_list.append([pro, lig])
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+                                    prot_id=prot_id)
+                processed_prots[prot_id] = pro
+                
+            if lig_seq not in processed_ligs:
+                try:
+                    mol_feat, mol_edge = smile_to_graph(lig_seq)
+                except ValueError:
+                    errors.append(code)
+                    continue
+                
+                lig = torchg.data.Data(x=torch.Tensor(mol_feat),
+                                    edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+                                    lig_seq=lig_seq)
+                processed_ligs[lig_seq] = lig
             
         print(f'{len(errors)} codes failed to create graphs')
-
-        if self.pre_filter is not None:
-            data_list = [data for data in data_list if self.pre_filter(data)]
-        if self.pre_transform is not None:
-            data_list = [self.pre_transform(data) for data in data_list]
-            
-        def collate(data_list):
-            batchA = torchg.data.Batch.from_data_list([data[0] for data in data_list])
-            batchB = torchg.data.Batch.from_data_list([data[1] for data in data_list])
-            return batchA, batchB
-        
-        self._data_pro, self._data_mol = collate(data_list)
         
         print('Saving...')
-        torch.save(self._data_pro, self.processed_paths[1])
-        torch.save(self._data_mol, self.processed_paths[2])
+        torch.save(processed_prots, self.processed_paths[1])
+        torch.save(processed_ligs, self.processed_paths[2])
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
