@@ -20,76 +20,37 @@ print_device_info(device)
 
 #/randomW_kiba_32B_0.001LR_0.2D_200E_msaF_DGraphDTAImproved.model
 #randomW_davis_64B_0.0001LR_0.4D_200E_msaF_DGraphDTA.model
-data_opt = ['kiba', 'davis']
-FEATURE_opt = ['msa', 'shannon']
-OG_MODEL_opt = [True, False]
-data = data_opt[1]
-FEATURE = FEATURE_opt[0]
-OG_MODEL = OG_MODEL_opt[0]
+
+#%% Testing esm model 
+# based on https://github.com/facebookresearch/esm#main-models-you-should-use-
+# I should be using ESM-MSA-1b (esm1b_t33_650M_UR50S)
+# from https://github.com/facebookresearch/esm/tree/main#pre-trained-models-
+# Luke used esm2_t6_8M_UR50D for his experiments
+
+# https://huggingface.co/facebook/esm2_t33_650M_UR50D is <10GB
+# https://huggingface.co/facebook/esm2_t36_3B_UR50D is 11GB
+from transformers import AutoTokenizer, EsmConfig, EsmForMaskedLM, EsmModel, EsmTokenizer
+
+config = EsmConfig.from_pretrained('facebook/esm2_t6_8M_UR50D')
+print(config)
+tok = AutoTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
+# this will raise a warning since lm head is missing but that is okay since we are not using it:
+esm2 = EsmModel.from_pretrained('facebook/esm2_t6_8M_UR50D')
 
 
-MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 
-# Dataset Hyperparameters
-TRAIN_SPLIT= .8 # 80% of data for training
-VAL_SPLIT = .1 # 10% for val and remaining is for testing (10%)
-SHUFFLE_DATA = True
-RAND_SEED=0
+# %% test:
+sample_seq = 'MMPPKLM'
+sample_tok = tok(sample_seq, return_tensors='pt')
+# NOTE: tokenizer adds special tokens to the beginning and end of the sequence
+# the first token is <cls> and the last token is <sep>
+# these are for classification tasks and are not needed for our purposes
+sample_out = esm2(**sample_tok)
+print(sample_seq)
+print(sample_tok.input_ids.shape)
+print(list(sample_seq[0:5]), 'corresponds to', sample_tok.input_ids[0][1:6])
 
-random.seed(RAND_SEED)
-np.random.seed(RAND_SEED)
-torch.manual_seed(RAND_SEED)
-
-# Tune Hyperparameters after grid search
-BATCH_SIZE = 64
-LEARNING_RATE = 0.0001
-DROPOUT = 0.4
-NUM_EPOCHS = 200
-
-SAVE_RESULTS = True
-SHOW_PLOTS = False
-media_save_p = 'results/model_media/davis_kiba/'
-# loading data
-DATA_ROOT = f'../data/davis_kiba/{data}/' # where to get data from
-dataset = DavisKibaDataset(
-        save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
-        data_root=DATA_ROOT,
-        aln_dir=f'{DATA_ROOT}/aln/',
-        cmap_threshold=-0.5, shannon=FEATURE=='shannon')
-print(f'Number of samples: {len(dataset)}')
-
-train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-                    train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
-                    shuffle_dataset=True, random_seed=RAND_SEED, 
-                    batch_size=BATCH_SIZE, use_refined=False)
-
-# loading model:
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-print(f'Device: {device}')
-
-num_feat_pro = 54 if FEATURE == 'msa' else 34
-if OG_MODEL:
-    model = DGraphDTA(num_features_pro=num_feat_pro,dropout=DROPOUT)
-else:
-    model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                        dropout=DROPOUT)
-    
-MODEL_KEY = f'randomW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
-print(f'\n{MODEL_KEY}')
-model.to(device)
-
-# %% loading checkpoint
-cp = torch.load(f'results/model_checkpoints/ours/{MODEL_KEY}.model')
-model.load_state_dict(cp)
+# print(sample_out)
+print('Hidden state shape:', sample_out.last_hidden_state.shape)
 
 
-# %% testing
-loss, pred, actual = test(model, test_loader, device)
-get_metrics(actual, pred,
-            save_results=SAVE_RESULTS,
-            save_path=media_save_p,
-            model_key=MODEL_KEY,
-            csv_file=MODEL_STATS_CSV,
-            show=True,
-            )
-# %%

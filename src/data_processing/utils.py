@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import torch
+from collections import Counter
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import InMemoryDataset
@@ -10,7 +11,8 @@ from torch_geometric.data import InMemoryDataset
 def train_val_test_split(dataset: InMemoryDataset, 
                          train_split=.8, val_split=.1, 
                          shuffle_dataset=True, random_seed=None,
-                         batch_size=128, use_refined=True) -> tuple[DataLoader]:
+                         batch_size=128, use_refined=False, 
+                         split_by_prot=True) -> tuple[DataLoader]:
     """
     Splits up InMemoryDataset into train, val, and test loaders.
 
@@ -30,6 +32,8 @@ def train_val_test_split(dataset: InMemoryDataset,
         size of batch, by default 128
     `use_refined` : bool, optional
         If true, the test set will only consist of refined samples for PDBbind, by default True
+    `split_by_prot` : bool, optional
+        If true, will take into consideration the proteins when splitting, by default True
 
     Returns
     -------
@@ -43,8 +47,11 @@ def train_val_test_split(dataset: InMemoryDataset,
     
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
+    tr_size = int(np.floor(train_split * dataset_size))
+    v_size = int(np.floor(val_split * dataset_size))
+    te_size = dataset_size - tr_size - v_size
     if shuffle_dataset:
-        np.random.shuffle(indices)
+        np.random.shuffle(indices) # in-place shuffle
 
     if use_refined:
         # test set will contain only refined complexes so that we can compare with vina
@@ -53,23 +60,52 @@ def train_val_test_split(dataset: InMemoryDataset,
         test_indices = []
         train_val_indices = []
         for i in range(dataset_size):
-                code = dataset[i][0].code
-                if code in vina_df.index:
-                    test_indices.append(i)
-                else:
-                    train_val_indices.append(i)
-                # break once we have enough test indices to meet the size requirement
-                if len(test_indices) >= (1-(train_split+val_split))*dataset_size:
-                    train_val_indices += indices[i+1:]
-                    break
+            code = dataset[i]['code']
+            if code in vina_df.index:
+                test_indices.append(i)
+            else:
+                train_val_indices.append(i)
+            # break once we have enough test indices to meet the size requirement
+            if len(test_indices) >= te_size:
+                train_val_indices += indices[i+1:]
+                break
+            
+        # now split train_val_indices into train and val
+        train_indices, val_indices = indices[:tr_size], indices[tr_size:]
+        
+    elif split_by_prot:
+        prot_counts = dataset.get_protein_counts()
+        prots = list(prot_counts.keys())
+        np.random.shuffle(prots)
+        
+        # NOTE: We want to ensure a diverse set of proteins across train, val, and test
+        # simple case is where proteins appear exactly once in the dataset
+        #     Then we can simply split the proteins into train, val, and test
+        
+        # the following code doesnt consider diversity, it just splits the proteins into 
+        # train, val, and test
+        
+        count = 0
+        selected = {}
+        for p in prots: # O(n)
+            if count + prot_counts[p] <= tr_size:
+                selected[p] = True
+                count += prot_counts[p]
+          
+        train_indices = []
+        val_test_indices = []
+        for i in range(dataset_size): # O(n)
+            if dataset[i]['prot_id'] in selected:
+                train_indices.append(i)
+            else:
+                val_test_indices.append(i)
+                
+        val_indices, test_indices = val_test_indices[:v_size], val_test_indices[v_size:]
+        
     else:
-        # split into train_val and test
-        tv_size = int(np.floor((train_split+val_split) * dataset_size))
-        train_val_indices, test_indices = indices[:tv_size], indices[tv_size:]
-
-    # split train_val into train and val
-    t_size = int(np.floor(train_split * dataset_size))
-    train_indices, val_indices = train_val_indices[:t_size], train_val_indices[t_size:]
+        # normal split into train_val and test
+        train_indices, val_test_indices = indices[:tr_size], indices[tr_size:]
+        val_indices, test_indices = val_test_indices[:v_size], val_test_indices[v_size:]
 
     # Creating PT data samplers
     train_sampler = SubsetRandomSampler(train_indices)

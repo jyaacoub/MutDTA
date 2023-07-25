@@ -127,7 +127,56 @@ class PDBbindProcessor(Processor):
         raise NotImplementedError
     
     @staticmethod
-    def get_binding_data(index_file : str) -> pd.DataFrame:
+    def get_name_data(index_name_file: str) -> pd.DataFrame:
+        """
+        Extracts PDB code, release year, Uniprot ID, protein name
+        from INDEX_general_PL_name.2020 file from PDBbind and returns 
+        it as a dataframe.
+        
+        Input file has cols:
+            PDB code, release year, Uniprot ID, protein name
+            
+        e.g. line:
+            `6mu1  2018  P29994  INOSITOL 1,4,5-TRISPHOSPHATE RECEPTOR TYPE 1`
+
+        Parameters
+        ----------
+        `index_name_file` : str
+            Path to the v2020-other-PL/index/INDEX_general_PL_name.2020 from PDBbind
+
+        Returns
+        -------
+        pd.DataFrame
+            With cols:
+            
+            PDBCode,release_year,prot_id,prot_name
+        """
+        data = {}
+        with open(index_name_file, 'r') as f:
+            for line in f.readlines():
+                if line.startswith('#'): continue
+                code = line[:4]
+                try:
+                    year = int(line[5:10])
+                    prot_id = line[11:18].strip()
+                    prot_name = line[18:].strip()
+                    print('year:', year, 
+                          '\nprot_id:', prot_id, 
+                          '\nprot_name:', prot_name)
+                    data[code] = [year, prot_id, prot_name]
+                except ValueError as e:
+                    print(f'Error with line: {line}')
+                    raise e
+        
+        df = pd.DataFrame.from_dict(data, orient='index', 
+                                    columns=['release_year', 'prot_id', 'prot_name'])
+        df.index.name = 'PDBCode'
+        
+        return df
+        
+    
+    @staticmethod
+    def get_binding_data(index_data_file : str) -> pd.DataFrame:
         """
         Extracts binding data from given index file and returns it as a dataframe.
         Sample file header:
@@ -137,7 +186,7 @@ class PDBbindProcessor(Processor):
 
         Parameters
         ----------
-        `index_file` : str
+        `index_data_file` : str
             Path to the v2020-other-PL/index/INDEX_general_PL_data.2020 from PDBbind
 
         Returns
@@ -148,7 +197,7 @@ class PDBbindProcessor(Processor):
             PDBCode,resolution,release_year,pkd,lig_name
         """
         data = {}
-        with open(index_file, 'r') as f:
+        with open(index_data_file, 'r') as f:
             for line in f.readlines():
                 if line.startswith('#'): continue
                 code = line[:4]

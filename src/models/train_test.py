@@ -54,15 +54,16 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
                   unit="batch") as progress_bar:
             model.train()
             train_loss = 0.0
-            for batch_pro, batch_mol in train_loader:
-                batch_pro = batch_pro.to(device)
-                batch_mol = batch_mol.to(device)
+            for data in train_loader:
+                batch_pro = data['protein'].to(device)
+                batch_mol = data['ligand'].to(device)
+                labels = data['y'].reshape(-1,1).to(device)
                 
                 # Forward pass
                 predictions = model(batch_pro, batch_mol)
 
                 # Compute loss
-                loss = CRITERION(predictions, batch_pro.y) # y is labels
+                loss = CRITERION(predictions, labels)
                 train_loss += loss.item()
 
                 # Backward pass and optimization
@@ -81,15 +82,16 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         model.eval()
         val_loss = 0.0
         with torch.no_grad():
-            for batch_pro, batch_mol in val_loader:
-                batch_pro = batch_pro.to(device)
-                batch_mol = batch_mol.to(device)
+            for data in val_loader:
+                batch_pro = data['protein'].to(device)
+                batch_mol = data['ligand'].to(device)
+                labels = data['y'].reshape(-1,1).to(device)
                 
                 # Forward pass
                 predictions = model(batch_pro, batch_mol)
 
                 # Compute loss
-                loss = CRITERION(predictions, batch_pro.y) # y is labels
+                loss = CRITERION(predictions, labels)
                 val_loss += loss.item()
 
             # Compute average validation loss for the epoch
@@ -106,6 +108,8 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
+        
+    logs['best_epoch'] = saver.best_epoch
     return logs
 
 
@@ -136,20 +140,23 @@ def test(model, test_loader, device) -> Tuple[float, np.ndarray, np.ndarray]:
     actual = np.array([])
     
     with torch.no_grad():
-        for batch_pro, batch_mol in test_loader:
-            batch_pro = batch_pro.to(device)
-            batch_mol = batch_mol.to(device)
+        for data in test_loader:
+            batch_pro = data['protein'].to(device)
+            batch_mol = data['ligand'].to(device)
+            labels = data['y'].reshape(-1,1).to(device)
             
             # Forward pass
             predictions = model(batch_pro, batch_mol)
+
+            # Compute loss
+            loss = CRITERION(predictions, labels) # y is labels
+            test_loss += loss.item()
+            
+            # save predictions and actual labels
             pred = np.append(pred, 
                             predictions.detach().cpu().numpy().flatten())
             actual = np.append(actual, 
-                            batch_pro.y.detach().cpu().numpy().flatten())
-
-            # Compute loss
-            loss = CRITERION(predictions, batch_pro.y) # y is labels
-            test_loss += loss.item()
+                               labels.detach().cpu().numpy().flatten())
 
         # Compute average test loss
         test_loss /= len(test_loader)
