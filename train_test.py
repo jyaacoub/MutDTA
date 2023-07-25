@@ -136,6 +136,7 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model
     print(f'\n{MODEL_KEY}')
     
     cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
+    model.to(device)
     
     # check if model has already been trained:
     logs = None
@@ -150,7 +151,6 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model
                 logs = json.load(f)
     else:
         # training
-        model.to(device)
         logs = train(model, train_loader, val_loader, device, 
                     epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
         cp_saver.save()
