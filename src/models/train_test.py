@@ -108,6 +108,8 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
+        
+    logs['best_epoch'] = saver.best_epoch
     return logs
 
 

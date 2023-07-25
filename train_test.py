@@ -99,7 +99,7 @@ model_save_p = 'results/model_checkpoints/ours/'
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False,
-                            patience=5, min_delta=0.05)
+                            patience=10, min_delta=0.1)
 
 
 # %% Training loop
@@ -132,39 +132,36 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
                             dropout=DROPOUT)
     MODEL_KEY = f'randW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
+    logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'\n{MODEL_KEY}')
     
     cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
     
     # check if model has already been trained:
+    logs = None
     if os.path.exists(cp_saver.save_path):
         print('Model already trained')
-        continue
-    
-    # training
-    model.to(device)
-    logs = train(model, train_loader, val_loader, device, 
-                epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
-    cp_saver.save()
-
-    ax = plt.figure().gca()
-    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    index = np.arange(1, NUM_EPOCHS+1)
-    plt.plot(index, logs['train_loss'], label='train')
-    plt.plot(index, logs['val_loss'], label='val')
-    plt.legend()
-    plt.title(f'{MODEL_KEY} Loss')
-    plt.xlabel('Epoch')
-    # plt.xticks(range(0,NUM_EPOCHS+1, 2))
-    plt.xlim(0, NUM_EPOCHS)
-    plt.ylabel('Loss')
-    if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_loss.png')
-    if SHOW_PLOTS: plt.show()
-    plt.clf()
-    
+        # load ckpnt for testing
+        model.load_state_dict(torch.load(cp_saver.save_path, 
+                                         map_location=device))
+        # loading logs for plotting 
+        if os.path.exists(logs_out_p):
+            with open(logs_out_p, 'r') as f:
+                logs = json.load(f)
+    else:
+        # training
+        model.to(device)
+        logs = train(model, train_loader, val_loader, device, 
+                    epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
+        cp_saver.save()
+        # load best model for testing
+        model.load_state_dict(cp_saver.best_model_dict) 
+        # save training logs for plotting later
+        with open(logs_out_p, 'w') as f:
+            json.dump(logs, f, indent=4)
+        
+            
     # testing
-    model.load_state_dict(cp_saver.best_model_dict)
-    
     loss, pred, actual = test(model, test_loader, device)
     get_metrics(actual, pred,
                 save_results=SAVE_RESULTS,
@@ -173,11 +170,22 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model
                 csv_file=MODEL_STATS_CSV,
                 show=SHOW_PLOTS,
                 )
-    metrics[MODEL_KEY] = {'test_loss': loss, 
-                          'best_epoch': cp_saver.best_epoch,
-                            'logs': logs}
-    
+    plt.clf()
 
-# save metrics
-with open(f'{media_save_p}/metrics.json', 'a') as f:
-    json.dump(metrics, f, indent=4)
+    # display train val plot
+    if logs is not None: 
+        ax = plt.figure().gca()
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        index = np.arange(1, len(logs['train_loss'])+1)
+        plt.plot(index, logs['train_loss'], label='train')
+        plt.plot(index, logs['val_loss'], label='val')
+        plt.legend()
+        plt.title(f'{MODEL_KEY} Loss')
+        plt.xlabel('Epoch')
+        # plt.xticks(range(0,NUM_EPOCHS+1, 2))
+        plt.xlim(0, NUM_EPOCHS)
+        plt.ylabel('Loss')
+        if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_loss.png')
+        if SHOW_PLOTS: plt.show()
+    plt.clf()
+    
