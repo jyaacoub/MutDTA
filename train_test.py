@@ -39,6 +39,8 @@ parser.add_argument('-m',
         'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+\
         'and EDA is the same but with esm_only set to False.'
 )
+# Parse the arguments from the command line
+args = parser.parse_args()
 
 #%%
 import os, random, itertools, math, json, argparse
@@ -62,9 +64,6 @@ from src.models.utils import print_device_info
 from src.data_analysis import get_metrics
 
 
-# Parse the arguments from the command line
-args = parser.parse_args()
-
 # %%
 # Access the selected options
 data_opt = args.data_opt
@@ -85,7 +84,7 @@ MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 TRAIN_SPLIT= .8 # 80% of data for training
 VAL_SPLIT = .1 # 10% for val and remaining is for testing (10%)
 SHUFFLE_DATA = True
-RAND_SEED=0
+RAND_SEED = 0
 
 random.seed(RAND_SEED)
 np.random.seed(RAND_SEED)

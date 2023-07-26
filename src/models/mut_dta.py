@@ -13,7 +13,8 @@ from torch_geometric import data as geo_data
 
 from src.models.utils import BaseModel
 
-from transformers import AutoTokenizer, EsmConfig, EsmForMaskedLM, EsmModel, EsmTokenizer
+from transformers import AutoTokenizer, EsmModel
+from transformers.utils import logging
 
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
@@ -34,6 +35,7 @@ class EsmDTA(BaseModel):
         self.pro_fc_g2 = nn.Linear(1024, output_dim)
         
         # this will raise a warning since lm head is missing but that is okay since we are not using it:
+        logging.set_verbosity(logging.CRITICAL)
         self.esm_tok = AutoTokenizer.from_pretrained(esm_head)
         self.esm_mdl = EsmModel.from_pretrained(esm_head)
         self.esm_mdl.requires_grad_(False) # freeze weights
