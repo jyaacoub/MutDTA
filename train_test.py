@@ -54,7 +54,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.feature_extraction.protein import get_pfm
-from src.models.prior_work import DGraphDTA, DGraphDTAImproved, EsmDTA
+from src.models.mut_dta import EsmDTA
+from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
 from src.models import train, test, CheckpointSaver
 from src.models.utils import print_device_info
@@ -91,7 +92,7 @@ np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
 
 # Tune Hyperparameters after grid search
-BATCH_SIZE = 64
+BATCH_SIZE = 10
 LEARNING_RATE = 0.0001
 DROPOUT = 0.4
 NUM_EPOCHS = 2000
@@ -137,23 +138,27 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
                             dropout=DROPOUT)
     elif MODEL == 'ED':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_feat_pro=320, # only esm features
+                       num_features_pro=320, # only esm features
                        pro_emb_dim=54, # inital embedding size after first GCN layer
+                       dropout=DROPOUT,
                        esm_only=True)
     elif MODEL == 'EDA':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_feat_pro=320+num_feat_pro, # esm features + other features
+                       num_features_pro=320+num_feat_pro, # esm features + other features
                        pro_emb_dim=54, # inital embedding size after first GCN layer
+                       dropout=DROPOUT,
                        esm_only=False)
     elif MODEL == 'EDI':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_feat_pro=320,
+                       num_features_pro=320,
                        pro_emb_dim=512, # increase embedding size
+                       dropout=DROPOUT,
                        esm_only=True)
     elif MODEL == 'EDAI':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_feat_pro=320 + num_feat_pro,
+                       num_features_pro=320 + num_feat_pro,
                        pro_emb_dim=512,
+                       dropout=DROPOUT,
                        esm_only=False)
         
     MODEL_KEY = f'randW_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
