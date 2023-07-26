@@ -3,7 +3,7 @@ import argparse
 # Define the options for data_opt and FEATURE_opt
 data_opt_choices = ['davis', 'kiba']
 feature_opt_choices = ['nomsa', 'msa', 'shannon']
-og_model_opt_choices = [True, False]
+og_model_opt_choices = ['True', 'False']
 
 # Create the argument parser
 parser = argparse.ArgumentParser(description="Argument parser for selecting options.")
@@ -44,6 +44,9 @@ args = parser.parse_args()
 data_opt = args.data_opt
 feature_opt = args.feature_opt
 og_model_opt = args.og_model_opt
+
+# parse og_model_opt => t/f
+og_model_opt = [s == 'True' for s in og_model_opt]
 
 # Now you can use the selected options in your code as needed
 print(f"Selected data_opt: {data_opt}")
