@@ -11,6 +11,7 @@ lifelines # used for concordance index calc
 # model building
 torch
 torch_geometric
+transformers # huggingface needed for esm
 
 # optional:
 torchsummary 
