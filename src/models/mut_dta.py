@@ -17,7 +17,7 @@ from transformers import AutoTokenizer, EsmConfig, EsmForMaskedLM, EsmModel, Esm
 
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
-                 num_features_pro=320, num_features_mol=78, 
+                 num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
                  output_dim=128, dropout=0.2, esm_only=True):
         super(EsmDTA, self).__init__()
 
@@ -27,11 +27,10 @@ class EsmDTA(BaseModel):
         self.mol_fc_g1 = nn.Linear(num_features_mol * 4, 1024)
         self.mol_fc_g2 = nn.Linear(1024, output_dim)
 
-        emb_feat= 54 # to ensure constant embedding size regardless of input size (for fair comparison)
-        self.pro_conv1 = GCNConv(num_features_pro, emb_feat)
-        self.pro_conv2 = GCNConv(emb_feat, emb_feat * 2)
-        self.pro_conv3 = GCNConv(emb_feat * 2, emb_feat * 4)
-        self.pro_fc_g1 = nn.Linear(emb_feat * 4, 1024)
+        self.pro_conv1 = GCNConv(num_features_pro, pro_emb_dim)
+        self.pro_conv2 = GCNConv(pro_emb_dim, pro_emb_dim * 2)
+        self.pro_conv3 = GCNConv(pro_emb_dim * 2, pro_emb_dim * 4)
+        self.pro_fc_g1 = nn.Linear(pro_emb_dim * 4, 1024)
         self.pro_fc_g2 = nn.Linear(1024, output_dim)
         
         # this will raise a warning since lm head is missing but that is okay since we are not using it:
