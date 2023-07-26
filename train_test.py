@@ -124,7 +124,7 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
                         shuffle_dataset=True, random_seed=RAND_SEED, 
-                        batch_size=BATCH_SIZE, use_refined=False)
+                        batch_train=BATCH_SIZE, use_refined=False)
 
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

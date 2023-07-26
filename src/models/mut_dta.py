@@ -36,6 +36,7 @@ class EsmDTA(BaseModel):
         # this will raise a warning since lm head is missing but that is okay since we are not using it:
         self.esm_tok = AutoTokenizer.from_pretrained(esm_head)
         self.esm_mdl = EsmModel.from_pretrained(esm_head)
+        self.esm_mdl.requires_grad_(False) # freeze weights
 
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
