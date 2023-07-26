@@ -17,8 +17,8 @@ if __name__ == "__main__":
     for data, FEATURE in itertools.product(datas, FEATUREs):
         # DATA_ROOT = f'/home/jyaacoub/projects/data/davis_kiba/{data}/'
         DATA_ROOT = f'/cluster/home/t122995uhn/projects/data/{data}/'
-        create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
         print('\n', data, FEATURE)
+        create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
         if FEATURE == 'nomsa':
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
@@ -32,8 +32,7 @@ if __name__ == "__main__":
                     data_root=DATA_ROOT,
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
-                    shannon=FEATURE=='shannon',
-                    esm_only=FEATURE=='esm') # override shannon if esm_only
+                    shannon=FEATURE=='shannon')
             
         del dataset # free up memory
                         

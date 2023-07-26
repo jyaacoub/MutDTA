@@ -3,7 +3,7 @@ import argparse
 # Define the options for data_opt and FEATURE_opt
 data_opt_choices = ['davis', 'kiba']
 feature_opt_choices = ['nomsa', 'msa', 'shannon']
-og_model_opt_choices = [True, False]
+model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI']
 
 # Create the argument parser
 parser = argparse.ArgumentParser(description="Argument parser for selecting options.")
@@ -29,26 +29,18 @@ parser.add_argument('-f',
 
 # Add the argument for FEATURE_opt
 parser.add_argument('-m',
-    '--og_model_opt',
-    choices=og_model_opt_choices,
+    '--model_opt',
+    choices=model_opt_choices,
     nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
-    default=og_model_opt_choices,
+    default=model_opt_choices,
     required=False,
-    help=f'Select one or more from {og_model_opt_choices}.'
+    help=f'Select one or more from {model_opt_choices} where I = "improved" and '+\
+        'A = "all features". For example: DG is DGraphDTA ' + \
+        'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+\
+        'and EDA is the same but with esm_only set to False.'
 )
-
 # Parse the arguments from the command line
 args = parser.parse_args()
-# %%
-# Access the selected options
-data_opt = args.data_opt
-feature_opt = args.feature_opt
-og_model_opt = args.og_model_opt
-
-# Now you can use the selected options in your code as needed
-print(f"Selected data_opt: {data_opt}")
-print(f"Selected feature_opt list: {feature_opt}")
-print(f"Selected og_model_opt: {og_model_opt}")
 
 #%%
 import os, random, itertools, math, json, argparse
@@ -64,12 +56,24 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.feature_extraction.protein import get_pfm
+from src.models.mut_dta import EsmDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
 from src.models import train, test, CheckpointSaver
 from src.models.utils import print_device_info
 from src.data_analysis import get_metrics
 
+
+# %%
+# Access the selected options
+data_opt = args.data_opt
+feature_opt = args.feature_opt
+model_opt = args.model_opt
+
+# Now you can use the selected options in your code as needed
+print(f"Selected data_opt: {data_opt}")
+print(f"Selected feature_opt list: {feature_opt}")
+print(f"Selected og_model_opt: {model_opt}")
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print_device_info(device)
@@ -80,14 +84,14 @@ MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 TRAIN_SPLIT= .8 # 80% of data for training
 VAL_SPLIT = .1 # 10% for val and remaining is for testing (10%)
 SHUFFLE_DATA = True
-RAND_SEED=0
+RAND_SEED = 0
 
 random.seed(RAND_SEED)
 np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
 
 # Tune Hyperparameters after grid search
-BATCH_SIZE = 64
+BATCH_SIZE = 10
 LEARNING_RATE = 0.0001
 DROPOUT = 0.4
 NUM_EPOCHS = 2000
@@ -105,12 +109,12 @@ cp_saver = CheckpointSaver(model=None,
 # %% Training loop
 metrics = {}
 
-for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model_opt):
-    print(f'({data}, {FEATURE}, {OG_MODEL}):')
+for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
+    print(f'({DATA}, {FEATURE}, {MODEL}):')
     # loading data
-    DATA_ROOT = f'../data/davis_kiba/{data}/' # where to get data from
+    DATA_ROOT = f'../data/davis_kiba/{DATA}/' # where to get data from
     dataset = DavisKibaDataset(
-            save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
+            save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
             data_root=DATA_ROOT,
             aln_dir=f'{DATA_ROOT}/aln/',
             cmap_threshold=-0.5, shannon=FEATURE=='shannon')
@@ -119,19 +123,44 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
                         shuffle_dataset=True, random_seed=RAND_SEED, 
-                        batch_size=BATCH_SIZE, use_refined=False)
+                        batch_train=BATCH_SIZE, use_refined=False)
 
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'Device: {device}')
 
     num_feat_pro = 54 if 'msa' in FEATURE else 34
-    if OG_MODEL:
+    if MODEL == 'DG':
         model = DGraphDTA(num_features_pro=num_feat_pro,dropout=DROPOUT)
-    else:
+    elif MODEL == 'DGI':
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
                             dropout=DROPOUT)
-    MODEL_KEY = f'randW_{data}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
+    elif MODEL == 'ED':
+        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                       num_features_pro=320, # only esm features
+                       pro_emb_dim=54, # inital embedding size after first GCN layer
+                       dropout=DROPOUT,
+                       esm_only=True)
+    elif MODEL == 'EDA':
+        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                       num_features_pro=320+num_feat_pro, # esm features + other features
+                       pro_emb_dim=54, # inital embedding size after first GCN layer
+                       dropout=DROPOUT,
+                       esm_only=False)
+    elif MODEL == 'EDI':
+        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                       num_features_pro=320,
+                       pro_emb_dim=512, # increase embedding size
+                       dropout=DROPOUT,
+                       esm_only=True)
+    elif MODEL == 'EDAI':
+        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                       num_features_pro=320 + num_feat_pro,
+                       pro_emb_dim=512,
+                       dropout=DROPOUT,
+                       esm_only=False)
+        
+    MODEL_KEY = f'randW_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'\n{MODEL_KEY}')
     
@@ -189,3 +218,5 @@ for data, FEATURE, OG_MODEL in itertools.product(data_opt, feature_opt, og_model
         if SHOW_PLOTS: plt.show()
     plt.clf()
     
+
+# %%

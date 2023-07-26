@@ -11,7 +11,7 @@ from torch_geometric.data import InMemoryDataset
 def train_val_test_split(dataset: InMemoryDataset, 
                          train_split=.8, val_split=.1, 
                          shuffle_dataset=True, random_seed=None,
-                         batch_size=128, use_refined=False, 
+                         batch_train=128, use_refined=False, 
                          split_by_prot=True) -> tuple[DataLoader]:
     """
     Splits up InMemoryDataset into train, val, and test loaders.
@@ -28,7 +28,7 @@ def train_val_test_split(dataset: InMemoryDataset,
         self explainatory, by default True
     `random_seed` : _type_, optional
         seed for shuffle, by default None
-    `batch_size` : int, optional
+    `batch_train` : int, optional
         size of batch, by default 128
     `use_refined` : bool, optional
         If true, the test set will only consist of refined samples for PDBbind, by default True
@@ -124,11 +124,11 @@ def train_val_test_split(dataset: InMemoryDataset,
     assert te_count > 0, 'Test set is empty, check that use_refined is set correctly'
     
     # create dataloaders
-    train_loader = DataLoader(dataset, batch_size=batch_size, 
-                            sampler=train_sampler)
-    val_loader = DataLoader(dataset, batch_size=batch_size,
-                            sampler=val_sampler)
-    test_loader = DataLoader(dataset, batch_size=batch_size,
-                            sampler=test_sampler)
+    train_loader = DataLoader(dataset, batch_size=batch_train, 
+                            sampler=train_sampler, pin_memory=True)
+    val_loader = DataLoader(dataset, batch_size=batch_train,
+                            sampler=val_sampler, pin_memory=True)
+    test_loader = DataLoader(dataset, batch_size=1, # batch size 1 for testing
+                            sampler=test_sampler, pin_memory=True)
     
     return train_loader, val_loader, test_loader
