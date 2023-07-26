@@ -18,7 +18,7 @@ from transformers import AutoTokenizer, EsmConfig, EsmForMaskedLM, EsmModel, Esm
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, num_features_mol=78, 
-                 output_dim=128, dropout=0.2):
+                 output_dim=128, dropout=0.2, esm_only=True):
         super(EsmDTA, self).__init__()
 
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
@@ -45,18 +45,37 @@ class EsmDTA(BaseModel):
         self.fc1 = nn.Linear(2 * output_dim, 1024)
         self.fc2 = nn.Linear(1024, 512)
         self.out = nn.Linear(512, 1) # 1 output (binding affinity)
+
+        self.esm_only = esm_only
     
-    def forward_pro(self, data):        
-        # TODO: might need to reshape??
+    def forward_pro(self, data):
+        # cls and sep tokens are added to the sequence by the tokenizer
+        seq_tok = self.esm_tok(data.pro_seq, 
+                               return_tensors='pt', 
+                               padding=True) # [B, L_max+2]
+        seq_tok['input_ids'] = seq_tok['input_ids'].to(data.x.device)
+        seq_tok['attention_mask'] = seq_tok['attention_mask'].to(data.x.device)
         
-        # leaving cls and sep tokens in the sequence
-        seq_tok = self.esm_tok(data.seq, return_tensors='pt', padding=True)
+        esm_emb = self.esm_mdl(**seq_tok).last_hidden_state # [B, L_max+2, emb_dim]
         
-        esm_emb = self.esm_mdl(seq_tok['input_ids'], seq_tok['attention_mask']).last_hidden_state
+        # removing <cls> token
+        esm_emb = esm_emb[:,1:,:] # [B, L_max+1, emb_dim]
         
-        # append esm embeddings to protein input
-        target_x = torch.cat((esm_emb, data.x), axis=2) 
-        #  ->> [batch, seq_len, emb_dim+feat_dim]
+        # removing <sep> token by applying mask
+        L_max = esm_emb.shape[1] # L_max+1
+        mask = torch.arange(L_max)[None, :] < torch.tensor([len(seq) for seq in data.pro_seq])[:, None]
+        mask = mask.flatten(0,1) # [B*L_max+1]
+        
+        # flatten to [B*L_max+1, emb_dim]
+        esm_emb = esm_emb.flatten(0,1)
+        esm_emb = esm_emb[mask] # [B*L, emb_dim]
+        
+        if self.esm_only:
+            target_x = esm_emb # [B*L, emb_dim]
+        else:
+            # append esm embeddings to protein input
+            target_x = torch.cat((esm_emb, data.x), axis=1)
+            #  ->> [B*L, emb_dim+feat_dim]
 
         xt = self.pro_conv1(target_x, data.edge_index)
         xt = self.relu(xt)
