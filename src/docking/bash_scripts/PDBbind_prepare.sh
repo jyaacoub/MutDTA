@@ -215,7 +215,8 @@ for dir in $dirs; do
     #             [syntax is molname:chainid:resname]
     
     flex_res=$(python $get_flexpy -pf "${dir}/${code}_pocket.pdb")
-    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -s $flex_res
+    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -g "${protein_p}_rigid.pdbqt" -x "${protein_p}_flex.pdbqt" -s $flex_res 
+    # -g and -x are output files for rigid and flexible parts of receptor
     
     # Checking error code
     if [ $? -ne 0 ]; then
@@ -255,7 +256,12 @@ for dir in $dirs; do
     continue
   fi
 
-  python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out
+  if $flexible; then
+    # -f flag for flexible receptor
+    python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out -f
+  else
+    python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out
+  fi
 
   #checking error code
   if [ $? -ne 0 ]; then
