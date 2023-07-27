@@ -12,36 +12,78 @@
 #     1a28/
 #       ...
 #     ...
-echo $(pwd)
 
 #>>>>>>>>>>>>>>>>> ARG PARSING >>>>>>>>>>>>>>>>>>>>>
 # Check if the required arguments are provided
-if [ $# -lt 2 ] || [ $# -gt 4 ]; then
-  echo "Usage: $0 <path> <template> <shortlist> [<config_dir>]"
-  echo -e "\t path      - path to PDBbind dir containing pdb for protein to convert to pdbqt (ABSOLUTE PATH)."
-  echo -e "\t template  - path to conf template file (create empty file if you want vina defaults)."
-  echo -e "\t shortlist - path to csv file containing a list of pdbcodes to process."
-  echo -e "\t             Doesnt matter what the file is as long as the first column contains the pdbcodes."
-  echo -e "Options:"
-  echo -e "\t config_dir (optional) - path to store new configurations in. default is to store it with the protein as {PDBCode}_conf.txt"
+function usage {
+  echo "Usage: $0 path template [OPTIONS]"
+  echo "       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt."
+  echo "       template - path to conf template file (create empty file if you want vina defaults)."
+  echo "Options:"
+  echo "       -sl --shortlist: path to csv file containing a list of pdbcodes to process."
+  echo "              Doesn't matter what the file is as long as the first column contains the pdbcodes."
+  echo "       -cd --config-dir: path to store new configurations in."
+  echo "              Default is to store it with the prepared receptor as <PDBCode>_conf.txt"
+  echo "       -f --flex: optional, runs prepare_flexreceptor4.py with all residues in <code>_pocket.pdb"
+  echo "              as flexible."
   exit 1
+}
+
+
+if [[ $# -lt 2 ]]; then
+  usage
 fi
 # e.g. use:
 # prepare_conf_only.sh /cluster/projects/kumargroup/jean/data/refined-set ./data/vina_conf/run4.conf 
 #                       ./data/shortlists/no_err_50/sample.csv ./data/vina_conf/run4/
 
-echo -e "\n### Starting ###\n"
-PDBbind_dir=$1
-template=$2
-shortlist=$3
-#NOTE: Hard coded path for pyconf
-pyconf_path="/cluster/home/t122995uhn/projects/MutDTA/src/docking/python_helpers/prep_conf.py"
+bash_scripts=$(dirname $(realpath "$0")) # get the directory of this script
+# prep_conf file is in the same directory as this script
+prep_confpy=${bash_scripts}/../python_helpers/prep_conf.py
 
-if [ $# -eq 4 ]; then
-  config_dir=$4
-else
-  config_dir=""
+PDBbind=$(realpath $1)
+template=$2
+
+shortlist=""
+config_dir=""
+flexible=false # default is not flexible
+
+echo $# ARGS
+# Parse the options
+while [[ $# -gt 2 ]]; do
+  key="$3"
+  case $key in
+    -sl|--shortlist)
+      shortlist="$4"
+      shift 2
+      ;;
+    -cd|--config-dir)
+      config_dir="$4"
+      shift 2
+      ;;
+    -f|--flex)
+      flexible=true
+      shift 1
+      ;;
+    *)
+      echo "Unknown option: $key"
+      usage
+      ;;
+  esac
+done
+
+# Print the parsed arguments
+echo "$# ARGS"
+echo -e "\tPath: $PDBbind"
+echo -e "\tTemplate: $template"
+echo "OPTIONAL ARGS:"
+if [[ -n "$shortlist" ]]; then
+  echo -e "\tShortlist: $shortlist"
 fi
+if [[ -n "$config_dir" ]]; then
+  echo -e "\tConfig Dir: $config_dir"
+fi
+echo -e "\tFlexible: $flexible\n"
 #<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
 #<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
@@ -64,16 +106,16 @@ if [[ ! -z "$shortlist" ]]; then
   # Verifying that all pdbcodes in shortlist exist in PDBbind dir
   dirs=""
   for code in $codes; do
-    if [[ ! -d "${PDBbind_dir}/${code}" ]]; then
-      echo "PDBbind dir (${PDBbind_dir}) does not contain ${code} specified in shortlist file"
+    if [[ ! -d "${PDBbind}/${code}" ]]; then
+      echo "PDBbind dir (${PDBbind}) does not contain ${code} specified in shortlist file"
       exit 1
     fi
-    dirs="${dirs} ${PDBbind_dir}/${code}"
+    dirs="${dirs} ${PDBbind}/${code}"
   done
   total=$(echo "$dirs" | wc -w)
 else # otherwise use all
   # looping through all the pdbcodes in the PDBbind dir select everything except index and readme dir
-  dirs=$(find "$PDBbind_dir" -mindepth 1 -maxdepth 1 -type d -not -name "index" -not -name "readme")
+  dirs=$(find "$PDBbind" -mindepth 1 -maxdepth 1 -type d -not -name "index" -not -name "readme")
   # getting count of dirs
   total=$(echo "$dirs" | wc -l)
 fi
@@ -115,7 +157,12 @@ for dir in $dirs; do
     continue
   fi
 
-  python $pyconf_path -r $protein -l $ligand -pp $pocket -o $conf_out -c $template
+  if $flexible; then
+    # -f flag for flexible receptor
+    python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out -f
+  else
+    python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out
+  fi
 
   #checking error code
   if [ $? -ne 0 ]; then

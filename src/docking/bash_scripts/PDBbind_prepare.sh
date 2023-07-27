@@ -85,8 +85,6 @@ if [[ -n "$config_dir" ]]; then
   echo -e "\tConfig Dir: $config_dir"
 fi
 echo -e "\tFlexible: $flexible\n"
-exit
-
 #<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
 #<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
