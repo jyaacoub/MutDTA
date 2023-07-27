@@ -36,6 +36,7 @@ fi
 
 bash_scripts=$(dirname $(realpath "$0"))
 prep_confpy=${bash_scripts}/../python_helpers/prep_conf.py
+get_flexpy=${bash_scripts}/../python_helpers/get_flexible.py
 
 
 # Assign the arguments to variables
@@ -116,9 +117,15 @@ fi
 
 # NOTE: change this if you run from a diff dir Check to see if ../prep_conf.py file exists
 if [[ ! -f $prep_confpy ]]; then
-  echo "prep_conf.py does not exist (${prep_confpy}). Make sure to run this at src/docking/bash_scripts/PDBbind. "
+  echo "prep_conf.py does not exist (${prep_confpy}). Make sure to run this at src/docking/bash_scripts/."
   exit 1
 fi
+
+if [[ ! -f $get_flexpy ]]; then
+  echo "get_flexible.py does not exist (${get_flexpy}). Make sure to run this at src/docking/bash_scripts/."
+  exit 1
+fi
+
 
 # Checking if shortlist file exists
 #   [not empty] and [not a file]
@@ -199,7 +206,7 @@ for dir in $dirs; do
 
   # running flex receptor if toggled
   if $flexible; then
-    # getting
+    # getting flexible residues to pass into prepare_flexreceptor4.py as:
     # -s     specification for flex residues
     #             Use underscores to separate residue names:
     #               ARG8_ILE84  
@@ -207,8 +214,8 @@ for dir in $dirs; do
     #               hsg1:A:ARG8_ILE84,hsg1:B:THR4 
     #             [syntax is molname:chainid:resname]
     
-
-    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -s
+    flex_res=$(python $get_flexpy -pf "${dir}/${code}_pocket.pdb")
+    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -s $flex_res
     
     # Checking error code
     if [ $? -ne 0 ]; then
