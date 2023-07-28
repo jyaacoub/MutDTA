@@ -161,7 +161,7 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
                        dropout=DROPOUT,
                        esm_only=False)
         
-    MODEL_KEY = f'randW_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F_{model.__class__.__name__}'
+    MODEL_KEY = f'{MODEL}_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'\n{MODEL_KEY}')
     
