@@ -103,7 +103,8 @@ model_save_p = 'results/model_checkpoints/ours/'
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False,
-                            patience=10, min_delta=0.1)
+                            patience=10, min_delta=0.1,
+                            save_freq=10)
 
 
 # %% Training loop
