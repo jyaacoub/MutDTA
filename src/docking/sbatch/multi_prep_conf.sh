@@ -10,7 +10,7 @@
 #SBATCH --mem=2G
 #SBATCH --cpus-per-task=2
 
-#SBATCH --array=0-20 #NOTE: N total processes
+#SBATCH --array=0-40 #NOTE: N total processes
 
 prep_num=10 #NOTE: change prep#
 
@@ -32,7 +32,7 @@ prepsh="/cluster/home/t122995uhn/projects/MutDTA/src/docking/bash_scripts/prep_c
 
 path="/cluster/projects/kumargroup/jean/data/refined-set/"
 template="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}.conf"
-shortlist="/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv "
+shortlist="/cluster/projects/kumargroup/jean/data/shortlists/refined-set/${SLURM_ARRAY_TASK_ID}.csv "
 
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}"
 

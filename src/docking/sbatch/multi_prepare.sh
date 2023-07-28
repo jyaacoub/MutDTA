@@ -1,18 +1,19 @@
 #!/bin/bash
 #SBATCH -t 180
-#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/9/%x-%A_%a.out #NOTE: change prep#
-#SBATCH --job-name=v_prep9 #NOTE: change prep#
+#SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/prep/11/%x-%A_%a.out #NOTE: change prep#
+#SBATCH --job-name=v_prep11 #NOTE: change prep#
 
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
+##SBATCH --mail-type=ALL
+##SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
 #SBATCH -p all
 #SBATCH --mem=2G
 #SBATCH --cpus-per-task=2
 
-#SBATCH --array=0-14 #NOTE: N total processes
+#SBATCH --array=0 #NOTE: N total processes
 
-prep_num=9 #NOTE: change prep#
+prep_num=11 #NOTE: change prep#
+flexible=true
 
 # adding needed libraries to path:
 
@@ -44,11 +45,16 @@ PDBbind="/cluster/projects/kumargroup/jean/data/refined-set/"
 ADT="/cluster/home/t122995uhn/lib/mgltools_x86_64Linux2_1.5.7/"
 template="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}.conf"
 
-shortlist="/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv "
+shortlist="/cluster/projects/kumargroup/jean/data/shortlists/refined-set/${SLURM_ARRAY_TASK_ID}.csv "
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${prep_num}"
 
 if [ ! -d $conf_dir ]; then
   mkdir $conf_dir
 fi
 
-$prepsh $PDBbind $ADT $template -sl $shortlist -cd $conf_dir
+if $flexible; then
+  # -f flag for flexible receptor
+  $prepsh $PDBbind $ADT $template -sl $shortlist -cd $conf_dir -f
+else
+  $prepsh $PDBbind $ADT $template -sl $shortlist -cd $conf_dir
+fi

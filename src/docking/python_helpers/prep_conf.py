@@ -94,8 +94,12 @@ if __name__ == '__main__':
     
     # adding flexible residue file if specified
     if args.f:
+        print('Setting flexible')
         conf["flex"] = op.join(op.dirname(args.r), f'{PDBcode}_protein_flex.pdbqt')
         conf["receptor"] = op.join(op.dirname(args.r), f'{PDBcode}_protein_rigid.pdbqt')
+        
+        assert os.path.isfile(conf["flex"]) and os.path.isfile(conf["receptor"]), \
+            f"Rigid or Flex files dont exist, {conf['receptor']} or {conf['flex']}."
     
     # adding file name to out paths
     conf['out'] = op.join(conf['out'], f'{PDBcode}_vina_out.pdbqt')

@@ -92,5 +92,12 @@ increased energy range and search space.
 # 2 - Flexible docking
 Following https://autodock-vina.readthedocs.io/en/latest/docking_flexible.html, the next runs will use flexible docking.
 
-New parameters for flexibile docking:
+New parameters for flexible docking:
 ### run11
+```conf
+energy_range = 10
+exhaustiveness = 20
+num_modes = 9
+out = /cluster/projects/kumargroup/jean/data/vina_out/run11
+log = /cluster/projects/kumargroup/jean/data/vina_out/run11
+```
