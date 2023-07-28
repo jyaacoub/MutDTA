@@ -1,5 +1,5 @@
 from collections import Counter, OrderedDict
-import json, pickle, re, os
+import json, pickle, re, os, abc
 
 import torch
 import torch_geometric as torchg
@@ -14,7 +14,7 @@ from src.data_processing import PDBbindProcessor
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
-class BaseDataset(torchg.data.InMemoryDataset):
+class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, shannon=True, *args, **kwargs):
         """
@@ -53,15 +53,14 @@ class BaseDataset(torchg.data.InMemoryDataset):
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
         
+    @abc.abstractmethod
     def cmap_p(self, code):
-        return f'{self.data_root}/pconsc4/{code}.npy'
+        raise NotImplementedError
     
+    @abc.abstractmethod
     def aln_p(self, code):
-        # see feature_extraction/process_msa.py for details on how the alignments are cleaned
-        if self.aln_dir is None:
-            # dont use aln if none provided (will set to zeros)
-            return None
-        return f'{self.aln_dir}/{code}.aln'
+        # path to cleaned input alignment file
+        raise NotImplementedError
     
     @property
     def processed_file_names(self):
@@ -194,6 +193,16 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         super(PDBbindDataset, self).__init__(save_root, data_root=bind_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              shannon=shannon, *args, **kwargs)
+    
+    def cmap_p(self, code):
+        return f'{self.data_root}/{code}/{code}.npy'
+    
+    def aln_p(self, code):
+        # see feature_extraction/process_msa.py for details on how the alignments are cleaned
+        if self.aln_dir is None:
+            # dont use aln if none provided (will set to zeros)
+            return None
+        return f'{self.aln_dir}/{code}_cleaned.a3m'
         
     # for data augmentation override the transform method
     @property
@@ -230,7 +239,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pd.DataFrame
             The XY.csv dataframe.
         """
-        pdb_codes = os.listdir(self.bind_dir)
+        pdb_codes = os.listdir(self.data_root)
         # filter out readme and index folders
         pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
         
@@ -247,7 +256,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         # creating contact maps:
         seqs = create_save_cmaps(pdb_codes,
-                          pdb_p=lambda x: f'{self.bind_dir}/{x}/{x}_protein.pdb',
+                          pdb_p=lambda x: f'{self.data_root}/{x}/{x}_protein.pdb',
                           cmap_p=self.cmap_p)
         
         assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
@@ -256,7 +265,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         # getting ligand sequences:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
-                                              dir=lambda x: f'{self.bind_dir}/{x}/{x}_ligand.sdf')
+                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
         df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
         df_smi.index.name = 'PDBCode'
         
@@ -313,6 +322,17 @@ class DavisKibaDataset(BaseDataset):
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                                shannon=shannon, *args, **kwargs)
+    
+    def cmap_p(self, code):
+        return f'{self.data_root}/pconsc4/{code}.npy'
+    
+    def aln_p(self, code):
+        # using existing cleaned alignment files
+        # see feature_extraction/process_msa.py
+        if self.aln_dir is None:
+            # dont use aln if none provided (will set to zeros)
+            return None
+        return f'{self.aln_dir}/{code}.aln'
     
     @property
     def raw_file_names(self):
@@ -374,6 +394,7 @@ class DavisKibaDataset(BaseDataset):
             print(f'Number of codes with invalid aln files: {len(no_aln)} out of {len(codes)}')
             
         # Checking that contact maps are present for each code:
+        #       (Created by psconsc4)
         no_cmap = [c for c in codes if not os.path.isfile(self.cmap_p(c))]
         print(f'Number of codes without cmap files: {len(no_cmap)} out of {len(codes)}')
         
