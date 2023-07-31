@@ -36,6 +36,7 @@ fi
 
 bash_scripts=$(dirname $(realpath "$0"))
 prep_confpy=${bash_scripts}/../python_helpers/prep_conf.py
+get_flexpy=${bash_scripts}/../python_helpers/get_flexible.py
 
 
 # Assign the arguments to variables
@@ -84,8 +85,6 @@ if [[ -n "$config_dir" ]]; then
   echo -e "\tConfig Dir: $config_dir"
 fi
 echo -e "\tFlexible: $flexible\n"
-exit
-
 #<<<<<<<<<<<<<<<<< ARG PARSING <<<<<<<<<<<<<<<<<<<<<
 
 #<<<<<<<<<<<<<<<<< PRE-RUN CHECKS >>>>>>>>>>>>>>>>>>
@@ -116,9 +115,15 @@ fi
 
 # NOTE: change this if you run from a diff dir Check to see if ../prep_conf.py file exists
 if [[ ! -f $prep_confpy ]]; then
-  echo "prep_conf.py does not exist (${prep_confpy}). Make sure to run this at src/docking/bash_scripts/PDBbind. "
+  echo "prep_conf.py does not exist (${prep_confpy}). Make sure to run this at src/docking/bash_scripts/."
   exit 1
 fi
+
+if [[ ! -f $get_flexpy ]]; then
+  echo "get_flexible.py does not exist (${get_flexpy}). Make sure to run this at src/docking/bash_scripts/."
+  exit 1
+fi
+
 
 # Checking if shortlist file exists
 #   [not empty] and [not a file]
@@ -199,7 +204,7 @@ for dir in $dirs; do
 
   # running flex receptor if toggled
   if $flexible; then
-    # getting
+    # getting flexible residues to pass into prepare_flexreceptor4.py as:
     # -s     specification for flex residues
     #             Use underscores to separate residue names:
     #               ARG8_ILE84  
@@ -207,8 +212,9 @@ for dir in $dirs; do
     #               hsg1:A:ARG8_ILE84,hsg1:B:THR4 
     #             [syntax is molname:chainid:resname]
     
-
-    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -s
+    flex_res=$(python $get_flexpy -pf "${dir}/${code}_pocket.pdb")
+    "${ADT}/bin/pythonsh" $prep_flexreceptor -r "${protein_p}.pdbqt" -g "${protein_p}_rigid.pdbqt" -x "${protein_p}_flex.pdbqt" -s $flex_res 
+    # -g and -x are output files for rigid and flexible parts of receptor
     
     # Checking error code
     if [ $? -ne 0 ]; then
@@ -217,7 +223,7 @@ for dir in $dirs; do
       echo "$code" >> prep_pdb_error.txt
       ((errors++))
       # skip this code
-      exit 1
+      continue
     fi
   fi
 
@@ -244,11 +250,15 @@ for dir in $dirs; do
   if [[ ! -f "$protein" || ! -f "$ligand" || ! -f "$pocket" ]]; then
     echo "Error: One or more prep files not found for $code"
     ((errors++))
-    #exit 1
     continue
   fi
 
-  python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out
+  if $flexible; then
+    # -f flag for flexible receptor
+    python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out -f
+  else
+    python $prep_confpy -r $protein -l $ligand -pp $pocket -o $conf_out
+  fi
 
   #checking error code
   if [ $? -ne 0 ]; then
