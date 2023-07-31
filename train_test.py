@@ -39,8 +39,26 @@ parser.add_argument('-m',
         'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+\
         'and EDA is the same but with esm_only set to False.'
 )
+
+parser.add_argument('-t',
+    '--train',
+    action='store_true',
+    help='Forces training, if already trained it will load up the state dict')
+
 # Parse the arguments from the command line
 args = parser.parse_args()
+
+# Access the selected options
+data_opt = args.data_opt
+feature_opt = args.feature_opt
+model_opt = args.model_opt
+FORCE_TRAINING = args.train
+
+# Now you can use the selected options in your code as needed
+print(f"         Selected data_opt: {data_opt}")
+print(f" Selected feature_opt list: {feature_opt}")
+print(f"     Selected og_model_opt: {model_opt}")
+print(f"           forced training: {FORCE_TRAINING}")
 
 #%%
 import os, random, itertools, math, json, argparse
@@ -63,18 +81,7 @@ from src.models import train, test, CheckpointSaver
 from src.models.utils import print_device_info
 from src.data_analysis import get_metrics
 
-
 # %%
-# Access the selected options
-data_opt = args.data_opt
-feature_opt = args.feature_opt
-model_opt = args.model_opt
-
-# Now you can use the selected options in your code as needed
-print(f"Selected data_opt: {data_opt}")
-print(f"Selected feature_opt list: {feature_opt}")
-print(f"Selected og_model_opt: {model_opt}")
-
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print_device_info(device)
 
@@ -172,14 +179,15 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
     logs = None
     if os.path.exists(cp_saver.save_path):
         print('Model already trained')
-        # load ckpnt for testing
+        # load ckpnt
         model.load_state_dict(torch.load(cp_saver.save_path, 
                                          map_location=device))
         # loading logs for plotting 
         if os.path.exists(logs_out_p):
             with open(logs_out_p, 'r') as f:
                 logs = json.load(f)
-    else:
+    
+    if not os.path.exists(cp_saver.save_path) or FORCE_TRAINING:
         # training
         logs = train(model, train_loader, val_loader, device, 
                     epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
