@@ -112,6 +112,10 @@ metrics = {}
 
 for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
     print(f'({DATA}, {FEATURE}, {MODEL}):')
+    MODEL_KEY = f'{MODEL}_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F'
+    logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
+    print(f'{MODEL_KEY} \n')
+
     # loading data
     DATA_ROOT = f'../data/davis_kiba/{DATA}/' # where to get data from
     dataset = DavisKibaDataset(
@@ -160,10 +164,6 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
                        pro_emb_dim=512,
                        dropout=DROPOUT,
                        esm_only=False)
-        
-    MODEL_KEY = f'{MODEL}_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F'
-    logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
-    print(f'\n{MODEL_KEY}')
     
     cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
     model.to(device)
@@ -219,5 +219,3 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
         if SHOW_PLOTS: plt.show()
     plt.clf()
     
-
-# %%
