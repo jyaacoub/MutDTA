@@ -7,10 +7,10 @@
 ##SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
 #SBATCH -p all
-#SBATCH --mem=2G
+#SBATCH --mem=1G
 #SBATCH --cpus-per-task=2
 
-#SBATCH --array=0 #NOTE: N total processes
+#SBATCH --array=16,28,3,5,6,7,8,9 #NOTE: N total processes
 
 prep_num=11 #NOTE: change prep#
 flexible=true

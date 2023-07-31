@@ -223,7 +223,7 @@ for dir in $dirs; do
       echo "$code" >> prep_pdb_error.txt
       ((errors++))
       # skip this code
-      exit 1
+      continue
     fi
   fi
 
@@ -250,7 +250,6 @@ for dir in $dirs; do
   if [[ ! -f "$protein" || ! -f "$ligand" || ! -f "$pocket" ]]; then
     echo "Error: One or more prep files not found for $code"
     ((errors++))
-    #exit 1
     continue
   fi
 
