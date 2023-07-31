@@ -344,16 +344,16 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         dictionary of sequences for each pdbcode
     """
     seqs = {}
-    for pdbcode in tqdm(pdbcodes, 'Getting Sequences + Contact Maps'):
-        seqs[pdbcode], res = get_sequence(pdb_p(pdbcode), 
+    for code in tqdm(pdbcodes, 'Getting Sequences + Contact Maps'):
+        seqs[code], res = get_sequence(pdb_p(code), 
                                 check_missing=check_missing, 
                                 select_largest=True)
         # only get cmap if it doesnt exist
-        if not os.path.isfile(cmap_p(pdbcode)):
+        if not os.path.isfile(cmap_p(code)):
             cmap = get_contact(res,
                             CA_only=CA_only, # CB is needed by DGraphDTA
                             check_missing=check_missing)
-            np.save(cmap_p(pdbcode), cmap)
+            np.save(cmap_p(code), cmap)
         
     return seqs
 
