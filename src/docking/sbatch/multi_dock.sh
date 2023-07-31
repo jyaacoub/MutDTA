@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -t 1-00:00:00 #days-hours:minutes:seconds
+#SBATCH -t 2-00:00:00 #days-hours:minutes:seconds
 #SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run11/%x-%A_%a.out #NOTE: change run#
 
 #SBATCH --job-name=r11_vina_dock #NOTE: change run#
@@ -7,9 +7,9 @@
 ##SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
 #SBATCH --mem=4G
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 
-#SBATCH --array=0 #NOTE: N total processes
+#SBATCH --array=0-40 #NOTE: N total processes
 # takes ~1.5 days on 5 process nodes with 3,000 pdbs
 
 # adding needed libraries to path:
@@ -30,13 +30,14 @@ echo "run_num: $run_num"
 # e.g.: vina --config /cluster/projects/kumargroup/jean/data/refined-set/1a1e/1a1e_conf.txt --seed 904455071
 # shortlist file is different for each job in the array
 conf_dir="/cluster/projects/kumargroup/jean/data/vina_conf/run${run_num}/"
-shortlist=/cluster/projects/kumargroup/jean/data/shortlists/kd_ki/${SLURM_ARRAY_TASK_ID}.csv
-run_vina=/cluster/home/t122995uhn/projects/MutDTA/src/docking/bash_scripts/run_vina.sh
-pdb_data="/cluster/projects/kumargroup/jean/data/refined-set/"
+shortlist=/cluster/projects/kumargroup/jean/data/shortlists/refined-set/${SLURM_ARRAY_TASK_ID}.csv
+vina=/cluster/home/t122995uhn/projects/MutDTA/src/docking/bash_scripts/run_vina.sh
+data="/cluster/projects/kumargroup/jean/data/refined-set/"
 
 echo "shortlist: $shortlist"
 echo "conf_dir: $conf_dir"
+echo "data: $data"
 
-$run_vina $pdb_data $shortlist $conf_dir
+$vina $data $shortlist $conf_dir
 
 # Then extract with `extract_vina_out.py`
