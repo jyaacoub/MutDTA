@@ -218,40 +218,17 @@ Follow the same steps as in [**5. Data analysis**](#5-data-analysis) above.
 # Flexible Docking
 For flexible docking we need to also run `prepare_flexreceptor4.py` during our preparation stage [**3. Prepare receptor**](#3-preparing-receptor-and-ligand-pdbqt-files). 
 
-Format for -s param:
-```python
->>> rec = Read('/cluster/projects/kumargroup/jean/data/refined-set/10gs/10gs_protein.pdbqt')
->>> rec[0].name
-'10gs_protein'
->>> rec[0].chains[0].name
-'A'
->>> rec[0].chains[0].residues[0].name
-'PRO2'
->>> "10gs_protein:A:PRO2"
-'10gs_protein:A:PRO2'
+For this we just pass the additional `-f` argument to specify the flexible docking option. This will extra PDB files with the name `<code>_pocket.pdb` from which the script will select to be flexible residues.
 ```
-
-So if the binding pocket only has one chain A the format will look somthing like this:
+Usage: ./src/docking/bash_scripts/PDBbind_prepare.sh path ADT template [OPTIONS]
+       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt.
+       ADT - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')
+       template - path to conf template file (create empty file if you want vina defaults).
+Options:
+       -sl --shortlist: path to csv file containing a list of pdbcodes to process.
+              Doesn't matter what the file is as long as the first column contains the pdbcodes.
+       -cd --config-dir: path to store new configurations in.
+              Default is to store it with the prepared receptor as <PDBCode>_conf.txt
+       -f --flex: optional, runs prepare_flexreceptor4.py with all residues in <code>_pocket.pdb
+              as flexible.
 ```
-10gs_protein:A:TYR7_PHE8
-```
-
-```
-Usage: prepare_flexreceptor4.py -r receptor_filename -s list_of_names_of_residues_to_move
-    Description of command...
-         -r     receptor_filename (.pdbqt)
-         -s     specification for flex residues
-                Use underscores to separate residue names:
-                  ARG8_ILE84  
-                Use commas to separate 'full names' which uniquely identify residues:
-                  hsg1:A:ARG8_ILE84,hsg1:B:THR4 
-                [syntax is molname:chainid:resname]
-    Optional parameters:
-        [-v]    verbose output
-        [-N]    type(s) of bonds to disallow: 
-        [-M]    interactive mode (automatic is default)
-        [-P]    pairs of atom names bonds between which to disallow: hsg1:A:ARG8:CA_CB,CB_CG;hsg1:B:ARG8:CA_CB
-        [-g pdbqt_filename] (rigid output filename)
-        [-x pdbqt_filename] (flexible output filename)
-```
-For this I have created `PDBbind_prepareflex.sh` that does the same thing

@@ -23,6 +23,8 @@ parser.add_argument('-r', metavar='--receptor', type=str,
                     help='Path to pdbqt file containing sole protein.', required=False)
 parser.add_argument('-l', metavar='--ligand', type=str, 
                     help='Path to pdbqt file containing sole ligand.', required=False)
+parser.add_argument('-f', action='store_true',
+                    help='Whether or not to specify flexible residue file.')
 
 parser.add_argument('-pp', metavar='--pocket_path', type=str,
                     help='binding pocket pdb file from PDBbind', required=False)
@@ -76,8 +78,8 @@ if __name__ == '__main__':
         #"cpu": 1,           # num cpus to use. Default is to automatically detect.
         
         # My defaults (output files are sent to same place as receptor pdbqt file)
-        'receptor': args.r,
-        'ligand': args.l,
+        "receptor": args.r,
+        "ligand": args.l,
         "out": op.dirname(args.r),
         "log": op.dirname(args.r),
         "seed": 904455071,
@@ -89,6 +91,15 @@ if __name__ == '__main__':
             for line in f.readlines():
                 k, v = line.split('=')
                 conf[k.strip()] = v.strip()
+    
+    # adding flexible residue file if specified
+    if args.f:
+        print('Setting flexible')
+        conf["flex"] = op.join(op.dirname(args.r), f'{PDBcode}_protein_flex.pdbqt')
+        conf["receptor"] = op.join(op.dirname(args.r), f'{PDBcode}_protein_rigid.pdbqt')
+        
+        assert os.path.isfile(conf["flex"]) and os.path.isfile(conf["receptor"]), \
+            f"Rigid or Flex files dont exist, {conf['receptor']} or {conf['flex']}."
     
     # adding file name to out paths
     conf['out'] = op.join(conf['out'], f'{PDBcode}_vina_out.pdbqt')
