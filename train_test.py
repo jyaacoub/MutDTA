@@ -135,7 +135,8 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
                         shuffle_dataset=True, random_seed=RAND_SEED, 
-                        batch_train=BATCH_SIZE, use_refined=False)
+                        batch_train=BATCH_SIZE, use_refined=False,
+                        split_by_prot=True)
 
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -143,7 +144,7 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
 
     num_feat_pro = 54 if 'msa' in FEATURE else 34
     if MODEL == 'DG':
-        model = DGraphDTA(num_features_pro=num_feat_pro,dropout=DROPOUT)
+        model = DGraphDTA(num_features_pro=num_feat_pro, dropout=DROPOUT)
     elif MODEL == 'DGI':
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
                             dropout=DROPOUT)
@@ -201,6 +202,7 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
             
     # testing
     loss, pred, actual = test(model, test_loader, device)
+    print(f'Test loss: {loss}')
     get_metrics(actual, pred,
                 save_results=SAVE_RESULTS,
                 save_path=media_save_p,
