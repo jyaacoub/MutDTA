@@ -49,13 +49,23 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
 
     logs = {'train_loss': [], 'val_loss': []}
     
+    # pre training validation test:
+    val_loss = test(model, val_loader, device, CRITERION)[0]
+    # ensures that we save the best model arch even when loading from existing.
+    saver.early_stop(val_loss, 0) 
+    
+    # validation loss before training
+    print(f"Epoch {0}/{epochs}: Val Loss: {val_loss:.4f} ")
+    # we dont save it to logs since this will not be useful information
+    #   - either very high or the same as prev model (redundant)
+    
     for epoch in range(1, epochs+1):
         # Training loop
+        model.train()
+        train_loss = 0.0
         with tqdm(total=len(train_loader), 
                   desc=f"Epoch {epoch}/{epochs}", 
                   unit="batch") as progress_bar:
-            model.train()
-            train_loss = 0.0
             for data in train_loader:
                 batch_pro = data['protein'].to(device)
                 batch_mol = data['ligand'].to(device)
@@ -82,25 +92,9 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
 
             # Compute average training loss for the epoch
             train_loss /= len(train_loader)
-
+        
         # Validation loop
-        model.eval()
-        val_loss = 0.0
-        with torch.no_grad():
-            for data in val_loader:
-                batch_pro = data['protein'].to(device)
-                batch_mol = data['ligand'].to(device)
-                labels = data['y'].reshape(-1,1).to(device)
-                
-                # Forward pass
-                predictions = model(batch_pro, batch_mol)
-
-                # Compute loss
-                loss = CRITERION(predictions, labels)
-                val_loss += loss.item()
-
-            # Compute average validation loss for the epoch
-            val_loss /= len(val_loader)
+        val_loss = test(model, val_loader, device, CRITERION)[0]
 
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
@@ -113,12 +107,12 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
-        
+
     logs['best_epoch'] = saver.best_epoch
     return logs
 
 
-def test(model, test_loader, device) -> Tuple[float, np.ndarray, np.ndarray]:
+def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray, np.ndarray]:
     """
     Run inference on the test set.
 
@@ -139,7 +133,7 @@ def test(model, test_loader, device) -> Tuple[float, np.ndarray, np.ndarray]:
     # After training, you can evaluate the model on the test set if needed
     model.eval()
     test_loss = 0.0
-    CRITERION = torch.nn.MSELoss()
+    CRITERION = CRITERION or torch.nn.MSELoss()
     
     pred = np.array([])
     actual = np.array([])
@@ -165,11 +159,8 @@ def test(model, test_loader, device) -> Tuple[float, np.ndarray, np.ndarray]:
 
         # Compute average test loss
         test_loss /= len(test_loader)
-
-    print(f"Test Loss: {test_loss:.4f}")
     
     return test_loss, pred, actual
-
 
 
 def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
