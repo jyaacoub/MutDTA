@@ -1,12 +1,25 @@
 import argparse
 
 # Define the options for data_opt and FEATURE_opt
+model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI']
 data_opt_choices = ['davis', 'kiba']
 feature_opt_choices = ['nomsa', 'msa', 'shannon']
-model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI']
+edge_opt_choices = ['simple', 'binary']
 
 # Create the argument parser
 parser = argparse.ArgumentParser(description="Argument parser for selecting options.")
+
+# Add the argument for model_opt
+parser.add_argument('-m',
+    '--model_opt',
+    choices=model_opt_choices,
+    nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
+    required=True,
+    help=f'Select one or more from {model_opt_choices} where I = "improved" and '+ \
+        'A = "all features". For example: DG is DGraphDTA ' + \
+        'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
+        'and EDA is the same but with esm_only set to False.'
+)
 
 # Add the argument for data_opt
 parser.add_argument('-d',
@@ -28,36 +41,45 @@ parser.add_argument('-f',
 )
 
 # Add the argument for FEATURE_opt
-parser.add_argument('-m',
-    '--model_opt',
-    choices=model_opt_choices,
+parser.add_argument('-e',
+    '--edge_opt',
+    choices=edge_opt_choices,
     nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
-    default=model_opt_choices,
+    default=edge_opt_choices[0:1],
     required=False,
-    help=f'Select one or more from {model_opt_choices} where I = "improved" and '+\
-        'A = "all features". For example: DG is DGraphDTA ' + \
-        'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+\
-        'and EDA is the same but with esm_only set to False.'
+    help=f'Select one or more from {edge_opt_choices}. "simple" is just taking ' + \
+        'the normalized values from the protein cmap, "binary" means no edge weights'
 )
 
 parser.add_argument('-t',
     '--train',
     action='store_true',
-    help='Forces training, if already trained it will load up the state dict')
+    help='Forces training, if already trained it will load up the state dict'
+)
+
+parser.add_argument('-D',
+    '--debug',
+    action='store_true',
+    help='Enters debug mode, no training is done, just model initialization.'
+)
 
 # Parse the arguments from the command line
 args = parser.parse_args()
 
 # Access the selected options
+model_opt = args.model_opt
 data_opt = args.data_opt
 feature_opt = args.feature_opt
-model_opt = args.model_opt
+edge_opt = args.edge_opt
 FORCE_TRAINING = args.train
+DEBUG = args.debug
 
 # Now you can use the selected options in your code as needed
+if DEBUG: print(f'---------------- DEBUG MODE ----------------')
+print(f"     Selected og_model_opt: {model_opt}")
 print(f"         Selected data_opt: {data_opt}")
 print(f" Selected feature_opt list: {feature_opt}")
-print(f"     Selected og_model_opt: {model_opt}")
+print(f"    Selected edge_opt list: {edge_opt}")
 print(f"           forced training: {FORCE_TRAINING}")
 
 #%%
@@ -77,8 +99,7 @@ from src.feature_extraction.protein import get_pfm
 from src.models.mut_dta import EsmDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
-from src.models import train, test, CheckpointSaver
-from src.models.utils import print_device_info
+from src.models import train, test, CheckpointSaver, print_device_info, debug
 from src.data_analysis import get_metrics
 
 # %%
@@ -117,9 +138,9 @@ cp_saver = CheckpointSaver(model=None,
 # %% Training loop
 metrics = {}
 
-for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
-    print(f'({DATA}, {FEATURE}, {MODEL}):')
-    MODEL_KEY = f'{MODEL}_{DATA}_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E_{FEATURE}F'
+for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge_opt, model_opt):
+    print(f'({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
+    MODEL_KEY = f'{MODEL}m_{DATA}d_{FEATURE}f_{EDGEW}e_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'{MODEL_KEY} \n')
 
@@ -153,28 +174,37 @@ for DATA, FEATURE, MODEL in itertools.product(data_opt, feature_opt, model_opt):
                        num_features_pro=320, # only esm features
                        pro_emb_dim=54, # inital embedding size after first GCN layer
                        dropout=DROPOUT,
-                       esm_only=True)
+                       esm_only=True,
+                       edge_weight_opt=EDGEW)
     elif MODEL == 'EDA':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                        num_features_pro=320+num_feat_pro, # esm features + other features
                        pro_emb_dim=54, # inital embedding size after first GCN layer
                        dropout=DROPOUT,
-                       esm_only=False)
+                       esm_only=False,
+                       edge_weight_opt=EDGEW)
     elif MODEL == 'EDI':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                        num_features_pro=320,
                        pro_emb_dim=512, # increase embedding size
                        dropout=DROPOUT,
-                       esm_only=True)
+                       esm_only=True,
+                       edge_weight_opt=EDGEW)
     elif MODEL == 'EDAI':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                        num_features_pro=320 + num_feat_pro,
                        pro_emb_dim=512,
                        dropout=DROPOUT,
-                       esm_only=False)
+                       esm_only=False,
+                       edge_weight_opt=EDGEW)
     
     cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
     model.to(device)
+    
+    if DEBUG: 
+        # run single batch through model
+        debug(model, train_loader, device)
+        continue # skip training
     
     # check if model has already been trained:
     logs = None
