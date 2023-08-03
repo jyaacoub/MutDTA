@@ -1,39 +1,21 @@
 #%%
-import os, random, itertools, math, pickle, json
+import os, random, itertools, math, pickle, json, time
+import config
+
 
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
+
+import submitit
+
 import torch
-from transformers import AutoTokenizer, EsmConfig, EsmForMaskedLM, EsmModel, EsmTokenizer
+from transformers import AutoTokenizer, EsmModel
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-
-from src.models.prior_work import DGraphDTA, DGraphDTAImproved
-from src.models.mut_dta import EsmDTA
-from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
-from src.models import train, test, CheckpointSaver
 from src.models.utils import print_device_info
-from src.data_analysis import get_metrics
 
-# device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-# print_device_info(device)
-
-# # %%
-# dataset = DavisKibaDataset(save_root='../data/DavisKibaDataset/kiba_nomsa/',
-#                  data_root='../data/davis_kiba/kiba/',
-#                  aln_dir='../data/davis_kiba/kiba/aln/', 
-#                  cmap_threshold=-0.5,
-#                  shannon=True, esm_only=False,
-#                  )
-
-# # %%
-
-# train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-#                   train_split=0.8, val_split=.1,
-#                   shuffle_dataset=True, random_seed=0, 
-#                   batch_size=64, use_refined=False)
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print_device_info(device)
 
 #%% Testing esm model 
 # based on https://github.com/facebookresearch/esm#main-models-you-should-use-
@@ -44,40 +26,59 @@ from src.data_analysis import get_metrics
 # https://huggingface.co/facebook/esm2_t33_650M_UR50D is <10GB
 # https://huggingface.co/facebook/esm2_t36_3B_UR50D is 11GB
 df = pd.read_csv('../data/DavisKibaDataset/davis_msa/processed/XY.csv', index_col=0)
-config = EsmConfig.from_pretrained('facebook/esm2_t6_8M_UR50D')
-esm_tok = AutoTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
-# this will raise a warning since lm head is missing but that is okay since we are not using it:
-esm_mdl = EsmModel.from_pretrained('facebook/esm2_t6_8M_UR50D')
 prot_seqs = list(df['prot_seq'].unique())
-tok = esm_tok(prot_seqs, return_tensors='pt', padding=True)
 
 # %%
-out = esm_mdl(**tok)
-pro_feat = out.last_hidden_state.squeeze() # L x emb_dim
+def run_esm(prot_seqs):
+    start_t = time.time()
+    # this will raise a warning since lm head is missing but that is okay since we are not using it:
+    device_ids = [torch.device(f'cuda:{x}') for x in range(torch.cuda.device_count())]
+    print(device_ids)
+    
+    esm_tok = AutoTokenizer.from_pretrained('facebook/esm2_t6_8M_UR50D')
+    esm_mdl = EsmModel.from_pretrained('facebook/esm2_t6_8M_UR50D').to(device_ids[0])
+    print('Time to load:', time.time()-start_t)
+    start_t = time.time()
+    
+    tok = esm_tok(prot_seqs, return_tensors='pt', padding=True)
+    print('Time to tok:', time.time()-start_t)
+    start_t = time.time()
+    
+    out = torch.nn.DataParallel(esm_mdl, device_ids=device_ids)(**tok)
+    print('Time to inf:', time.time()-start_t)
+    print(out.last_hidden_state.shape)
+    
+    return out.last_hidden_state.to(torch.device('cpu'))
 
+#%%
+# the AutoExecutor class is your interface for submitting function to a cluster or run them locally.
+# The specified folder is used to dump job information, logs and result when finished
+# %j is replaced by the job id at runtime
+num_gpus = 3
+jobs = []
+for num_gpus in range(1,4):
+    print(num_gpus)
+    log_folder = f"log_test/Test_gpu_{num_gpus}"
+    executor = submitit.AutoExecutor(folder=log_folder)
 
+    executor.update_parameters(timeout_min=30, 
+                            slurm_partition="gpu",
+                            slurm_account='kumargroup_gpu',
+                            slurm_mem='10G',
+                            slurm_gres=f'gpu:v100:{num_gpus}',
+                            slurm_job_name=f'Test_gpu_{num_gpus}')
+    
+    # The submission interface is identical to concurrent.futures.Executor
+    job = executor.submit(run_esm, prot_seqs[:15])  # will compute add(5, 7)
+    print('state:', job.state)
+    print('id:', job.job_id)  # ID of your job
+    jobs.append(job)
+    
+#%%
+output = jobs[0].result()  # waits for the submitted function to complete and returns its output
 
-
-# %% test:
-sample_seq = 'MMSMA'
-sample_tok = tok(sample_seq, return_tensors='pt')['input_ids']
-sample_tok = sample_tok[0][1:-1]# remove <cls> and <sep> tokens
-sample_tok = sample_tok.unsqueeze(0) # add batch dimension
-sample_mask = torch.ones_like(sample_tok, dtype=torch.int8)
-# %% NOTE: tokenizer adds special tokens to the beginning and end of the sequence
-# the first token is <cls> and the last token is <sep>
-# these are for classification tasks and are not needed for our purposes
-sample_out = esm2(sample_tok, sample_mask)
-sample_emb = sample_out.last_hidden_state
-print(sample_seq)
-print(sample_tok.shape)
-print(list(sample_seq[0:5]), 'corresponds to', sample_tok[0][1:6])
-
-
-#%%# print(sample_out)
-print('Hidden state shape:', sample_emb.shape)
-print('+ features shape:', feat.shape)
-print('==',
-      torch.cat((sample_emb, feat.reshape((1,*feat.shape))), axis=2).shape)
+# %%
+for j in jobs:
+    j.cancel()
 
 # %%

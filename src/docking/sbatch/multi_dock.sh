@@ -3,8 +3,8 @@
 #SBATCH -o /cluster/projects/kumargroup/jean/slurm-outputs/docking/run11/%x-%A_%a.out #NOTE: change run#
 
 #SBATCH --job-name=r11_vina_dock #NOTE: change run#
-##SBATCH --mail-type=ALL
-##SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=j.yaacoub@mail.utoronto.ca
 
 #SBATCH --mem=4G
 #SBATCH --cpus-per-task=8
