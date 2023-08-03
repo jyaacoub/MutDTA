@@ -19,7 +19,9 @@ from transformers.utils import logging
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
-                 output_dim=128, dropout=0.2, esm_only=True):
+                 output_dim=128, dropout=0.2, esm_only=True, edge_weight_opt='binary'):
+        assert edge_weight_opt in ['simple', 'binary']
+        
         super(EsmDTA, self).__init__()
 
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
@@ -49,6 +51,8 @@ class EsmDTA(BaseModel):
         self.out = nn.Linear(512, 1) # 1 output (binding affinity)
 
         self.esm_only = esm_only
+        self.edge_weight = edge_weight_opt == 'simple'
+            
     
     def forward_pro(self, data):
         # cls and sep tokens are added to the sequence by the tokenizer
@@ -79,16 +83,19 @@ class EsmDTA(BaseModel):
             target_x = torch.cat((esm_emb, data.x), axis=1)
             #  ->> [B*L, emb_dim+feat_dim]
 
+        ei = data.edge_index
+        ew = data.edge_weight if self.edge_weight else None
+
         # if edge_weight doesnt exist no error is thrown it just passes it as None
-        xt = self.pro_conv1(target_x, data.edge_index, data.edge_weight)
+        xt = self.pro_conv1(target_x, ei, ew)
         xt = self.relu(xt)
 
         # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv2(xt, data.edge_index, data.edge_weight)
+        xt = self.pro_conv2(xt, ei, ew)
         xt = self.relu(xt)
 
         # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv3(xt, data.edge_index, data.edge_weight)
+        xt = self.pro_conv3(xt, ei, ew)
         xt = self.relu(xt)
 
         # xt = self.pro_conv4(xt, target_edge_index)
