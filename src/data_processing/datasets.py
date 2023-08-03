@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.process_msa import check_aln_lines
-from src.feature_extraction.protein import create_save_cmaps, get_target_edge_index
+from src.feature_extraction.protein import create_save_cmaps
 from src.data_processing import PDBbindProcessor
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
@@ -128,14 +128,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             if prot_id not in processed_prots:
                 pro_feat = torch.Tensor()
                 # extra_feat is Lx54 or Lx34 (if shannon=True)
-                extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
-                                                threshold=self.cmap_threshold,
-                                                aln_file=self.aln_p(code),
-                                                shannon=self.shannon)
+                extra_feat, pro_edge, pro_edge_weight = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
+                                                                threshold=self.cmap_threshold,
+                                                                aln_file=self.aln_p(code),
+                                                                shannon=self.shannon)
                 pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
                     
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+                                    edge_index=torch.LongTensor(pro_edge),
+                                    edge_weight=torch.Tensor(pro_edge_weight),
                                     pro_seq=pro_seq, # protein sequence for downstream esm model
                                     prot_id=prot_id)
                 processed_prots[prot_id] = pro
@@ -152,7 +153,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                     continue
                 
                 lig = torchg.data.Data(x=torch.Tensor(mol_feat),
-                                    edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+                                    edge_index=torch.LongTensor(mol_edge),
                                     lig_seq=lig_seq)
                 processed_ligs[lig_seq] = lig
             
