@@ -79,15 +79,16 @@ class EsmDTA(BaseModel):
             target_x = torch.cat((esm_emb, data.x), axis=1)
             #  ->> [B*L, emb_dim+feat_dim]
 
-        xt = self.pro_conv1(target_x, data.edge_index)
+        # if edge_weight doesnt exist no error is thrown it just passes it as None
+        xt = self.pro_conv1(target_x, data.edge_index, data.edge_weight)
         xt = self.relu(xt)
 
         # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv2(xt, data.edge_index)
+        xt = self.pro_conv2(xt, data.edge_index, data.edge_weight)
         xt = self.relu(xt)
 
         # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv3(xt, data.edge_index)
+        xt = self.pro_conv3(xt, data.edge_index, data.edge_weight)
         xt = self.relu(xt)
 
         # xt = self.pro_conv4(xt, target_edge_index)
