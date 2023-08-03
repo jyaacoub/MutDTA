@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.process_msa import check_aln_lines
-from src.feature_extraction.protein import create_save_cmaps, get_target_edge_index
+from src.feature_extraction.protein import create_save_cmaps
 from src.data_processing import PDBbindProcessor
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
@@ -128,14 +128,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             if prot_id not in processed_prots:
                 pro_feat = torch.Tensor()
                 # extra_feat is Lx54 or Lx34 (if shannon=True)
-                extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
-                                                threshold=self.cmap_threshold,
-                                                aln_file=self.aln_p(code),
-                                                shannon=self.shannon)
+                extra_feat, pro_edge, pro_edge_weight = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
+                                                                threshold=self.cmap_threshold,
+                                                                aln_file=self.aln_p(code),
+                                                                shannon=self.shannon)
                 pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
                     
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge).transpose(1, 0),
+                                    edge_index=torch.LongTensor(pro_edge),
+                                    edge_weight=torch.Tensor(pro_edge_weight),
                                     pro_seq=pro_seq, # protein sequence for downstream esm model
                                     prot_id=prot_id)
                 processed_prots[prot_id] = pro
@@ -152,7 +153,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                     continue
                 
                 lig = torchg.data.Data(x=torch.Tensor(mol_feat),
-                                    edge_index=torch.LongTensor(mol_edge).transpose(1, 0),
+                                    edge_index=torch.LongTensor(mol_edge),
                                     lig_seq=lig_seq)
                 processed_ligs[lig_seq] = lig
             
@@ -164,8 +165,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
-    def __init__(self, save_root='../data/PDBbindDataset/msa', 
-                 bind_root='../data/v2020-other-PL', 
+    def __init__(self, save_root='../data/PDBbindDataset/nomsa', 
+                 data_root='../data/v2020-other-PL', 
                  aln_dir=None,
                  cmap_threshold=8.0, shannon=False, *args, **kwargs):
         """
@@ -190,7 +191,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             
         *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """   
-        super(PDBbindDataset, self).__init__(save_root, data_root=bind_root,
+        super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              shannon=shannon, *args, **kwargs)
     

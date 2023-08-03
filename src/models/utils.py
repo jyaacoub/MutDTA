@@ -1,6 +1,9 @@
+from typing import Tuple
 import numpy as np
 import torch
 from torch import nn
+from torch_geometric.loader import DataLoader
+
 
 class BaseModel(nn.Module):
     """
@@ -131,3 +134,23 @@ def print_device_info(device:torch.device) -> torch.cuda.device:
     print(f'\tallocated: {a/1e6:<10.3f}MB')
     
     return prop
+
+
+def debug(model: BaseModel, data_loader:DataLoader,
+          device: torch.device) -> Tuple[torch.Tensor]:
+    """
+    Runs a single batch through model for testing that it has been 
+    set up properly
+    """
+    for data in data_loader:
+        batch_pro = data['protein'].to(device)
+        batch_mol = data['ligand'].to(device)
+        labels = data['y'].reshape(-1,1).to(device)
+        
+        # Forward pass
+        model.train()
+        train = model(batch_pro, batch_mol)
+        model.eval()
+        eval = model(batch_pro, batch_mol)
+        
+        return train, eval

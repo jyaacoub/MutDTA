@@ -1,3 +1,4 @@
+from multiprocessing import Pool
 from typing import Callable, Iterable, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,8 +13,8 @@ from src.feature_extraction import ResInfo, one_hot
 ###################### Protein Feature Extraction ######################
 ########################################################################
 # pconsc4 predicted contact map save in data/dataset/pconsc4
-def get_target_edge_index(target_sequence:str, contact_map:str or np.array,
-                          threshold=10.5):
+def get_target_edge(target_sequence:str, contact_map:str or np.array,
+                          threshold=10.5) -> Tuple[np.array]:
     """
     Returns edge index for target sequence given a contact map.
 
@@ -28,8 +29,8 @@ def get_target_edge_index(target_sequence:str, contact_map:str or np.array,
         
     Returns
     -------
-    np.array
-        edge index for target sequence.
+    Tuple[np.array]
+        edge index, edge weight for target sequence
     """
     # loading up contact map if it is a file path
     if type(contact_map) == str: contact_map = np.load(contact_map)
@@ -42,19 +43,27 @@ def get_target_edge_index(target_sequence:str, contact_map:str or np.array,
             f'{contact_map.shape[0]} != {target_size}'
     
     
-    # adding self loop then thresholding
-    # contact_map += np.matrix(np.eye(contact_map.shape[0])) # Self loop
-    # NOTE: the self loop is implied since the diagonal is already 0 (for real cmaps)
+    # threshold
+    # array of points for edge index (2,L) where L < seq_len**2
     if threshold >= 0.0:
-        index_row, index_col = np.where(contact_map <= threshold)
+        # NOTE: for real cmaps self loop is implied since the diagonal is already 0
+        edge_index = np.array(np.where(contact_map <= threshold))
+        edge_weight = contact_map[edge_index[0], edge_index[1]]
+        # normalize to be between 6A and 14A
+        #  - "in contact" is anywhere between 8 and 12A: https://en.wikipedia.org/wiki/Protein_contact_map
+        a_min, a_max = 6.0, 14.0
+        edge_weight = np.clip(edge_weight, a_min, a_max)
+        edge_weight = (edge_weight - a_min) / (a_max - a_min)
+        
     else: # negative threshold flips the sign
-        index_row, index_col = np.where(contact_map >= abs(threshold))
-    assert index_row.max() < target_size and index_col.max() < target_size, \
-        'contact map size does not match target sequence size'
+        contact_map += np.matrix(np.eye(contact_map.shape[0])*threshold) # Self loop
+        edge_index = np.array(np.where(contact_map >= abs(threshold)))
+        # no norm needed for probabilistic cmaps
+        edge_weight = contact_map[edge_index[0], edge_index[1]]  
+        
+    assert edge_index.max() < target_size, 'contact map size does not match target sequence size'
     
-    # converting edge matrix to edge index for pytorch geometric
-    target_edge_index = np.array([[i,j] for i, j in zip(index_row, index_col)])
-    return target_edge_index
+    return edge_index, edge_weight
 
 def target_to_graph(target_sequence:str, contact_map:str or np.array, 
                     threshold=10.5, aln_file:str=None, shannon=False):
@@ -85,7 +94,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     Tuple[np.array]
         tuple of (target_feature, target_edge_index)
     """
-    target_edge_index = get_target_edge_index(target_sequence, contact_map, threshold)
+    edge_index, edge_weight = get_target_edge(target_sequence, contact_map, threshold)
     # getting node features
     
     # aln_dir = 'data/' + dataset + '/aln'
@@ -117,7 +126,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
-    return target_feature, target_edge_index
+    return target_feature, edge_index, edge_weight
 
 def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
     """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
@@ -337,8 +346,8 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         If true then we use CA as point for distance measure, by default False
     `check_missing` : bool, optional
         Dont allow any missing residues, by default False
-
     Returns
+
     -------
     dict
         dictionary of sequences for each pdbcode
@@ -356,6 +365,33 @@ def create_save_cmaps(pdbcodes: Iterable[str],
             np.save(cmap_p(code), cmap)
         
     return seqs
+
+def _save_cmap(args):
+    pdb_f, cmap_f, CA_only, check_missing = args
+    
+    # skip if already created
+    if os.path.isfile(cmap_f): return
+    _, res = get_sequence(pdb_f, check_missing=check_missing)
+    cmap = get_contact(res,
+                    CA_only=CA_only, # CB is needed by DGraphDTA
+                    check_missing=check_missing)
+    np.save(cmap_f, cmap)
+    
+def multi_save_cmaps(pdbcodes: Iterable[str], 
+                      pdb_p: Callable[[str], str],
+                      cmap_p: Callable[[str], str],
+                      CA_only=False,
+                      check_missing=False,
+                      processes=8) -> dict:
+    
+        
+    args = [[pdb_p(code), cmap_p(code), CA_only, check_missing] for code in pdbcodes]
+    with Pool(processes=processes) as pool:
+        print('Starting process')
+        list(tqdm(pool.imap(_save_cmap, args),
+                  total=len(args),
+                  desc='Creating and saving cmaps'))
+    
 
 
 def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):

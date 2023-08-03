@@ -48,7 +48,7 @@ def smile_to_graph(smile):
     mol_adj += np.eye(mol_adj.shape[0])
     # converting edge matrix to edge index for pytorch geometric
     index_row, index_col = np.where(mol_adj >= 0.5)
-    edge_index = np.array([[i,j] for i,j in zip(index_row, index_col)])
+    edge_index = np.array([index_row, index_col])
     # print('smile_to_graph')
     # print(np.array(features).shape)
     return features, edge_index

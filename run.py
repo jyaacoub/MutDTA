@@ -7,10 +7,46 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 
+
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
+from src.models.prior_work import DGraphDTA, DGraphDTAImproved
+from src.models.mut_dta import EsmDTA
+from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
+from src.models import train, test, CheckpointSaver
+from src.models.utils import print_device_info
+from src.data_analysis import get_metrics
+from src.feature_extraction.protein import multi_save_cmaps
+
+#%% 
+pdb_codes = os.listdir('../data/v2020-other-PL/')
+# filter out readme and index folders
+pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
+
+assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
+
+# creating contact maps:
+seqs = multi_save_cmaps(pdb_codes,
+                  pdb_p=lambda x: f'../data/v2020-other-PL/{x}/{x}_protein.pdb',
+                  cmap_p=lambda x: f'../data/v2020-other-PL/{x}/{x}.npy',
+                  processes=2)
+        
+print('DONE!')
+exit()
+#%%
+dataset = PDBbindDataset(save_root='../data/PDBbindDataset/nomsa',
+                 data_root='../data/v2020-other-PL/',
+                 aln_dir=None, 
+                 cmap_threshold=8.0,
+                 shannon=False
+                 )
+
 import submitit
 
 import torch
 from transformers import AutoTokenizer, EsmModel
+
 
 from src.models.utils import print_device_info
 
