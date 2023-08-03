@@ -1,3 +1,4 @@
+from multiprocessing import Pool
 from typing import Callable, Iterable, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -345,8 +346,8 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         If true then we use CA as point for distance measure, by default False
     `check_missing` : bool, optional
         Dont allow any missing residues, by default False
-
     Returns
+
     -------
     dict
         dictionary of sequences for each pdbcode
@@ -364,6 +365,33 @@ def create_save_cmaps(pdbcodes: Iterable[str],
             np.save(cmap_p(code), cmap)
         
     return seqs
+
+def _save_cmap(args):
+    pdb_f, cmap_f, CA_only, check_missing = args
+    
+    # skip if already created
+    if os.path.isfile(cmap_f): return
+    _, res = get_sequence(pdb_f, check_missing=check_missing)
+    cmap = get_contact(res,
+                    CA_only=CA_only, # CB is needed by DGraphDTA
+                    check_missing=check_missing)
+    np.save(cmap_f, cmap)
+    
+def multi_save_cmaps(pdbcodes: Iterable[str], 
+                      pdb_p: Callable[[str], str],
+                      cmap_p: Callable[[str], str],
+                      CA_only=False,
+                      check_missing=False,
+                      processes=8) -> dict:
+    
+        
+    args = [[pdb_p(code), cmap_p(code), CA_only, check_missing] for code in pdbcodes]
+    with Pool(processes=processes) as pool:
+        print('Starting process')
+        list(tqdm(pool.imap(_save_cmap, args),
+                  total=len(args),
+                  desc='Creating and saving cmaps'))
+    
 
 
 def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):

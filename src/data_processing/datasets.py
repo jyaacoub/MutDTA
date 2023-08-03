@@ -165,8 +165,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
-    def __init__(self, save_root='../data/PDBbindDataset/msa', 
-                 bind_root='../data/v2020-other-PL', 
+    def __init__(self, save_root='../data/PDBbindDataset/nomsa', 
+                 data_root='../data/v2020-other-PL', 
                  aln_dir=None,
                  cmap_threshold=8.0, shannon=False, *args, **kwargs):
         """
@@ -191,7 +191,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             
         *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """   
-        super(PDBbindDataset, self).__init__(save_root, data_root=bind_root,
+        super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              shannon=shannon, *args, **kwargs)
     
