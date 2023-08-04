@@ -12,12 +12,43 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
-from src.models.mut_dta import EsmDTA
+from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
 from src.models import train, test, CheckpointSaver
 from src.models.utils import print_device_info
 from src.data_analysis import get_metrics
 from src.feature_extraction.protein import multi_save_cmaps
+
+
+#%% 
+import torch
+from src.models import debug
+mdl = EsmAttentionDTA()
+DATA = 'davis'
+FEATURE = 'nomsa'
+DATA_ROOT = f'../data/{DATA}/' # where to get data from
+dataset = DavisKibaDataset(
+        save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
+        data_root=DATA_ROOT,
+        aln_dir=f'{DATA_ROOT}/aln/',
+        cmap_threshold=-0.5, 
+        feature_opt=FEATURE
+        )
+TRAIN_SPLIT, VAL_SPLIT, RAND_SEED, BATCH_SIZE = 0.8, 0.1, 0, 4
+train_loader, val_loader, test_loader = train_val_test_split(dataset, 
+        train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
+        shuffle_dataset=True, random_seed=RAND_SEED, 
+        batch_train=BATCH_SIZE, use_refined=False,
+        split_by_prot=True
+        )
+
+# %%
+debug(mdl, train_loader, torch.device('cpu'))
+
+
+
+
+
 
 #%%
 dataset = PDBbindDataset(save_root='../data/PDBbindDataset/nomsa',
