@@ -2,7 +2,7 @@ import argparse
 
 # Define the options for data_opt and FEATURE_opt
 model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI']
-data_opt_choices = ['davis', 'kiba']
+data_opt_choices = ['davis', 'kiba', 'PDBbind']
 feature_opt_choices = ['nomsa', 'msa', 'shannon']
 edge_opt_choices = ['simple', 'binary']
 
@@ -139,19 +139,31 @@ cp_saver = CheckpointSaver(model=None,
 metrics = {}
 
 for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge_opt, model_opt):
-    print(f'({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
+    print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
+    
     MODEL_KEY = f'{MODEL}m_{DATA}d_{FEATURE}f_{EDGEW}e_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
+    # MODEL_KEY = f'DG_kiba_64B_0.0001LR_0.4D_2000E_{FEATURE}F'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'{MODEL_KEY} \n')
 
     # loading data
-    DATA_ROOT = f'../data/davis_kiba/{DATA}/' # where to get data from
-    dataset = DavisKibaDataset(
-            save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
-            data_root=DATA_ROOT,
-            aln_dir=f'{DATA_ROOT}/aln/',
-            cmap_threshold=-0.5, shannon=FEATURE=='shannon')
-    print(f'Number of samples: {len(dataset)}')
+    if DATA == 'PDBbind':
+        dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
+                 data_root='../data/v2020-other-PL/',
+                 aln_dir='../data/PDBbind_aln', 
+                 cmap_threshold=8.0,
+                 feature_opt=FEATURE
+                 )
+    else:
+        DATA_ROOT = f'../data/{DATA}/' # where to get data from
+        dataset = DavisKibaDataset(
+                save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
+                data_root=DATA_ROOT,
+                aln_dir=f'{DATA_ROOT}/aln/',
+                cmap_threshold=-0.5, 
+                feature_opt=FEATURE
+                )
+    print(f'-\tNumber of samples: {len(dataset)}')
 
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
@@ -161,7 +173,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
 
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(f'Device: {device}')
+    print(f'-\tDevice: {device}')
 
     num_feat_pro = 54 if 'msa' in FEATURE else 34
     if MODEL == 'DG':
@@ -209,7 +221,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
     # check if model has already been trained:
     logs = None
     if os.path.exists(cp_saver.save_path):
-        print('Model already trained')
+        print('-\tModel already trained')
         # load ckpnt
         model.load_state_dict(torch.load(cp_saver.save_path, 
                                          map_location=device))
@@ -232,7 +244,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
             
     # testing
     loss, pred, actual = test(model, test_loader, device)
-    print(f'Test loss: {loss}')
+    print(f'-\tTest loss: {loss}')
     get_metrics(actual, pred,
                 save_results=SAVE_RESULTS,
                 save_path=media_save_p,

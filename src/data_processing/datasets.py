@@ -16,7 +16,7 @@ from src.data_processing import PDBbindProcessor
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, shannon=True, *args, **kwargs):
+                 cmap_threshold:float, feature_opt='nomsa', *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -38,18 +38,26 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
-        `shannon` : bool, optional
-            If True, shannon entropy instead of PSSM matrix is used for 
-            protein features, by default False.
+        `feature_opt` : bool, optional
+            choose from ['nomsa', 'msa', 'shannon']
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.data_root = data_root
-        self.aln_dir =  aln_dir # path to sequence alignments
-            
         self.cmap_threshold = cmap_threshold
-        self.shannon = shannon
+            
+        self.shannon = False
         
+        if feature_opt == 'nomsa':# FINISH THIS AND TRAIN PDBBIND...
+            self.aln_dir = None # none treats it as np.zeros
+        elif feature_opt == 'msa':
+            self.aln_dir =  aln_dir # path to sequence alignments
+        elif feature_opt == 'shannon':
+            self.aln_dir = aln_dir
+            self.shannon = True
+        else:
+            raise Exception("Invalid feature_opt please pick from nomsa, msa, shannon")
+            
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
         
@@ -168,7 +176,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
     def __init__(self, save_root='../data/PDBbindDataset/nomsa', 
                  data_root='../data/v2020-other-PL', 
                  aln_dir=None,
-                 cmap_threshold=8.0, shannon=False, *args, **kwargs):
+                 cmap_threshold=8.0, feature_opt='nomsa', *args, **kwargs):
         """
         Subclass of `torch_geometric.data.InMemoryDataset`.
         Dataset for PDBbind data. This dataset is used to train graph models.
@@ -185,15 +193,14 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             done and is set to zeros, by default None.
         `cmap_threshold` : float, optional
             Threshold for contact map creation, by default 8.0
-        `shannon` : bool, optional
-            If True, shannon entropy instead of PSSM matrix is used for 
-            protein features, by default False.
+        `feature_opt` : bool, optional
+            choose from ['nomsa', 'msa', 'shannon']
             
         *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """   
         super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
-                                             shannon=shannon, *args, **kwargs)
+                                             feature_opt=feature_opt, *args, **kwargs)
     
     def cmap_p(self, code):
         return f'{self.data_root}/{code}/{code}.npy'
@@ -303,7 +310,7 @@ class DavisKibaDataset(BaseDataset):
     def __init__(self, save_root='../data/DavisKibaDataset/', 
                  data_root='../data/davis_kiba/davis/', 
                  aln_dir='../data/davis_kiba/davis/aln/',
-                 cmap_threshold=-0.5, shannon=True, *args, **kwargs):
+                 cmap_threshold=-0.5, feature_opt='nomsa', *args, **kwargs):
         """
         InMemoryDataset for davis or kiba. This dataset is used to train graph models.
 
@@ -321,15 +328,13 @@ class DavisKibaDataset(BaseDataset):
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
-        `shannon` : bool, optional
-            If True, shannon entropy instead of PSSM matrix is used for 
-            protein features, by default False.
-            
+        `feature_opt` : bool, optional
+            choose from ['nomsa', 'msa', 'shannon']
         *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
-                                               shannon=shannon, *args, **kwargs)
+                                               feature_opt=feature_opt, *args, **kwargs)
     
     def cmap_p(self, code):
         return f'{self.data_root}/pconsc4/{code}.npy'
