@@ -353,7 +353,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         dictionary of sequences for each pdbcode
     """
     seqs = {}
-    for code in tqdm(pdbcodes, 'Getting Sequences + Contact Maps'):
+    for code in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
         seqs[code], res = get_sequence(pdb_p(code), 
                                 check_missing=check_missing, 
                                 select_largest=True)

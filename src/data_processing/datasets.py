@@ -222,8 +222,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         List[str]
             List of file names.
         """
-        return ['index/INDEX_general_PL_data.2020', 
-                'index/INDEX_general_PL_name.2020']
+        return [f'{self.data_root}/index/INDEX_general_PL_data.2020', 
+                f'{self.data_root}/index/INDEX_general_PL_name.2020']
         
     def pre_process(self):
         """
@@ -255,7 +255,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
         
-        # creating contact maps:
+        # Getting protein seq & contact maps:
         seqs = create_save_cmaps(pdb_codes,
                           pdb_p=lambda x: f'{self.data_root}/{x}/{x}_protein.pdb',
                           cmap_p=self.cmap_p)
@@ -264,11 +264,15 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
         df_seq.index.name = 'PDBCode'
         
-        # getting ligand sequences:
+        # Extracting SMILE strings:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
                                               dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
         df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
         df_smi.index.name = 'PDBCode'
+        
+        missing_smiles = df_smi.SMILE.isna()
+        if sum(missing_smiles) > 0:
+            print(f'\t{sum(missing_smiles)} ligands failed to get SMILEs')
         
         # Get binding data:
         df_binding = PDBbindProcessor.get_binding_data(self.raw_file_names[0])
@@ -278,13 +282,15 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_pid = PDBbindProcessor.get_name_data(self.raw_file_names[1])
         df_pid.drop(columns=['release_year','prot_name'], inplace=True)
         # contains col: prot_id
-        
+        # some might not have prot_ids available so we need to use PDBcode as id instead
+        missing_pid = df_pid.prot_id == '------'
+        df_pid[missing_pid] = df_pid[missing_pid].assign(prot_id = df_pid[missing_pid].index)
         
         # merging dataframes:
-        df_binding.merge(df_pid, on='PDBCode')
+        df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
         
-        df = df_smi[df_smi.SMILE.notna()].merge(df_binding, on='PDBCode')
-        df = df.merge(df_seq, on='PDBCode')
+        df = df.merge(df_smi[df_smi.SMILE.notna()], on='PDBCode') # + smiles
+        df = df.merge(df_seq, on='PDBCode') # + prot_seq
         
         # changing index name to code (to match with super class):
         df.index.name = 'code'

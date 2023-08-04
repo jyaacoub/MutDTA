@@ -160,9 +160,9 @@ class PDBbindProcessor(Processor):
                     year = int(line[5:10])
                     prot_id = line[11:18].strip()
                     prot_name = line[18:].strip()
-                    print('year:', year, 
-                          '\nprot_id:', prot_id, 
-                          '\nprot_name:', prot_name)
+                    # print('year:', year, 
+                    #       '\nprot_id:', prot_id, 
+                    #       '\nprot_name:', prot_name)
                     data[code] = [year, prot_id, prot_name]
                 except ValueError as e:
                     print(f'Error with line: {line}')
