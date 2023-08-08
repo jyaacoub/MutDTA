@@ -112,7 +112,8 @@ class Downloader:
                 ID_status[name] = 'already downloaded'
                 continue
                 
-            os.makedirs(save_path(name)[:-len(name)])
+            os.makedirs(os.path.dirname(save_path(name)), 
+                        exist_ok=True)
             with open(save_path(name), 'w') as f:
                 f.write(r.get(url(name)).text)
             ID_status[name] = 'downloaded'
@@ -120,15 +121,15 @@ class Downloader:
         return ID_status
     
     @staticmethod
-    def download_PDBs(PDBCodes: List[str], save_dir='./') -> dict:
+    def download_PDBs(PDBCodes: Iterable[str], save_dir='./') -> dict:
         """
         Wrapper of `Downloader.download` for downloading PDB files.
         Fetches PDB files from https://files.rcsb.org/download/{PDBCode}.pdb.           
         """
-        save_path = lambda x: f'{save_dir}/{x}.pdb',
+        save_path = lambda x: f'{save_dir}/{x}.pdb'
         url = lambda x: f'https://files.rcsb.org/download/{x}.pdb'
         
-        return Downloader.download(PDBCodes,save_path=save_path, url=url)
+        return Downloader.download(PDBCodes, save_path=save_path, url=url)
     
     @staticmethod
     def download_SDFs(ligand_names: List[str], 
