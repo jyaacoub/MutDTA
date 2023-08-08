@@ -141,6 +141,8 @@ def debug(model: BaseModel, data_loader:DataLoader,
     """
     Runs a single batch through model for testing that it has been 
     set up properly
+    
+    returns model.train() and model.eval() outputs
     """
     for data in data_loader:
         batch_pro = data['protein'].to(device)
