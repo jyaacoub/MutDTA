@@ -177,10 +177,11 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
 
     num_feat_pro = 54 if 'msa' in FEATURE else 34
     if MODEL == 'DG':
-        model = DGraphDTA(num_features_pro=num_feat_pro, dropout=DROPOUT)
+        model = DGraphDTA(num_features_pro=num_feat_pro, 
+                          dropout=DROPOUT, edge_weight_opt=EDGEW)
     elif MODEL == 'DGI':
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                            dropout=DROPOUT)
+                                  dropout=DROPOUT,edge_weight_opt=EDGEW)
     elif MODEL == 'ED':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                        num_features_pro=320, # only esm features

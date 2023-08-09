@@ -22,11 +22,12 @@ class DGraphDTA(BaseModel):
         See: https://github.com/595693085/DGraphDTA
         paper: https://pubs.rsc.org/en/content/articlelanding/2020/ra/d0ra02297g
     """
-    def __init__(self, n_output=1, num_features_pro=54, num_features_mol=78, output_dim=128, dropout=0.2):
+    def __init__(self, num_features_pro=54, num_features_mol=78, output_dim=128, dropout=0.2,
+                 edge_weight_opt='binary'):
+        assert edge_weight_opt in ['binary', 'simple']
         super(DGraphDTA, self).__init__()
 
         print('DGraphDTA Loaded')
-        self.n_output = n_output
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
         self.mol_conv2 = GCNConv(num_features_mol, num_features_mol * 2)
         self.mol_conv3 = GCNConv(num_features_mol * 2, num_features_mol * 4)
@@ -46,21 +47,25 @@ class DGraphDTA(BaseModel):
         # combined layers
         self.fc1 = nn.Linear(2 * output_dim, 1024)
         self.fc2 = nn.Linear(1024, 512)
-        self.out = nn.Linear(512, self.n_output)
+        self.out = nn.Linear(512, 1)
+        
+        self.edge_weight = edge_weight_opt == 'simple'
     
-    def forward_pro(self, data_pro):
+    def forward_pro(self, data):
         # get protein input
-        target_x, target_edge_index, target_batch = data_pro.x, data_pro.edge_index, data_pro.batch
+        target_x, ei, target_batch = data.x, data.edge_index, data.batch
+        # if edge_weight doesnt exist no error is thrown it just passes it as None
+        ew = data.edge_weight if self.edge_weight else None
 
-        xt = self.pro_conv1(target_x, target_edge_index)
+        xt = self.pro_conv1(target_x, ei, ew)
         xt = self.relu(xt)
 
         # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv2(xt, target_edge_index)
+        xt = self.pro_conv2(xt, ei, ew)
         xt = self.relu(xt)
-
+        
         # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv3(xt, target_edge_index)
+        xt = self.pro_conv3(xt, ei, ew)
         xt = self.relu(xt)
 
         # xt = self.pro_conv4(xt, target_edge_index)
@@ -163,7 +168,9 @@ class DGraphDTAImproved(DGraphDTA):
                  # instead of full 21XL PSSM matrix
                  num_features_mol=78, 
                  output_dim=512, # increased to 512
-                 dropout=0.2):
+                 dropout=0.2,
+                 edge_weight_opt='binary'):
+        
         super(DGraphDTAImproved, self).__init__(n_output, num_features_pro, 
                                                 num_features_mol, output_dim, 
                                                 dropout)
@@ -174,9 +181,16 @@ class DGraphDTAImproved(DGraphDTA):
         self.pro_conv3 = GCNConv(prev_feat * 2, prev_feat * 4)
         self.pro_conv4 = GCNConv(prev_feat * 4, prev_feat * 8)
         
-        self.pro_fc_g0 = nn.Linear(prev_feat * 8, prev_feat*4)
-        self.pro_fc_g1 = nn.Linear(prev_feat * 4, 1024)
-        self.pro_fc_g2 = nn.Linear(1024, output_dim)    
+        self.ff_pro = nn.Sequential(
+            nn.Linear(prev_feat * 8, prev_feat * 4),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(prev_feat * 4, 1024),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(1024, output_dim)
+        )
+        
     
     def forward_pro(self, data_pro):
         # get protein input
@@ -198,13 +212,7 @@ class DGraphDTAImproved(DGraphDTA):
         xt = gep(xt, target_batch)  # global pooling
 
         # flatten
-        xt = self.relu(xt)
-        xt = self.pro_fc_g0(xt)
-        xt = self.dropout(xt)
-        xt = self.pro_fc_g1(xt)
-        xt = self.dropout(xt)
-        xt = self.pro_fc_g2(xt)
-        xt = self.dropout(xt)
+        xt = self.ff_pro(xt)
         return xt
     
 
