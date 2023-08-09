@@ -68,7 +68,7 @@ parser.add_argument('-D',
 try:
     if get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
         # Jupyter notebook
-        in_args = '-m DG -d davis -f nomsa -e simple -D'.split()
+        in_args = '-m DG DGI ED EDI -d davis -f nomsa -e simple -D'.split()
         args = parser.parse_args(args=in_args)
     else:  
         args = parser.parse_args()
@@ -151,7 +151,7 @@ metrics = {}
 for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge_opt, model_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
     
-    MODEL_KEY = f'{MODEL}m_{DATA}d_{FEATURE}f_{EDGEW}e_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
+    MODEL_KEY = f'{MODEL}M_{DATA}D_{FEATURE}F_{EDGEW}E_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
     # MODEL_KEY = f'DG_kiba_64B_0.0001LR_0.4D_2000E_{FEATURE}F'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'# {MODEL_KEY} \n')
@@ -191,7 +191,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
                           dropout=DROPOUT, edge_weight_opt=EDGEW)
     elif MODEL == 'DGI':
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                                  dropout=DROPOUT,edge_weight_opt=EDGEW)
+                                  dropout=DROPOUT, edge_weight_opt=EDGEW)
     elif MODEL == 'ED':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                        num_features_pro=320, # only esm features

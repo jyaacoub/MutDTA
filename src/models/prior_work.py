@@ -162,8 +162,7 @@ class DGraphDTAImproved(DGraphDTA):
     +conv layer
     +double size of output dim
     """
-    def __init__(self, n_output=1, 
-                 num_features_pro=34, 
+    def __init__(self, num_features_pro=34, 
                  # changed from 54-21 = 33 + 1 = 34 due to use of shannon entropy 
                  # instead of full 21XL PSSM matrix
                  num_features_mol=78, 
@@ -171,9 +170,9 @@ class DGraphDTAImproved(DGraphDTA):
                  dropout=0.2,
                  edge_weight_opt='binary'):
         
-        super(DGraphDTAImproved, self).__init__(n_output, num_features_pro, 
+        super(DGraphDTAImproved, self).__init__(num_features_pro, 
                                                 num_features_mol, output_dim, 
-                                                dropout)
+                                                dropout, edge_weight_opt)
         
         prev_feat = 54 # previous size was 54
         self.pro_conv1 = GCNConv(num_features_pro, prev_feat)
