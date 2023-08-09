@@ -53,7 +53,7 @@ class Processor:
         seq = list(seq)
         for mut in muts:
             ref, pos, mut = mut[0], int(mut[1:-1])-1, mut[-1]
-            assert seq[pos] == ref, f"Reference does not match sequence at position {pos}: {ref} != {seq[pos]}"
+            assert seq[pos] == ref or seq[pos] == mut, f"Reference does not match sequence at position {pos}: {ref} != {seq[pos]}"
             seq[pos] = mut
         return ''.join(seq)
             
@@ -90,7 +90,9 @@ class Processor:
                 
                 # make sure res# is in order and not missing
                 if check_missing:
-                    if prev_chain != curr_chain: # new chain
+                    # some might be negative (https://proteopedia.org/wiki/index.php/Unusual_sequence_numbering#Starts_With_Zero_Or_Negative_Numbers)
+                    # which may or may not include a zero at the point of transition
+                    if prev_chain != curr_chain or prev_res == -1: # new chain or neg number issue^
                         prev_res = None
                     assert prev_res is None or \
                         curr_res == prev_res or \

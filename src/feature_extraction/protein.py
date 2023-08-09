@@ -181,7 +181,7 @@ def residue_features(residue):
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
 
-def get_contact(residues: OrderedDict, CA_only=True, check_missing=False,
+def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
                 display=False, title="Residue Contact Map") -> np.array:
     """
     Given the residue chain dict this will return the residue contact map for that structure.
@@ -317,7 +317,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
                                 select_largest=True)
         # only get cmap if it doesnt exist
         if not os.path.isfile(cmap_p(code)):
-            cmap = get_contact(res,
+            cmap = get_contact_map(res,
                             CA_only=CA_only, # CB is needed by DGraphDTA
                             check_missing=check_missing)
             np.save(cmap_p(code), cmap)
@@ -330,7 +330,7 @@ def _save_cmap(args):
     # skip if already created
     if os.path.isfile(cmap_f): return
     _, res = get_sequence(pdb_f, check_missing=check_missing)
-    cmap = get_contact(res,
+    cmap = get_contact_map(res,
                     CA_only=CA_only, # CB is needed by DGraphDTA
                     check_missing=check_missing)
     np.save(cmap_f, cmap)
@@ -375,7 +375,7 @@ if __name__ == "__main__":
     for code in tqdm(os.listdir(PDBbind)[32:100]):
         if os.path.isdir(os.path.join(PDBbind, code)) and code not in ["index", "readme"]:
             try:
-                cmap, _ = get_contact(path(code), CA_only=True)
+                cmap, _ = get_contact_map(path(code), CA_only=True)
                 cmaps[code] = cmap
             except Exception as e:
                 print(code)

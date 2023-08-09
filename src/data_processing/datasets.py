@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.utils import ResInfo
-from src.feature_extraction.protein import create_save_cmaps
+from src.feature_extraction.protein import create_save_cmaps, get_contact_map
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
 
@@ -211,14 +211,14 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                                              feature_opt=feature_opt, *args, **kwargs)
     
     def cmap_p(self, code):
-        return f'{self.data_root}/{code}/{code}.npy'
+        return os.path.join(self.data_root, code, f'{code}.npy')
     
     def aln_p(self, code):
         # see feature_extraction/process_msa.py for details on how the alignments are cleaned
         if self.aln_dir is None:
             # dont use aln if none provided (will set to zeros)
             return None
-        return f'{self.aln_dir}/{code}_cleaned.a3m'
+        return os.path.join(self.aln_dir, f'{code}_cleaned.a3m')
         
     # for data augmentation override the transform method
     @property
@@ -250,7 +250,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         It creates a XY.csv file that contains the binding data and the sequences for 
         both ligand and proteins. with the following columns: 
-        PDBCode,resolution,release_year,pkd,lig_name
+        code,SMILE,pkd,prot_seq,prot_id
         
         It also generates and saves contact maps for each protein in the dataset.
 
@@ -349,7 +349,7 @@ class DavisKibaDataset(BaseDataset):
                                                feature_opt=feature_opt, *args, **kwargs)
     
     def cmap_p(self, code):
-        return f'{self.data_root}/pconsc4/{code}.npy'
+        return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
     
     def aln_p(self, code):
         # using existing cleaned alignment files
@@ -357,7 +357,7 @@ class DavisKibaDataset(BaseDataset):
         if self.aln_dir is None:
             # dont use aln if none provided (will set to zeros)
             return None
-        return f'{self.aln_dir}/{code}.aln'
+        return os.path.join(self.aln_dir, f'{code}.a3m')
     
     @property
     def raw_file_names(self):
@@ -453,3 +453,163 @@ class DavisKibaDataset(BaseDataset):
         return df
     
     
+class PlatinumDataset(BaseDataset):
+    CSV_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_flat_file.csv'
+    PBD_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_processed_pdb_files.tar.gz'
+    def __init__(self, save_root: str, data_root: str, 
+                 aln_dir: str=None, cmap_threshold: float=8.0, 
+                 feature_opt='nomsa', mutated=True, *args, **kwargs):
+        """
+        Dataset class for the Platinum dataset.
+
+        Parameters
+        ----------
+        `save_root` : str
+            Where to save the processed data.
+        `data_root` : str
+            Where the raw data is stored from the Platinum dataset 
+            (from: https://biosig.lab.uq.edu.au/platinum/).
+        `aln_dir` : str, optional
+            MSA alignments for each protein in the dataset, by default None
+        `cmap_threshold` : float, optional
+            Threshold for contact map creation, by default 8.0
+        `feature_opt` : str, optional
+            Choose from ['nomsa', 'msa', 'shannon'], by default 'nomsa'
+        """
+        options = ['nomsa']
+        if feature_opt not in options:
+            raise ValueError(f'Invalid feature_opt: {feature_opt}. '+\
+                        f'Only {options} is currently supported for Platinum dataset.')
+        
+        # Platinum dataset is essentially two datasets in one
+        # (one for mutations and one for wildtype) and is why we need to
+        # specify mutations_only.
+        self.mutated = mutated # only use mutated sequences and data
+        if mutated:
+            save_root = save_root + '_mut'
+        
+        if aln_dir is not None:
+            print('WARNING: aln_dir is not used for Platinum dataset, no support for MSA alignments.')
+        
+        super().__init__(save_root, data_root, None, cmap_threshold, 
+                         feature_opt, *args, **kwargs)
+        
+    def cmap_p(self, code):
+        return os.path.join(self.raw_dir, 'contact_maps', f'{code}.npy')
+    
+    def aln_p(self, code):
+        raise NotImplementedError('Platinum dataset does not have MSA alignments.')
+    
+    @property
+    def raw_file_names(self):
+        """call by self.raw_paths to get the proper file paths"""
+        # in order of download/creation:
+        return ['platinum_flat_file.csv',# downloaded from website
+                'platinum_pdb']
+    
+    def download(self):
+        """Download the raw data for the dataset."""
+        if not os.path.isfile(self.raw_paths[0]):
+            print('CSV file not found, downloading from website...')
+            urllib.request.urlretrieve(self.CSV_LINK, self.raw_paths[0])
+        
+        df = pd.read_csv(self.raw_paths[0])
+        
+        # Downloading pdb files:
+        os.makedirs(self.raw_paths[1], exist_ok=True)
+        print('Downloading pdb files from PLATINUM website...')
+        try:
+            temp_fp, msg  = urllib.request.urlretrieve(self.PBD_LINK)
+            # check if successfully downloaded:
+            if msg['Content-Type'] != 'application/x-tar':
+                raise ValueError('Error downloading pdb files from PLATINUM website, '+\
+                    'content type is not tar.gz:\n' + str(msg))
+                # NOTE: alternate approach is to download directly from PDB using the pdb codes:
+                # pdb_status = Downloader.download_PDBs(df['affin.pdb_id'], self.raw_paths[1])
+                # print(f'Downloaded {len(pdb_status)} unique pdb files out of {len(df)}...')
+            else:
+                # extracting files:
+                with tarfile.open(temp_fp, 'r:gz') as tar:
+                    tar.extractall(self.raw_dir)
+            os.remove(temp_fp)
+        except requests.HTTPError as e:
+            raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
+        
+    def pre_process(self):
+        """
+        This method is used to create the processed data files for feature extraction.
+        
+        It creates a XY.csv file that contains the binding data and the sequences for 
+        both ligand and proteins. with the following columns: 
+        code,SMILE,pkd,prot_seq
+        
+        It generates and saves contact maps for each protein in the dataset.
+        
+        And also generates mutated sequences for each protein in the dataset.   
+
+        Returns
+        -------
+        pd.DataFrame
+            The XY.csv dataframe.
+        """
+        df_raw = pd.read_csv(self.raw_paths[0])
+        os.makedirs(os.path.join(self.raw_dir, 'contact_maps'), exist_ok=True)
+        
+        # Getting sequences and cmaps:
+        prot_seq = {}
+        for i, row in tqdm(df_raw.iterrows(), 
+                           desc='Getting sequences and cmaps',
+                           total=len(df_raw)):
+            mut = row['mutation']
+            pdb = row['affin.pdb_id']
+            t_chain = row['affin.chain']
+            
+            # getting sequence from pdb file:
+            pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
+            chains = PDBbindProcessor.pdb_get_chains(pdb_fp, check_missing=False)
+            
+            # getting and saving contact map:
+            if not os.path.isfile(self.cmap_p(pdb)):
+                cmap = get_contact_map(chains[t_chain])
+                np.save(self.cmap_p(pdb), cmap)
+            
+            ref_seq = ''
+            for res, v in chains[t_chain].items():
+                ref_seq += ResInfo.pep_to_code[v["name"]]
+                
+            # getting mutated sequence:
+            if self.mutated:
+                mut_seq = PDBbindProcessor.get_mutated_seq(ref_seq, mut.split('/'))
+                prot_seq[i] = (pdb, mut_seq)
+            else:
+                prot_seq[i] = (pdb, ref_seq)
+                
+        df_seq = pd.DataFrame.from_dict(prot_seq, orient='index', 
+                                        columns=['prot_id', 'prot_seq'])
+        
+        # NOTE: ligand sequences and binding data are already in the csv file
+        # 'affin.lig_id', 'lig.canonical_smiles', 'affin.k_wt', 'affin.k_mt'
+        if self.mutated:
+            # parsing out '>' and '<' from binding data for pure numbers:
+            df_binding = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
+                                                      expand=False).astype(float)
+        else:
+            df_binding = df_raw['affin.k_wt']
+        
+        # adjusting units for binding data from nM to pKd:
+        df_binding = -np.log10(df_binding*1e-9)
+        
+        # merging dataframes:
+        df = pd.DataFrame({
+            'lig_id': df_raw['affin.lig_id'],
+            'prot_id': df_seq['prot_id'],
+            
+            'pkd': df_binding,
+            
+            'prot_seq': df_seq['prot_seq'],
+            'SMILE': df_raw['lig.canonical_smiles']
+        }, index=df_raw.index)
+        df.index.name = 'code'
+        
+        df.to_csv(self.processed_paths[0])
+        return df
