@@ -108,7 +108,8 @@ from matplotlib.ticker import MaxNLocator
 from src.feature_extraction.protein import get_pfm
 from src.models.mut_dta import EsmDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
-from src.data_processing import PDBbindDataset, DavisKibaDataset, train_val_test_split
+from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
+from src.data_processing import train_val_test_split
 from src.models import train, test, CheckpointSaver, print_device_info, debug
 from src.data_analysis import get_metrics
 
