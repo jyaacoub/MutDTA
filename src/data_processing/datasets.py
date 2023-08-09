@@ -1,5 +1,8 @@
 from collections import Counter, OrderedDict
 import json, pickle, re, os, abc
+import tarfile
+import requests
+import urllib.request
 
 import torch
 import torch_geometric as torchg
@@ -8,9 +11,10 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.feature_extraction import smile_to_graph, target_to_graph
-from src.feature_extraction.process_msa import check_aln_lines
+from src.feature_extraction.utils import ResInfo
 from src.feature_extraction.protein import create_save_cmaps
-from src.data_processing import PDBbindProcessor
+from src.feature_extraction.process_msa import check_aln_lines
+from src.data_processing.processors import PDBbindProcessor
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
@@ -61,10 +65,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
-    @property
-    def raw_dir(self) -> str:
-        return self.data_root
-    
     @abc.abstractmethod
     def cmap_p(self, code):
         raise NotImplementedError
@@ -73,6 +73,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def aln_p(self, code):
         # path to cleaned input alignment file
         raise NotImplementedError
+    
+    @property
+    def raw_dir(self) -> str:
+        return self.data_root
     
     @property
     def processed_file_names(self):
@@ -312,8 +316,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df.index.name = 'code'
         df.to_csv(self.processed_paths[0])
         return df
-    
-    
+
+  
 class DavisKibaDataset(BaseDataset):
     def __init__(self, save_root='../data/DavisKibaDataset/', 
                  data_root='../data/davis_kiba/davis/', 

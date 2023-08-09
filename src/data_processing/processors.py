@@ -13,6 +13,7 @@ from collections import OrderedDict
 from ctypes import ArgumentError
 from typing import Callable, Iterable, List, Tuple
 from urllib.parse import quote
+import numpy as np
 import requests as r
 import os, re
 
@@ -21,8 +22,6 @@ from tqdm import tqdm
 from rdkit import Chem
 from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
-
-from src.feature_extraction.utils import ResInfo
 
 class Processor:    
     @staticmethod
@@ -37,6 +36,90 @@ class Processor:
             f.write('protID,prot_seq\n')
             for k,v in prot_dict.items():
                 f.write(f'{k},{v}\n')
+                
+    @staticmethod
+    def get_mutated_seq(seq: str, muts: List[str]) -> str:
+        """
+        IMPORTANT: Currently only works for substitution mutations.
+        
+        Given a protein sequence and a list of mutations, this returns the mutated sequence.
+        Mutations are given as list of strings of substitutions in the form:
+            '{ref}{pos}{mut}'
+            
+        e.g.: ['A10G', 'T20C']
+        
+        Throws an error if ref does not match the sequence at that position.
+        """
+        seq = list(seq)
+        for mut in muts:
+            ref, pos, mut = mut[0], int(mut[1:-1])-1, mut[-1]
+            assert seq[pos] == ref, f"Reference does not match sequence at position {pos}: {ref} != {seq[pos]}"
+            seq[pos] = mut
+        return ''.join(seq)
+            
+    @staticmethod    
+    def pdb_get_chains(pdb_file: str, check_missing=False) -> OrderedDict:
+        """
+        Reads a pdb file and returns a dict of dicts with the following structure:
+            {chain: {residue: {atom: np.array([x,y,z])}}}
+
+        Parameters
+        ----------
+        `pdb_file` : str
+            Path to pdb file
+        `check_missing` : bool, optional
+            Throws error if missing residues, by default True
+
+        Returns
+        -------
+        OrderedDict
+            Dict of dicts with the chain as the key and the value is a dict with the residue as the key
+        """
+        
+        # read and filter
+        with open(pdb_file, 'r') as f:
+            lines = f.readlines()
+            chains = OrderedDict() # chain dict of dicts
+            curr_res, prev_res = None, None
+            curr_chain, prev_chain = None, None
+            for line in lines:
+                if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
+                
+                prev_res, curr_res = curr_res, int(line[22:26])
+                prev_chain, curr_chain = curr_chain, line[21]
+                
+                # make sure res# is in order and not missing
+                if check_missing:
+                    if prev_chain != curr_chain: # new chain
+                        prev_res = None
+                    assert prev_res is None or \
+                        curr_res == prev_res or \
+                        curr_res == prev_res+1, \
+                            f"Invalid order or missing residues: {prev_res} -> {curr_res} in {pdb_file}"
+                                
+                # only want CA and CB atoms
+                atm_type = line[12:16].strip()
+                if atm_type not in ['CA', 'CB']: continue
+                icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
+                                # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
+                
+                # Glycine has no CB atom, so only CA is saved
+                res_key = f"{curr_res}_{icode}"            
+                chains.setdefault(curr_chain, OrderedDict())
+                assert atm_type not in chains[curr_chain].get(res_key, {}), \
+                        f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
+                
+                # adding atom to residue
+                x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
+                chains[curr_chain].setdefault(res_key, OrderedDict())[atm_type] = np.array([x,y,z])
+                
+                # Saving residue name
+                res_name = line[17:20].strip()
+                assert ("name" not in chains[curr_chain].get(res_key, {})) or \
+                    (chains[curr_chain][res_key]["name"] == res_name), \
+                                            f"Inconsistent residue name for residue {res_key} in {pdb_file}"
+                chains[curr_chain][res_key]["name"] = res_name
+        return chains
 
 class PDBbindProcessor(Processor):
     @staticmethod

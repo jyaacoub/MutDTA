@@ -8,6 +8,7 @@ from tqdm import tqdm
 import os, math
 import pandas as pd
 from src.feature_extraction.utils import ResInfo, one_hot
+from src.data_processing.processors import Processor
 
 ########################################################################
 ###################### Protein Feature Extraction ######################
@@ -260,65 +261,20 @@ def get_sequence(pdb_file: str, check_missing=False,
         check_missing (bool, optional): Adds check to ensure all residues are available. 
                                 Defaults to False.
         select_largest (bool, optional): If True, only the largest chain is used. Otherwise
-                    returns the first chain. Defaults to True.
+                    returns all chains. Defaults to True.
         
     Returns:
         Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
-    """
-
-    # read and filter
-    with open(pdb_file, 'r') as f:
-        lines = f.readlines()
-        chains = OrderedDict() # chain dict of dicts
-        ter = 0 # chain terminator
-        chains[0] = OrderedDict() # first chain
-        curr_res, prev_res = None, None
-        curr_chain = None
-        for line in lines:
-            if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
-                ter += 1
-                chains[ter] = OrderedDict()
-                curr_res, prev_res = None, None
-            
-            if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
-            curr_chain = line[21]
-            
-            # make sure res# is in order and not missing
-            prev_res = curr_res
-            curr_res = int(line[22:26])
-            if check_missing:
-                assert prev_res is None or \
-                    curr_res == prev_res or \
-                    curr_res == prev_res+1, \
-                        f"Invalid order or missing residues: {prev_res} -> {curr_res} in {pdb_file}"
-                            
-            # only want CA and CB atoms
-            atm_type = line[12:16].strip()
-            if atm_type not in ['CA', 'CB']: continue
-            icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
-                            # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
-            
-            # Glycine has no CB atom, so we save both 
-            key = f"{curr_res}_{icode}"
-            assert atm_type not in chains[ter].get(key, {}), f"Duplicate {atm_type} for residue {key} in {pdb_file}"
-            # adding atom to residue
-            chains[ter].setdefault(key, {})[atm_type] = np.array(
-                [float(line[30:38]), float(line[38:46]), float(line[46:54])])
-            
-            # Saving residue name
-            res_name = line[17:20].strip()
-            assert ("name" not in chains[ter].get(key, {})) or \
-                (chains[ter][key]["name"] == res_name), \
-                                        f"Inconsistent residue name for residue {key} in {pdb_file}"
-            chains[ter][key]["name"] = res_name
-            
-    # getting sequence of largest chain
-    chain_opt = 0
-    if select_largest:
-        for i in range(len(chains)):
-            if len(chains[i]) > len(chains[chain_opt]): chain_opt = i
         
-    return_chain = chains[chain_opt]
+    """
+    # getting residue chain dict
+    chains = Processor.pdb_get_chains(pdb_file, check_missing)
+    
+    return_chain = next(iter(chains.values())) # first chain
+    # getting sequence of largest chain
+    if select_largest:
+        return_chain = max(chains.values(), key=lambda x: len(x))
+        
     seq = '' # sequence of residues based on pdb file
     for res in return_chain:
         seq += ResInfo.pep_to_code[return_chain[res]["name"]]

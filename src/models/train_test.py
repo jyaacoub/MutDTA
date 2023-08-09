@@ -199,3 +199,4 @@ def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
                                     'train_loss': logs['train_loss'][-1],
                                     'val_loss': logs['val_loss'][-1]}
     return model_results
+

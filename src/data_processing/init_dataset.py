@@ -8,7 +8,7 @@ sys.path.append(PROJECT_ROOT)
 
 
 from src.feature_extraction.process_msa import create_pfm_np_files
-from src.data_processing import DavisKibaDataset
+from src.data_processing.datasets import DavisKibaDataset
 
 if __name__ == "__main__":
     datas = ['davis', 'kiba']
