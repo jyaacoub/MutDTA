@@ -1,3 +1,4 @@
+#%%
 import argparse
 
 # Define the options for data_opt and FEATURE_opt
@@ -63,8 +64,17 @@ parser.add_argument('-D',
     help='Enters debug mode, no training is done, just model initialization.'
 )
 
-# Parse the arguments from the command line
-args = parser.parse_args()
+#%% Parse the arguments from the command line
+try:
+    if get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
+        # Jupyter notebook
+        in_args = '-m DG DGI ED EDI -d davis -f nomsa -e simple -D'.split()
+        args = parser.parse_args(args=in_args)
+    else:  
+        args = parser.parse_args()
+except NameError:
+    # Python script
+    args = parser.parse_args()
 
 # Access the selected options
 model_opt = args.model_opt
@@ -141,10 +151,10 @@ metrics = {}
 for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge_opt, model_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
     
-    MODEL_KEY = f'{MODEL}m_{DATA}d_{FEATURE}f_{EDGEW}e_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
+    MODEL_KEY = f'{MODEL}M_{DATA}D_{FEATURE}F_{EDGEW}E_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
     # MODEL_KEY = f'DG_kiba_64B_0.0001LR_0.4D_2000E_{FEATURE}F'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
-    print(f'{MODEL_KEY} \n')
+    print(f'# {MODEL_KEY} \n')
 
     # loading data
     if DATA == 'PDBbind':
@@ -163,7 +173,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
                 cmap_threshold=-0.5, 
                 feature_opt=FEATURE
                 )
-    print(f'-\tNumber of samples: {len(dataset)}')
+    print(f'# Number of samples: {len(dataset)}')
 
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                         train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
@@ -173,14 +183,15 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
 
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(f'-\tDevice: {device}')
+    print(f'#Device: {device}')
 
     num_feat_pro = 54 if 'msa' in FEATURE else 34
     if MODEL == 'DG':
-        model = DGraphDTA(num_features_pro=num_feat_pro, dropout=DROPOUT)
+        model = DGraphDTA(num_features_pro=num_feat_pro, 
+                          dropout=DROPOUT, edge_weight_opt=EDGEW)
     elif MODEL == 'DGI':
         model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                            dropout=DROPOUT)
+                                  dropout=DROPOUT, edge_weight_opt=EDGEW)
     elif MODEL == 'ED':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                        num_features_pro=320, # only esm features
@@ -221,7 +232,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
     # check if model has already been trained:
     logs = None
     if os.path.exists(cp_saver.save_path):
-        print('-\tModel already trained')
+        print('# Model already trained')
         # load ckpnt
         model.load_state_dict(torch.load(cp_saver.save_path, 
                                          map_location=device))
@@ -244,7 +255,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
             
     # testing
     loss, pred, actual = test(model, test_loader, device)
-    print(f'-\tTest loss: {loss}')
+    print(f'# Test loss: {loss}')
     get_metrics(actual, pred,
                 save_results=SAVE_RESULTS,
                 save_path=media_save_p,
@@ -271,3 +282,5 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
         if SHOW_PLOTS: plt.show()
     plt.clf()
     
+
+# %%

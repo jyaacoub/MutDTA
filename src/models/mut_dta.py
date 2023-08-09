@@ -66,12 +66,12 @@ class EsmAttentionDTA(BaseModel):
         
         esm_emb = self.esm_mdl(**seq_tok).last_hidden_state # [B, L_max+2, emb_dim]
         x = self.pro_encode(esm_emb, 
-                            mask=torch.tensor(seq_tok['attention_mask'], dtype=torch.bool))
+                            src_key_padding_mask=~seq_tok['attention_mask'].bool().T)
         
         # [B, L_max+2, emb_dim]
         # pool data -> [B, emb_dim]
         x = torch.mean(x, dim=1)
-        return esm_emb
+        return x
         
     def forward_mol(self, data):
         x = self.mol_conv1(data.x, data.edge_index)

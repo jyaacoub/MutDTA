@@ -9,6 +9,7 @@ e.g.: here we might want to use prep_save_data to get the X and Y csv files for 
 """
 
 from argparse import ArgumentError as ArgError
+from collections import OrderedDict
 from ctypes import ArgumentError
 from typing import Callable, Iterable, List, Tuple
 from urllib.parse import quote
@@ -20,6 +21,8 @@ from tqdm import tqdm
 from rdkit import Chem
 from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
+
+from src.feature_extraction.utils import ResInfo
 
 class Processor:    
     @staticmethod
@@ -34,7 +37,6 @@ class Processor:
             f.write('protID,prot_seq\n')
             for k,v in prot_dict.items():
                 f.write(f'{k},{v}\n')
-                
 
 class PDBbindProcessor(Processor):
     @staticmethod
@@ -173,8 +175,7 @@ class PDBbindProcessor(Processor):
         df.index.name = 'PDBCode'
         
         return df
-        
-    
+         
     @staticmethod
     def get_binding_data(index_data_file : str) -> pd.DataFrame:
         """

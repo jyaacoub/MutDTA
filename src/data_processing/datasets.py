@@ -60,7 +60,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
-        
+    
+    @property
+    def raw_dir(self) -> str:
+        return self.data_root
+    
     @abc.abstractmethod
     def cmap_p(self, code):
         raise NotImplementedError
@@ -223,14 +227,18 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
 
             "INDEX_general_PL_name.2020": List of the "general set" of protein-small 
             ligand complexes with protein names and UniProt IDs.
+            
+        Paths are accessed via self.raw_paths attribute, which adds the raw_dir to the
+        file names. For example:
+            self.raw_paths[0] = self.raw_dir + '/index/INDEX_general_PL_data.2020'
 
         Returns
         -------
         List[str]
             List of file names.
         """
-        return [f'{self.data_root}/index/INDEX_general_PL_data.2020', 
-                f'{self.data_root}/index/INDEX_general_PL_name.2020']
+        return ['index/INDEX_general_PL_data.2020', 
+                'index/INDEX_general_PL_name.2020']
         
     def pre_process(self):
         """
@@ -284,11 +292,11 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_seq.index.name = 'PDBCode'
         
         # Get binding data:
-        df_binding = PDBbindProcessor.get_binding_data(self.raw_file_names[0])
+        df_binding = PDBbindProcessor.get_binding_data(self.raw_paths[0]) # _data.2020
         df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
         
         # Get prot ids data:
-        df_pid = PDBbindProcessor.get_name_data(self.raw_file_names[1])
+        df_pid = PDBbindProcessor.get_name_data(self.raw_paths[1]) # _name.2020
         df_pid.drop(columns=['release_year','prot_name'], inplace=True)
         # contains col: prot_id
         # some might not have prot_ids available so we need to use PDBcode as id instead
@@ -366,9 +374,9 @@ class DavisKibaDataset(BaseDataset):
         List[str]
             List of file names.
         """
-        return [f'{self.data_root}/proteins.txt',
-                f'{self.data_root}/ligands_can.txt',
-                f'{self.data_root}/Y']
+        return ['proteins.txt',
+                'ligands_can.txt',
+                'Y']
     
     def pre_process(self):
         """
@@ -385,17 +393,17 @@ class DavisKibaDataset(BaseDataset):
         pd.DataFrame
             The XY.csv dataframe.
         """
-        prot_seq = json.load(open(f'{self.data_root}/proteins.txt', 'r'), object_hook=OrderedDict)
+        prot_seq = json.load(open(self.raw_paths[0], 'r'), object_hook=OrderedDict)
         codes = list(prot_seq.keys())
         prot_seq = list(prot_seq.values())
         
         # get ligand sequences (order is important since they are indexed by row in affinity matrix):
-        ligand_seq = json.load(open(f'{self.data_root}/ligands_can.txt', 'r'), 
+        ligand_seq = json.load(open(self.raw_paths[1], 'r'), 
                                object_hook=OrderedDict)
         ligand_seq = list(ligand_seq.values())
         
         # Get binding data:
-        affinity_mat = pickle.load(open(f'{self.data_root}/Y', 'rb'), encoding='latin1')
+        affinity_mat = pickle.load(open(self.raw_paths[2], 'rb'), encoding='latin1')
         lig_r, prot_c = np.where(~np.isnan(affinity_mat)) # index values corresponding to non-nan values
         
         # checking alignment files present for each code:
