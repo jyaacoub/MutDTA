@@ -153,8 +153,12 @@ metrics = {}
 for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge_opt, model_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
     
-    MODEL_KEY = f'{MODEL}M_{DATA}D_{FEATURE}F_{EDGEW}E_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
-    # MODEL_KEY = f'DG_kiba_64B_0.0001LR_0.4D_2000E_{FEATURE}F'
+    if MODEL in ['EAT']: # no edgew or features for this model type
+        print('WARNING: edge weight and feature opt is not supported with the specified model.')
+        MODEL_KEY = f'{MODEL}M_{DATA}D_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
+    else:
+        MODEL_KEY = f'{MODEL}M_{DATA}D_{FEATURE}F_{EDGEW}E_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
+    
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'# {MODEL_KEY} \n')
 
