@@ -2,7 +2,7 @@
 import argparse
 
 # Define the options for data_opt and FEATURE_opt
-model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI']
+model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
 data_opt_choices = ['davis', 'kiba', 'PDBbind']
 feature_opt_choices = ['nomsa', 'msa', 'shannon']
 edge_opt_choices = ['simple', 'binary']
@@ -19,7 +19,8 @@ parser.add_argument('-m',
     help=f'Select one or more from {model_opt_choices} where I = "improved" and '+ \
         'A = "all features". For example: DG is DGraphDTA ' + \
         'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
-        'and EDA is the same but with esm_only set to False.'
+        'and EDA is the same but with esm_only set to False. Additional options:' + \
+        '\n\t- EAT: EsmAttentionDTA (no graph for protein rep)' 
 )
 
 # Add the argument for data_opt
@@ -68,7 +69,7 @@ parser.add_argument('-D',
 try:
     if get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
         # Jupyter notebook
-        in_args = '-m DG DGI ED EDI -d davis -f nomsa -e simple -D'.split()
+        in_args = '-m EAT -d davis -f nomsa -e simple -D'.split()
         args = parser.parse_args(args=in_args)
     else:  
         args = parser.parse_args()
@@ -106,7 +107,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.feature_extraction.protein import get_pfm
-from src.models.mut_dta import EsmDTA
+from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
 from src.data_processing import train_val_test_split
@@ -221,6 +222,10 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
                        dropout=DROPOUT,
                        esm_only=False,
                        edge_weight_opt=EDGEW)
+    elif MODEL == 'EAT':
+        # this model only needs protein sequence, no additional features.
+        model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                                dropout=DROPOUT)
     
     cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
     model.to(device)

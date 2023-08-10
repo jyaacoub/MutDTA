@@ -47,7 +47,10 @@ class EsmAttentionDTA(BaseModel):
         
         # final output
         self.fc_out = nn.Sequential(
-            nn.Linear(output_dim*2, 1024),
+            nn.Linear(output_dim*2, output_dim*4), #increase dim to minimize info loss due to ReLU
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(output_dim*4, 1024),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(1024, 512),
