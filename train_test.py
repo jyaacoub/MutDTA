@@ -131,7 +131,7 @@ np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
 
 # Tune Hyperparameters after grid search
-BATCH_SIZE = 10
+BATCH_SIZE = 64
 LEARNING_RATE = 0.0001
 DROPOUT = 0.4
 NUM_EPOCHS = 2000
@@ -160,9 +160,10 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
     
     print(f'# {MODEL_KEY} \n')
     
-    media_save_p = f'{media_save_dir}/{DATA}/'
+    media_save_p = f'{media_save_dir}/davis_kiba/' if DATA in ['davis', 'kiba'] else f'{media_save_dir}/{DATA}/'
+    print(f'    Saving media to: {media_save_p}')
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
-    model_save_p = f'{model_save_dir}/{DATA}/{MODEL_KEY}.model'
+    model_save_p = f'{model_save_dir}/{MODEL_KEY}.model'
 
     # loading data
     if DATA == 'PDBbind':
