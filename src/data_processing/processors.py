@@ -23,6 +23,8 @@ from rdkit import Chem
 from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
 
+from src.feature_extraction.utils import ResInfo
+
 class Processor:    
     @staticmethod
     def save_prot_seq(prot_dict: dict, save_path="data/prot_seq.csv", overwrite=False) -> None:
@@ -36,26 +38,48 @@ class Processor:
             f.write('protID,prot_seq\n')
             for k,v in prot_dict.items():
                 f.write(f'{k},{v}\n')
-                
+    
     @staticmethod
-    def get_mutated_seq(seq: str, muts: List[str]) -> str:
+    def get_mutated_seq(chain: OrderedDict, muts: List[str]) -> Tuple[str, str]:
         """
+        Given the protein chain dict and a list of mutations, this returns the 
+        mutated and reference sequences.
+        
         IMPORTANT: Currently only works for substitution mutations.
-        
-        Given a protein sequence and a list of mutations, this returns the mutated sequence.
-        Mutations are given as list of strings of substitutions in the form:
-            '{ref}{pos}{mut}'
-            
-        e.g.: ['A10G', 'T20C']
-        
-        Throws an error if ref does not match the sequence at that position.
+
+        Parameters
+        ----------
+        `chain` : OrderedDict
+            The chain dict of dicts (see `pdb_get_chains`)
+        `muts` : List[str]
+            List of mutations in the form '{ref}{pos}{mut}' e.g.: ['A10G', 'T20C']
+
+        Returns
+        -------
+        Tuple[str, str]
+            The mutated and reference sequences, respectively.
         """
-        seq = list(seq)
+        mut_dict = OrderedDict()
         for mut in muts:
-            ref, pos, mut = mut[0], int(mut[1:-1])-1, mut[-1]
-            assert seq[pos] == ref or seq[pos] == mut, f"Reference does not match sequence at position {pos}: {ref} != {seq[pos]}"
-            seq[pos] = mut
-        return ''.join(seq)
+            ref, pos, mut = mut[0], mut[1:-1], mut[-1]
+            mut_dict[pos] = (ref, mut)
+        
+        mut_seq = ''
+        ref_seq = ''
+        for res_id, res in chain.items():
+            ref_actual = ResInfo.pep_to_code[res['name']]
+            res_num = res_id.split('_')[0] # remove icode
+            
+            ref, mut = mut_dict.get(res_num, (ref_actual, ref_actual))
+            
+            assert ref == ref_actual or ref_actual == mut, \
+                'Reference does not match sequence at position ' + \
+                f'{res_num}: {ref} != {ref_actual}'
+            
+            mut_seq += mut
+            ref_seq += ref
+            
+        return mut_seq, ref_seq
             
     @staticmethod    
     def pdb_get_chains(pdb_file: str, check_missing=False) -> OrderedDict:

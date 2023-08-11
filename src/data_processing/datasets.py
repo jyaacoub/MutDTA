@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from src.feature_extraction import smile_to_graph, target_to_graph
 from src.feature_extraction.utils import ResInfo
-from src.feature_extraction.protein import create_save_cmaps, get_contact_map
+from src.feature_extraction.ligand import smile_to_graph
+from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
 
@@ -498,7 +498,8 @@ class PlatinumDataset(BaseDataset):
         return os.path.join(self.raw_dir, 'contact_maps', f'{code}.npy')
     
     def aln_p(self, code):
-        raise NotImplementedError('Platinum dataset does not have MSA alignments.')
+        return None # no support for MSA alignments
+        # raise NotImplementedError('Platinum dataset does not have MSA alignments.')
     
     @property
     def raw_file_names(self):
@@ -571,15 +572,12 @@ class PlatinumDataset(BaseDataset):
             # getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
                 cmap = get_contact_map(chains[t_chain])
-                np.save(self.cmap_p(pdb), cmap)
+                np.save(self.cmap_p(i), cmap)
             
-            ref_seq = ''
-            for res, v in chains[t_chain].items():
-                ref_seq += ResInfo.pep_to_code[v["name"]]
-                
+            mut_seq, ref_seq = PDBbindProcessor.get_mutated_seq(chains[t_chain], 
+                                                                mut.split('/'))
             # getting mutated sequence:
             if self.mutated:
-                mut_seq = PDBbindProcessor.get_mutated_seq(ref_seq, mut.split('/'))
                 prot_seq[i] = (pdb, mut_seq)
             else:
                 prot_seq[i] = (pdb, ref_seq)
