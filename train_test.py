@@ -65,6 +65,41 @@ parser.add_argument('-D',
     help='Enters debug mode, no training is done, just model initialization.'
 )
 
+
+# hyperparameter options
+parser.add_argument('-bs',
+    '--batch_size',
+    action='store',
+    type=int,
+    default=64,
+    help='Batch size for training (default: 64)'
+)
+
+parser.add_argument('-lr',
+    '--learning_rate',
+    action='store',
+    type=float,
+    default=0.0001,
+    help='Learning rate for training (default: 0.0001)'
+)
+
+parser.add_argument('-do',
+    '--dropout',
+    action='store',
+    type=float,
+    default=0.4,
+    help='Dropout rate for training (default: 0.4)'
+)
+
+parser.add_argument('-ne',
+    '--num_epochs',
+    action='store',
+    type=int,
+    default=2000,
+    help='Number of epochs for training (default: 2000)'
+)
+
+
 #%% Parse the arguments from the command line
 try:
     if get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
@@ -93,6 +128,24 @@ print(f" Selected feature_opt list: {feature_opt}")
 print(f"    Selected edge_opt list: {edge_opt}")
 print(f"           forced training: {FORCE_TRAINING}")
 
+# Dataset Hyperparameters
+TRAIN_SPLIT= .8 # 80% of data for training
+VAL_SPLIT = .1 # 10% for val and remaining is for testing (10%)
+SHUFFLE_DATA = True
+RAND_SEED = 0
+
+# Model Hyperparameters
+BATCH_SIZE = args.batch_size
+LEARNING_RATE = args.learning_rate
+DROPOUT = args.dropout
+NUM_EPOCHS = args.num_epochs
+
+print(f"----------------- HYPERPARAMETERS -----------------")
+print(f"               Batch size: {BATCH_SIZE}")
+print(f"            Learning rate: {LEARNING_RATE}")
+print(f"                  Dropout: {DROPOUT}")
+print(f"               Num epochs: {NUM_EPOCHS}")
+
 #%%
 import os, random, itertools, math, json, argparse
 import config
@@ -120,21 +173,9 @@ print_device_info(device)
 
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 
-# Dataset Hyperparameters
-TRAIN_SPLIT= .8 # 80% of data for training
-VAL_SPLIT = .1 # 10% for val and remaining is for testing (10%)
-SHUFFLE_DATA = True
-RAND_SEED = 0
-
 random.seed(RAND_SEED)
 np.random.seed(RAND_SEED)
 torch.manual_seed(RAND_SEED)
-
-# Tune Hyperparameters after grid search
-BATCH_SIZE = 64
-LEARNING_RATE = 0.0001
-DROPOUT = 0.4
-NUM_EPOCHS = 2000
 
 SAVE_RESULTS = True
 SHOW_PLOTS = False
