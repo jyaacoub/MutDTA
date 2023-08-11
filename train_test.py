@@ -138,8 +138,8 @@ NUM_EPOCHS = 2000
 
 SAVE_RESULTS = True
 SHOW_PLOTS = False
-media_save_p = 'results/model_media/davis_kiba/'
-model_save_p = 'results/model_checkpoints/ours/'
+media_save_dir = 'results/model_media/'
+model_save_dir = 'results/model_checkpoints/ours/'
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False,
@@ -152,15 +152,17 @@ metrics = {}
 
 for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge_opt, model_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
-    
     if MODEL in ['EAT']: # no edgew or features for this model type
         print('WARNING: edge weight and feature opt is not supported with the specified model.')
         MODEL_KEY = f'{MODEL}M_{DATA}D_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
     else:
         MODEL_KEY = f'{MODEL}M_{DATA}D_{FEATURE}F_{EDGEW}E_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
     
-    logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     print(f'# {MODEL_KEY} \n')
+    
+    media_save_p = f'{media_save_dir}/{DATA}/'
+    logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
+    model_save_p = f'{model_save_dir}/{DATA}/{MODEL_KEY}.model'
 
     # loading data
     if DATA == 'PDBbind':
@@ -210,7 +212,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
                        num_features_pro=320+num_feat_pro, # esm features + other features
                        pro_emb_dim=54, # inital embedding size after first GCN layer
                        dropout=DROPOUT,
-                       esm_only=False,
+                       esm_only=False, # false to include all feats
                        edge_weight_opt=EDGEW)
     elif MODEL == 'EDI':
         model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
@@ -231,7 +233,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
         model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                                 dropout=DROPOUT)
     
-    cp_saver.new_model(model, save_path=f'{model_save_p}/{MODEL_KEY}.model')
+    cp_saver.new_model(model, save_path=model_save_p)
     model.to(device)
     
     if DEBUG: 
@@ -246,7 +248,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
         # load ckpnt
         model.load_state_dict(torch.load(cp_saver.save_path, 
                                          map_location=device))
-        # loading logs for plotting 
+        # loading logs for plotting
         if os.path.exists(logs_out_p):
             with open(logs_out_p, 'r') as f:
                 logs = json.load(f)
@@ -259,6 +261,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
         # load best model for testing
         model.load_state_dict(cp_saver.best_model_dict) 
         # save training logs for plotting later
+        os.makedirs(os.path.dirname(logs_out_p), exist_ok=True)
         with open(logs_out_p, 'w') as f:
             json.dump(logs, f, indent=4)
         
