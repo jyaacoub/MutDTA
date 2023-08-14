@@ -126,7 +126,7 @@ print(f"     Selected og_model_opt: {model_opt}")
 print(f"         Selected data_opt: {data_opt}")
 print(f" Selected feature_opt list: {feature_opt}")
 print(f"    Selected edge_opt list: {edge_opt}")
-print(f"           forced training: {FORCE_TRAINING}")
+print(f"           forced training: {FORCE_TRAINING}\n")
 
 # Dataset Hyperparameters
 TRAIN_SPLIT= .8 # 80% of data for training
@@ -144,7 +144,7 @@ print(f"----------------- HYPERPARAMETERS -----------------")
 print(f"               Batch size: {BATCH_SIZE}")
 print(f"            Learning rate: {LEARNING_RATE}")
 print(f"                  Dropout: {DROPOUT}")
-print(f"               Num epochs: {NUM_EPOCHS}")
+print(f"               Num epochs: {NUM_EPOCHS}\n")
 
 #%%
 import os, random, itertools, math, json, argparse
@@ -201,6 +201,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
     
     print(f'# {MODEL_KEY} \n')
     
+    #TODO: change this to split up davis and kiba dataset folders
     media_save_p = f'{media_save_dir}/davis_kiba/' if DATA in ['davis', 'kiba'] else f'{media_save_dir}/{DATA}/'
     print(f'    Saving media to: {media_save_p}')
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
