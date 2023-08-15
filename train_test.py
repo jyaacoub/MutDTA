@@ -201,11 +201,13 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
     
     print(f'# {MODEL_KEY} \n')
     
-    #TODO: change this to split up davis and kiba dataset folders
-    media_save_p = f'{media_save_dir}/davis_kiba/' if DATA in ['davis', 'kiba'] else f'{media_save_dir}/{DATA}/'
+    media_save_p = f'{media_save_dir}/{DATA}/'
     print(f'    Saving media to: {media_save_p}')
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     model_save_p = f'{model_save_dir}/{MODEL_KEY}.model'
+    # create paths if they dont exist already:
+    os.makedirs(media_save_p, exist_ok=True)
+    os.makedirs(f'{media_save_p}/train_log/', exist_ok=True)
 
     # loading data
     if DATA == 'PDBbind':
@@ -276,8 +278,8 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(data_opt, feature_opt, edge
         model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                                 dropout=DROPOUT)
     
-    cp_saver.new_model(model, save_path=model_save_p)
     model.to(device)
+    cp_saver.new_model(model, save_path=model_save_p)
     
     if DEBUG: 
         # run single batch through model
