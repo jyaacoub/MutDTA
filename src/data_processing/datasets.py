@@ -1,5 +1,8 @@
 from collections import Counter, OrderedDict
 import json, pickle, re, os, abc
+import tarfile
+import requests
+import urllib.request
 
 import torch
 import torch_geometric as torchg
@@ -7,16 +10,17 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from src.feature_extraction import smile_to_graph, target_to_graph
+from src.feature_extraction.utils import ResInfo
+from src.feature_extraction.ligand import smile_to_graph
+from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
 from src.feature_extraction.process_msa import check_aln_lines
-from src.feature_extraction.protein import create_save_cmaps
-from src.data_processing import PDBbindProcessor
+from src.data_processing.processors import PDBbindProcessor
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, shannon=True, *args, **kwargs):
+                 cmap_threshold:float, feature_opt='nomsa', *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -38,21 +42,29 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
-        `shannon` : bool, optional
-            If True, shannon entropy instead of PSSM matrix is used for 
-            protein features, by default False.
+        `feature_opt` : bool, optional
+            choose from ['nomsa', 'msa', 'shannon']
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
         self.data_root = data_root
-        self.aln_dir =  aln_dir # path to sequence alignments
-            
         self.cmap_threshold = cmap_threshold
-        self.shannon = shannon
+            
+        self.shannon = False
         
+        if feature_opt == 'nomsa':# FINISH THIS AND TRAIN PDBBIND...
+            self.aln_dir = None # none treats it as np.zeros
+        elif feature_opt == 'msa':
+            self.aln_dir =  aln_dir # path to sequence alignments
+        elif feature_opt == 'shannon':
+            self.aln_dir = aln_dir
+            self.shannon = True
+        else:
+            raise Exception("Invalid feature_opt please pick from nomsa, msa, shannon")
+            
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
-        
+    
     @abc.abstractmethod
     def cmap_p(self, code):
         raise NotImplementedError
@@ -61,6 +73,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def aln_p(self, code):
         # path to cleaned input alignment file
         raise NotImplementedError
+    
+    @property
+    def raw_dir(self) -> str:
+        return self.data_root
     
     @property
     def processed_file_names(self):
@@ -168,7 +184,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
     def __init__(self, save_root='../data/PDBbindDataset/nomsa', 
                  data_root='../data/v2020-other-PL', 
                  aln_dir=None,
-                 cmap_threshold=8.0, shannon=False, *args, **kwargs):
+                 cmap_threshold=8.0, feature_opt='nomsa', *args, **kwargs):
         """
         Subclass of `torch_geometric.data.InMemoryDataset`.
         Dataset for PDBbind data. This dataset is used to train graph models.
@@ -185,25 +201,24 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             done and is set to zeros, by default None.
         `cmap_threshold` : float, optional
             Threshold for contact map creation, by default 8.0
-        `shannon` : bool, optional
-            If True, shannon entropy instead of PSSM matrix is used for 
-            protein features, by default False.
+        `feature_opt` : bool, optional
+            choose from ['nomsa', 'msa', 'shannon']
             
         *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """   
         super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
-                                             shannon=shannon, *args, **kwargs)
+                                             feature_opt=feature_opt, *args, **kwargs)
     
     def cmap_p(self, code):
-        return f'{self.data_root}/{code}/{code}.npy'
+        return os.path.join(self.data_root, code, f'{code}.npy')
     
     def aln_p(self, code):
         # see feature_extraction/process_msa.py for details on how the alignments are cleaned
         if self.aln_dir is None:
             # dont use aln if none provided (will set to zeros)
             return None
-        return f'{self.aln_dir}/{code}_cleaned.a3m'
+        return os.path.join(self.aln_dir, f'{code}_cleaned.a3m')
         
     # for data augmentation override the transform method
     @property
@@ -216,6 +231,10 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
 
             "INDEX_general_PL_name.2020": List of the "general set" of protein-small 
             ligand complexes with protein names and UniProt IDs.
+            
+        Paths are accessed via self.raw_paths attribute, which adds the raw_dir to the
+        file names. For example:
+            self.raw_paths[0] = self.raw_dir + '/index/INDEX_general_PL_data.2020'
 
         Returns
         -------
@@ -231,7 +250,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         It creates a XY.csv file that contains the binding data and the sequences for 
         both ligand and proteins. with the following columns: 
-        PDBCode,resolution,release_year,pkd,lig_name
+        code,SMILE,pkd,prot_seq,prot_id
         
         It also generates and saves contact maps for each protein in the dataset.
 
@@ -255,7 +274,19 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
         
-        # creating contact maps:
+        # Extracting SMILE strings:
+        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
+                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
+        df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
+        df_smi.index.name = 'PDBCode'
+        
+        df_smi = df_smi[df_smi.SMILE.notna()]
+        num_missing = len(pdb_codes) - len(df_smi)
+        if  num_missing > 0:
+            print(f'\t{num_missing} ligands failed to get SMILEs')
+            pdb_codes = list(df_smi.index)
+            
+        # Getting protein seq & contact maps:
         seqs = create_save_cmaps(pdb_codes,
                           pdb_p=lambda x: f'{self.data_root}/{x}/{x}_protein.pdb',
                           cmap_p=self.cmap_p)
@@ -264,39 +295,34 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
         df_seq.index.name = 'PDBCode'
         
-        # getting ligand sequences:
-        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
-                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
-        df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
-        df_smi.index.name = 'PDBCode'
-        
         # Get binding data:
-        df_binding = PDBbindProcessor.get_binding_data(self.raw_file_names[0])
+        df_binding = PDBbindProcessor.get_binding_data(self.raw_paths[0]) # _data.2020
         df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
         
         # Get prot ids data:
-        df_pid = PDBbindProcessor.get_name_data(self.raw_file_names[1])
+        df_pid = PDBbindProcessor.get_name_data(self.raw_paths[1]) # _name.2020
         df_pid.drop(columns=['release_year','prot_name'], inplace=True)
         # contains col: prot_id
-        
+        # some might not have prot_ids available so we need to use PDBcode as id instead
+        missing_pid = df_pid.prot_id == '------'
+        df_pid[missing_pid] = df_pid[missing_pid].assign(prot_id = df_pid[missing_pid].index)
         
         # merging dataframes:
-        df_binding.merge(df_pid, on='PDBCode')
-        
-        df = df_smi[df_smi.SMILE.notna()].merge(df_binding, on='PDBCode')
-        df = df.merge(df_seq, on='PDBCode')
+        df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
+        df = df.merge(df_smi, on='PDBCode') # + smiles
+        df = df.merge(df_seq, on='PDBCode') # + prot_seq
         
         # changing index name to code (to match with super class):
         df.index.name = 'code'
         df.to_csv(self.processed_paths[0])
         return df
-    
-    
+
+  
 class DavisKibaDataset(BaseDataset):
     def __init__(self, save_root='../data/DavisKibaDataset/', 
                  data_root='../data/davis_kiba/davis/', 
                  aln_dir='../data/davis_kiba/davis/aln/',
-                 cmap_threshold=-0.5, shannon=True, *args, **kwargs):
+                 cmap_threshold=-0.5, feature_opt='nomsa', *args, **kwargs):
         """
         InMemoryDataset for davis or kiba. This dataset is used to train graph models.
 
@@ -314,18 +340,16 @@ class DavisKibaDataset(BaseDataset):
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
-        `shannon` : bool, optional
-            If True, shannon entropy instead of PSSM matrix is used for 
-            protein features, by default False.
-            
+        `feature_opt` : bool, optional
+            choose from ['nomsa', 'msa', 'shannon']
         *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
         """
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
-                                               shannon=shannon, *args, **kwargs)
+                                               feature_opt=feature_opt, *args, **kwargs)
     
     def cmap_p(self, code):
-        return f'{self.data_root}/pconsc4/{code}.npy'
+        return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
     
     def aln_p(self, code):
         # using existing cleaned alignment files
@@ -333,7 +357,7 @@ class DavisKibaDataset(BaseDataset):
         if self.aln_dir is None:
             # dont use aln if none provided (will set to zeros)
             return None
-        return f'{self.aln_dir}/{code}.aln'
+        return os.path.join(self.aln_dir, f'{code}.a3m')
     
     @property
     def raw_file_names(self):
@@ -354,9 +378,9 @@ class DavisKibaDataset(BaseDataset):
         List[str]
             List of file names.
         """
-        return [f'{self.data_root}/proteins.txt',
-                f'{self.data_root}/ligands_can.txt',
-                f'{self.data_root}/Y']
+        return ['proteins.txt',
+                'ligands_can.txt',
+                'Y']
     
     def pre_process(self):
         """
@@ -373,17 +397,17 @@ class DavisKibaDataset(BaseDataset):
         pd.DataFrame
             The XY.csv dataframe.
         """
-        prot_seq = json.load(open(f'{self.data_root}/proteins.txt', 'r'), object_hook=OrderedDict)
+        prot_seq = json.load(open(self.raw_paths[0], 'r'), object_hook=OrderedDict)
         codes = list(prot_seq.keys())
         prot_seq = list(prot_seq.values())
         
         # get ligand sequences (order is important since they are indexed by row in affinity matrix):
-        ligand_seq = json.load(open(f'{self.data_root}/ligands_can.txt', 'r'), 
+        ligand_seq = json.load(open(self.raw_paths[1], 'r'), 
                                object_hook=OrderedDict)
         ligand_seq = list(ligand_seq.values())
         
         # Get binding data:
-        affinity_mat = pickle.load(open(f'{self.data_root}/Y', 'rb'), encoding='latin1')
+        affinity_mat = pickle.load(open(self.raw_paths[2], 'rb'), encoding='latin1')
         lig_r, prot_c = np.where(~np.isnan(affinity_mat)) # index values corresponding to non-nan values
         
         # checking alignment files present for each code:
@@ -429,3 +453,161 @@ class DavisKibaDataset(BaseDataset):
         return df
     
     
+class PlatinumDataset(BaseDataset):
+    CSV_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_flat_file.csv'
+    PBD_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_processed_pdb_files.tar.gz'
+    def __init__(self, save_root: str, data_root: str, 
+                 aln_dir: str=None, cmap_threshold: float=8.0, 
+                 feature_opt='nomsa', mutated=True, *args, **kwargs):
+        """
+        Dataset class for the Platinum dataset.
+
+        Parameters
+        ----------
+        `save_root` : str
+            Where to save the processed data.
+        `data_root` : str
+            Where the raw data is stored from the Platinum dataset 
+            (from: https://biosig.lab.uq.edu.au/platinum/).
+        `aln_dir` : str, optional
+            MSA alignments for each protein in the dataset, by default None
+        `cmap_threshold` : float, optional
+            Threshold for contact map creation, by default 8.0
+        `feature_opt` : str, optional
+            Choose from ['nomsa', 'msa', 'shannon'], by default 'nomsa'
+        """
+        options = ['nomsa']
+        if feature_opt not in options:
+            raise ValueError(f'Invalid feature_opt: {feature_opt}. '+\
+                        f'Only {options} is currently supported for Platinum dataset.')
+        
+        # Platinum dataset is essentially two datasets in one
+        # (one for mutations and one for wildtype) and is why we need to
+        # specify mutations_only.
+        self.mutated = mutated # only use mutated sequences and data
+        if mutated:
+            save_root = save_root + '_mut'
+        
+        if aln_dir is not None:
+            print('WARNING: aln_dir is not used for Platinum dataset, no support for MSA alignments.')
+        
+        super().__init__(save_root, data_root, None, cmap_threshold, 
+                         feature_opt, *args, **kwargs)
+        
+    def cmap_p(self, code):
+        return os.path.join(self.raw_dir, 'contact_maps', f'{code}.npy')
+    
+    def aln_p(self, code):
+        return None # no support for MSA alignments
+        # raise NotImplementedError('Platinum dataset does not have MSA alignments.')
+    
+    @property
+    def raw_file_names(self):
+        """call by self.raw_paths to get the proper file paths"""
+        # in order of download/creation:
+        return ['platinum_flat_file.csv',# downloaded from website
+                'platinum_pdb']
+    
+    def download(self):
+        """Download the raw data for the dataset."""
+        if not os.path.isfile(self.raw_paths[0]):
+            print('CSV file not found, downloading from website...')
+            urllib.request.urlretrieve(self.CSV_LINK, self.raw_paths[0])
+        
+        df = pd.read_csv(self.raw_paths[0])
+        
+        # Downloading pdb files:
+        os.makedirs(self.raw_paths[1], exist_ok=True)
+        print('Downloading pdb files from PLATINUM website...')
+        try:
+            temp_fp, msg  = urllib.request.urlretrieve(self.PBD_LINK)
+            # check if successfully downloaded:
+            if msg['Content-Type'] != 'application/x-tar':
+                raise ValueError('Error downloading pdb files from PLATINUM website, '+\
+                    'content type is not tar.gz:\n' + str(msg))
+                # NOTE: alternate approach is to download directly from PDB using the pdb codes:
+                # pdb_status = Downloader.download_PDBs(df['affin.pdb_id'], self.raw_paths[1])
+                # print(f'Downloaded {len(pdb_status)} unique pdb files out of {len(df)}...')
+            else:
+                # extracting files:
+                with tarfile.open(temp_fp, 'r:gz') as tar:
+                    tar.extractall(self.raw_dir)
+            os.remove(temp_fp)
+        except requests.HTTPError as e:
+            raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
+        
+    def pre_process(self):
+        """
+        This method is used to create the processed data files for feature extraction.
+        
+        It creates a XY.csv file that contains the binding data and the sequences for 
+        both ligand and proteins. with the following columns: 
+        code,SMILE,pkd,prot_seq
+        
+        It generates and saves contact maps for each protein in the dataset.
+        
+        And also generates mutated sequences for each protein in the dataset.   
+
+        Returns
+        -------
+        pd.DataFrame
+            The XY.csv dataframe.
+        """
+        df_raw = pd.read_csv(self.raw_paths[0])
+        os.makedirs(os.path.join(self.raw_dir, 'contact_maps'), exist_ok=True)
+        
+        # Getting sequences and cmaps:
+        prot_seq = {}
+        for i, row in tqdm(df_raw.iterrows(), 
+                           desc='Getting sequences and cmaps',
+                           total=len(df_raw)):
+            mut = row['mutation']
+            pdb = row['affin.pdb_id']
+            t_chain = row['affin.chain']
+            
+            # getting sequence from pdb file:
+            pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
+            chains = PDBbindProcessor.pdb_get_chains(pdb_fp, check_missing=False)
+            
+            # getting and saving contact map:
+            if not os.path.isfile(self.cmap_p(pdb)):
+                cmap = get_contact_map(chains[t_chain])
+                np.save(self.cmap_p(i), cmap)
+            
+            mut_seq, ref_seq = PDBbindProcessor.get_mutated_seq(chains[t_chain], 
+                                                                mut.split('/'))
+            # getting mutated sequence:
+            if self.mutated:
+                prot_seq[i] = (pdb, mut_seq)
+            else:
+                prot_seq[i] = (pdb, ref_seq)
+                
+        df_seq = pd.DataFrame.from_dict(prot_seq, orient='index', 
+                                        columns=['prot_id', 'prot_seq'])
+        
+        # NOTE: ligand sequences and binding data are already in the csv file
+        # 'affin.lig_id', 'lig.canonical_smiles', 'affin.k_wt', 'affin.k_mt'
+        if self.mutated:
+            # parsing out '>' and '<' from binding data for pure numbers:
+            df_binding = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
+                                                      expand=False).astype(float)
+        else:
+            df_binding = df_raw['affin.k_wt']
+        
+        # adjusting units for binding data from nM to pKd:
+        df_binding = -np.log10(df_binding*1e-9)
+        
+        # merging dataframes:
+        df = pd.DataFrame({
+            'lig_id': df_raw['affin.lig_id'],
+            'prot_id': df_seq['prot_id'],
+            
+            'pkd': df_binding,
+            
+            'prot_seq': df_seq['prot_seq'],
+            'SMILE': df_raw['lig.canonical_smiles']
+        }, index=df_raw.index)
+        df.index.name = 'code'
+        
+        df.to_csv(self.processed_paths[0])
+        return df

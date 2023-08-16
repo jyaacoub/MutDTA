@@ -7,7 +7,8 @@ from tqdm import tqdm
 
 import os, math
 import pandas as pd
-from src.feature_extraction import ResInfo, one_hot
+from src.feature_extraction.utils import ResInfo, one_hot
+from src.data_processing.processors import Processor
 
 ########################################################################
 ###################### Protein Feature Extraction ######################
@@ -180,81 +181,7 @@ def residue_features(residue):
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
 
-def get_sequence(pdb_file: str, check_missing=False, 
-                 select_largest=True) -> Tuple[str, OrderedDict]:
-    """
-    Given a pdb file path this will return the residue sequence for that structure
-    (could be missing residues) and the residue dict in order of seq# that contains coords.
-
-    Args:
-        pdb_file (str): path to .pdb file to process.
-        check_missing (bool, optional): Adds check to ensure all residues are available. 
-                                Defaults to False.
-        select_largest (bool, optional): If True, only the largest chain is used. Otherwise
-                    returns the first chain. Defaults to True.
-        
-    Returns:
-        Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
-    """
-
-    # read and filter
-    with open(pdb_file, 'r') as f:
-        lines = f.readlines()
-        chains = OrderedDict() # chain dict of dicts
-        ter = 0 # chain terminator
-        chains[0] = OrderedDict() # first chain
-        curr_res, prev_res = None, None
-        for line in lines:
-            if (line[:6].strip() == 'TER'): # TER indicates new chain "terminator"
-                ter += 1
-                chains[ter] = OrderedDict()
-                curr_res, prev_res = None, None
-            
-            if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
-            
-            # make sure res# is in order and not missing
-            prev_res = curr_res
-            curr_res = int(line[22:26])
-            if check_missing:
-                assert prev_res is None or \
-                    curr_res == prev_res or \
-                    curr_res == prev_res+1, \
-                        f"Invalid order or missing residues: {prev_res} -> {curr_res} in {pdb_file}"
-                             
-            # only want CA and CB atoms
-            atm_type = line[12:16].strip()
-            if atm_type not in ['CA', 'CB']: continue
-            icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
-                             # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
-            
-            # Glycine has no CB atom, so we save both 
-            key = f"{curr_res}_{icode}"
-            assert atm_type not in chains[ter].get(key, {}), f"Duplicate {atm_type} for residue {key} in {pdb_file}"
-            # adding atom to residue
-            chains[ter].setdefault(key, {})[atm_type] = np.array(
-                [float(line[30:38]), float(line[38:46]), float(line[46:54])])
-            
-            # Saving residue name
-            assert ("name" not in chains[ter].get(key, {})) or \
-                (chains[ter][key]["name"] == line[17:20].strip()), \
-                                        f"Inconsistent residue name for residue {key} in {pdb_file}"
-            chains[ter][key]["name"] = line[17:20].strip()
-            
-    # getting sequence of largest chain
-    chain_opt = 0
-    if select_largest:
-        for i in range(len(chains)):
-            if len(chains[i]) > len(chains[chain_opt]): chain_opt = i
-        
-    return_chain = chains[chain_opt]
-    seq = '' # sequence of residues based on pdb file
-    for res in return_chain:
-        seq += ResInfo.pep_to_code[return_chain[res]["name"]]
-            
-    return seq, return_chain
-
-
-def get_contact(residues: OrderedDict, CA_only=True, check_missing=False,
+def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
                 display=False, title="Residue Contact Map") -> np.array:
     """
     Given the residue chain dict this will return the residue contact map for that structure.
@@ -323,6 +250,37 @@ def get_contact(residues: OrderedDict, CA_only=True, check_missing=False,
         
     return m
 
+def get_sequence(pdb_file: str, check_missing=False, 
+                select_largest=True) -> Tuple[str, OrderedDict]:
+    """
+    Given a pdb file path this will return the residue sequence for that structure
+    (could be missing residues) and the residue dict in order of seq# that contains coords.
+
+    Args:
+        pdb_file (str): path to .pdb file to process.
+        check_missing (bool, optional): Adds check to ensure all residues are available. 
+                                Defaults to False.
+        select_largest (bool, optional): If True, only the largest chain is used. Otherwise
+                    returns all chains. Defaults to True.
+        
+    Returns:
+        Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
+        
+    """
+    # getting residue chain dict
+    chains = Processor.pdb_get_chains(pdb_file, check_missing)
+    
+    return_chain = next(iter(chains.values())) # first chain
+    # getting sequence of largest chain
+    if select_largest:
+        return_chain = max(chains.values(), key=lambda x: len(x))
+        
+    seq = '' # sequence of residues based on pdb file
+    for res in return_chain:
+        seq += ResInfo.pep_to_code[return_chain[res]["name"]]
+            
+    return seq, return_chain
+
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
@@ -353,13 +311,13 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         dictionary of sequences for each pdbcode
     """
     seqs = {}
-    for code in tqdm(pdbcodes, 'Getting Sequences + Contact Maps'):
+    for code in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
         seqs[code], res = get_sequence(pdb_p(code), 
                                 check_missing=check_missing, 
                                 select_largest=True)
         # only get cmap if it doesnt exist
         if not os.path.isfile(cmap_p(code)):
-            cmap = get_contact(res,
+            cmap = get_contact_map(res,
                             CA_only=CA_only, # CB is needed by DGraphDTA
                             check_missing=check_missing)
             np.save(cmap_p(code), cmap)
@@ -372,7 +330,7 @@ def _save_cmap(args):
     # skip if already created
     if os.path.isfile(cmap_f): return
     _, res = get_sequence(pdb_f, check_missing=check_missing)
-    cmap = get_contact(res,
+    cmap = get_contact_map(res,
                     CA_only=CA_only, # CB is needed by DGraphDTA
                     check_missing=check_missing)
     np.save(cmap_f, cmap)
@@ -417,7 +375,7 @@ if __name__ == "__main__":
     for code in tqdm(os.listdir(PDBbind)[32:100]):
         if os.path.isdir(os.path.join(PDBbind, code)) and code not in ["index", "readme"]:
             try:
-                cmap, _ = get_contact(path(code), CA_only=True)
+                cmap, _ = get_contact_map(path(code), CA_only=True)
                 cmaps[code] = cmap
             except Exception as e:
                 print(code)

@@ -16,6 +16,94 @@ from src.models.utils import BaseModel
 from transformers import AutoTokenizer, EsmModel
 from transformers.utils import logging
 
+class EsmAttentionDTA(BaseModel):
+    def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
+                 num_features_pro=320, 
+                 num_features_mol=78, nhead_mol=8,
+                 output_dim=320, dropout=0.2):
+        super(EsmAttentionDTA, self).__init__()
+
+        # Mol graph:
+        self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
+        self.mol_conv2 = GCNConv(num_features_mol, num_features_mol * 2)
+        self.mol_conv3 = GCNConv(num_features_mol * 2, num_features_mol * 4)
+        self.mol_fc_g1 = nn.Linear(num_features_mol * 4, 1024)
+        self.mol_fc_g2 = nn.Linear(1024, output_dim)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+        
+        # protein encoding:
+        # this will raise a warning since lm head is missing but that is okay since we are not using it:
+        logging.set_verbosity(logging.CRITICAL)
+        self.esm_tok = AutoTokenizer.from_pretrained(esm_head)
+        self.esm_mdl = EsmModel.from_pretrained(esm_head)
+        self.esm_mdl.requires_grad_(False) # freeze weights
+        
+        self.pro_encode = nn.TransformerEncoder(
+            nn.TransformerEncoderLayer(d_model=num_features_pro, nhead=nhead_mol*2,
+                                       dim_feedforward=num_features_pro*4, dropout=0.2),
+            num_layers=4
+        )
+        
+        # final output
+        self.fc_out = nn.Sequential(
+            nn.Linear(output_dim*2, output_dim*4), #increase dim to minimize info loss due to ReLU
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(output_dim*4, 1024),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, 1) # 1 output (binding affinity)
+        )
+        
+    def forward_pro(self, data):
+        # cls and sep tokens are added to the sequence by the tokenizer
+        seq_tok = self.esm_tok(data.pro_seq, 
+                               return_tensors='pt', 
+                               padding=True) # [B, L_max+2]
+        seq_tok['input_ids'] = seq_tok['input_ids'].to(data.x.device)
+        seq_tok['attention_mask'] = seq_tok['attention_mask'].to(data.x.device)
+        
+        esm_emb = self.esm_mdl(**seq_tok).last_hidden_state # [B, L_max+2, emb_dim]
+        x = self.pro_encode(esm_emb, 
+                            src_key_padding_mask=~seq_tok['attention_mask'].bool().T)
+        
+        # [B, L_max+2, emb_dim]
+        # pool data -> [B, emb_dim]
+        x = torch.mean(x, dim=1)
+        return x
+        
+    def forward_mol(self, data):
+        x = self.mol_conv1(data.x, data.edge_index)
+        x = self.relu(x)
+
+        x = self.mol_conv2(x, data.edge_index)
+        x = self.relu(x)
+
+        x = self.mol_conv3(x, data.edge_index)
+        x = self.relu(x)
+        x = gep(x, data.batch)  # global pooling
+
+        # flatten
+        x = self.relu(self.mol_fc_g1(x))
+        x = self.dropout(x)
+        x = self.relu(self.mol_fc_g2(x))
+        x = self.dropout(x)
+        return x
+
+    def forward(self, data_pro, data_mol):
+        xm = self.forward_mol(data_mol)
+        xp = self.forward_pro(data_pro)
+
+        # concat
+        xc = torch.cat((xm, xp), 1)
+        
+        return self.fc_out(xc)
+        
+
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
@@ -72,8 +160,8 @@ class EsmDTA(BaseModel):
         mask = torch.arange(L_max)[None, :] < torch.tensor([len(seq) for seq in data.pro_seq])[:, None]
         mask = mask.flatten(0,1) # [B*L_max+1]
         
-        # flatten to [B*L_max+1, emb_dim]
-        esm_emb = esm_emb.flatten(0,1)
+        # flatten from [B, L_max+1, emb_dim] 
+        esm_emb = esm_emb.flatten(0,1) # to [B*L_max+1, emb_dim]
         esm_emb = esm_emb[mask] # [B*L, emb_dim]
         
         if self.esm_only:
@@ -125,7 +213,7 @@ class EsmDTA(BaseModel):
         # flatten
         x = self.relu(self.mol_fc_g1(x))
         x = self.dropout(x)
-        x = self.mol_fc_g2(x)
+        x = self.relu(self.mol_fc_g2(x))
         x = self.dropout(x)
         return x
 

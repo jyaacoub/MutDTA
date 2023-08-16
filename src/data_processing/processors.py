@@ -9,9 +9,11 @@ e.g.: here we might want to use prep_save_data to get the X and Y csv files for 
 """
 
 from argparse import ArgumentError as ArgError
+from collections import OrderedDict
 from ctypes import ArgumentError
 from typing import Callable, Iterable, List, Tuple
 from urllib.parse import quote
+import numpy as np
 import requests as r
 import os, re
 
@@ -20,6 +22,8 @@ from tqdm import tqdm
 from rdkit import Chem
 from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
+
+from src.feature_extraction.utils import ResInfo
 
 class Processor:    
     @staticmethod
@@ -34,7 +38,114 @@ class Processor:
             f.write('protID,prot_seq\n')
             for k,v in prot_dict.items():
                 f.write(f'{k},{v}\n')
+    
+    @staticmethod
+    def get_mutated_seq(chain: OrderedDict, muts: List[str]) -> Tuple[str, str]:
+        """
+        Given the protein chain dict and a list of mutations, this returns the 
+        mutated and reference sequences.
+        
+        IMPORTANT: Currently only works for substitution mutations.
+
+        Parameters
+        ----------
+        `chain` : OrderedDict
+            The chain dict of dicts (see `pdb_get_chains`)
+        `muts` : List[str]
+            List of mutations in the form '{ref}{pos}{mut}' e.g.: ['A10G', 'T20C']
+
+        Returns
+        -------
+        Tuple[str, str]
+            The mutated and reference sequences, respectively.
+        """
+        mut_dict = OrderedDict()
+        for mut in muts:
+            ref, pos, mut = mut[0], mut[1:-1], mut[-1]
+            mut_dict[pos] = (ref, mut)
+        
+        mut_seq = ''
+        ref_seq = ''
+        for res_id, res in chain.items():
+            ref_actual = ResInfo.pep_to_code[res['name']]
+            res_num = res_id.split('_')[0] # remove icode
+            
+            ref, mut = mut_dict.get(res_num, (ref_actual, ref_actual))
+            
+            assert ref == ref_actual or ref_actual == mut, \
+                'Reference does not match sequence at position ' + \
+                f'{res_num}: {ref} != {ref_actual}'
+            
+            mut_seq += mut
+            ref_seq += ref
+            
+        return mut_seq, ref_seq
+            
+    @staticmethod    
+    def pdb_get_chains(pdb_file: str, check_missing=False) -> OrderedDict:
+        """
+        Reads a pdb file and returns a dict of dicts with the following structure:
+            {chain: {residue: {atom: np.array([x,y,z])}}}
+
+        Parameters
+        ----------
+        `pdb_file` : str
+            Path to pdb file
+        `check_missing` : bool, optional
+            Throws error if missing residues, by default True
+
+        Returns
+        -------
+        OrderedDict
+            Dict of dicts with the chain as the key and the value is a dict with the residue as the key
+        """
+        
+        # read and filter
+        with open(pdb_file, 'r') as f:
+            lines = f.readlines()
+            chains = OrderedDict() # chain dict of dicts
+            curr_res, prev_res = None, None
+            curr_chain, prev_chain = None, None
+            for line in lines:
+                if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
                 
+                prev_res, curr_res = curr_res, int(line[22:26])
+                prev_chain, curr_chain = curr_chain, line[21]
+                
+                # make sure res# is in order and not missing
+                if check_missing:
+                    # some might be negative (https://proteopedia.org/wiki/index.php/Unusual_sequence_numbering#Starts_With_Zero_Or_Negative_Numbers)
+                    # which may or may not include a zero at the point of transition
+                    if prev_chain != curr_chain or prev_res == -1: # new chain or neg number issue^
+                        prev_res = None
+                    assert prev_res is None or \
+                        curr_res == prev_res or \
+                        curr_res == prev_res+1, \
+                            f"Invalid order or missing residues: {prev_res} -> {curr_res} in {pdb_file}"
+                                
+                # only want CA and CB atoms
+                atm_type = line[12:16].strip()
+                if atm_type not in ['CA', 'CB']: continue
+                icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
+                                # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
+                
+                # Glycine has no CB atom, so only CA is saved
+                res_key = f"{curr_res}_{icode}"            
+                chains.setdefault(curr_chain, OrderedDict())
+                assert atm_type not in chains[curr_chain].get(res_key, {}), \
+                        f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
+                
+                # adding atom to residue
+                x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
+                chains[curr_chain].setdefault(res_key, OrderedDict())[atm_type] = np.array([x,y,z])
+                
+                # Saving residue name
+                res_name = line[17:20].strip()
+                assert ("name" not in chains[curr_chain].get(res_key, {})) or \
+                    (chains[curr_chain][res_key]["name"] == res_name), \
+                                            f"Inconsistent residue name for residue {res_key} in {pdb_file}"
+                chains[curr_chain][res_key]["name"] = res_name
+        return chains
 
 class PDBbindProcessor(Processor):
     @staticmethod
@@ -160,9 +271,9 @@ class PDBbindProcessor(Processor):
                     year = int(line[5:10])
                     prot_id = line[11:18].strip()
                     prot_name = line[18:].strip()
-                    print('year:', year, 
-                          '\nprot_id:', prot_id, 
-                          '\nprot_name:', prot_name)
+                    # print('year:', year, 
+                    #       '\nprot_id:', prot_id, 
+                    #       '\nprot_name:', prot_name)
                     data[code] = [year, prot_id, prot_name]
                 except ValueError as e:
                     print(f'Error with line: {line}')
@@ -173,8 +284,7 @@ class PDBbindProcessor(Processor):
         df.index.name = 'PDBCode'
         
         return df
-        
-    
+         
     @staticmethod
     def get_binding_data(index_data_file : str) -> pd.DataFrame:
         """
