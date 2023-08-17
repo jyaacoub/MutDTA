@@ -119,8 +119,9 @@ class CheckpointSaver:
                f'stop epoch: {self.stop_epoch}'+ \
                f'best epoch: {self.best_epoch}'
     
-def print_device_info(device:torch.device) -> torch.cuda.device:
-    if device.type != 'cuda':
+def print_device_info(device:torch.device|int) -> torch.cuda.device:
+    if (type(device) is int  and device == -1) or \
+        (type(device) is torch.device and device.type != 'cuda'):
         print('Device is not cuda, no device info available')
         return None
     prop = torch.cuda.get_device_properties(device)

@@ -11,10 +11,10 @@ from src.distributed_train.utils import dtrain
 args = {
     'port': random.randint(49152,65535),
     'output_dir': "/cluster/home/t122995uhn/projects/MutDTA/slurm_tests/DDP/%j",
-    'slurm_ngpus': 3,
+    'slurm_ngpus': 2,
     'slurm_nnodes': 1,
     'slurm_nodelist': None,
-    'slurm_time': 2800,
+    'slurm_time': 60,
     'slurm_cpus_per_task': 2
 }
 n_gpu = args['slurm_ngpus']

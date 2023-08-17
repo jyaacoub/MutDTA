@@ -16,6 +16,7 @@ from src.models.mut_dta import EsmDTA
 from src.models.prior_work import DGraphDTA
 from src.data_processing.datasets import DavisKibaDataset
 from src.models.train_test import train
+from src.models import print_device_info
 
 
 def handle_sigusr1(signum, frame):
@@ -88,11 +89,15 @@ def dtrain(args):
     
     print(os.getcwd())
     print(f"----------------- HYPERPARAMETERS -----------------")
-    print(f"               Batch size: {BATCH_SIZE}")
+    print(f"         Local Batch size: {BATCH_SIZE}")
+    print(f"        Global Batch size: {BATCH_SIZE*args['world_size']}")
     print(f"            Learning rate: {LEARNING_RATE}")
     print(f"                  Dropout: {DROPOUT}")
     print(f"               Num epochs: {EPOCHS}")
     print(f"              Edge option: {EDGEW}")
+    
+    print(f'----------------- GPU INFO ------------------------')
+    print_device_info(args['gpu'])
     
     # ==== Load up training dataset ====
     dataset = DavisKibaDataset(
@@ -106,11 +111,11 @@ def dtrain(args):
 
     #TODO: replace this with my version of train_test split to account for prot overlap
     sampler = DistributedSampler(dataset, shuffle=True, 
-                                 num_replicas=args['world_size'], 
+                                 num_replicas=args['world_size'],
                                  rank=args['rank'], seed=0)
     train_loader = DataLoader(dataset=dataset, 
                             sampler = sampler,
-                            batch_size=BATCH_SIZE, # batch size per gpu 
+                            batch_size=BATCH_SIZE, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
                             num_workers = 2, # number of subproc used for data loading
                             pin_memory = True,
                             drop_last = True
@@ -135,7 +140,7 @@ def dtrain(args):
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
-    
+    print("starting training:")
     #TODO: add validation data.
     for epoch in range(1, EPOCHS+1):
         START_T = time.time()
