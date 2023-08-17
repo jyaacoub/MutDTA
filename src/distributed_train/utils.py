@@ -15,7 +15,7 @@ from torch_geometric.loader import DataLoader
 from src.models.mut_dta import EsmDTA
 from src.models.prior_work import DGraphDTA
 from src.data_processing.datasets import DavisKibaDataset
-from src.models.train_test import train
+from src.models.training import train
 from src.models import print_device_info
 
 
