@@ -2,6 +2,7 @@
 import random, argparse, os
 import submitit
 
+import config
 from src.distributed_train.utils import dtrain
 
 #example call:
@@ -28,14 +29,14 @@ executor.update_parameters(
     timeout_min=args['slurm_time'], # SBATCH "-time" param
     
     nodes=args['slurm_nnodes'],
-    gpus_per_node=n_gpu,
+    slurm_gpus_per_node=f'v100:{n_gpu}',
     tasks_per_node=n_gpu,
     
     slurm_job_name=f'Test_gpu_{n_gpu}',
     slurm_partition="gpu",
     slurm_account='kumargroup_gpu',
     slurm_mem='15GB',
-    # slurm_gres=f'gpu:v100:{n_gpu}' # Might need this since ESM takes up a lot of memory
+    # Might need this since ESM takes up a lot of memory
     # slurm_constraint='gpu32g', # using small batch size will be sufficient for now
     # v100-34G can handle batch size of 15 -> v100-16G == 7?
 )

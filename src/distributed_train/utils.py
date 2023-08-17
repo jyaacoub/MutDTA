@@ -69,7 +69,7 @@ def init_dist_gpu(args):
     
 
 # distributed training fn
-def dtrain(args): 
+def dtrain(args):
     # ==== initialize the node ====
     init_node(args)
     
@@ -80,12 +80,19 @@ def dtrain(args):
     DATA = 'davis'
     FEATURE = 'nomsa'
     DATA_ROOT = f'../data/{DATA}/' # where to get data from
-    BATCH_SIZE = 64
+    BATCH_SIZE = 10
     DROPOUT = 0.4
-    EDGEW = 'binary'
+    EDGEW = 'simple'
     LEARNING_RATE = 1e-4
     EPOCHS = 100
     
+    print(os.getcwd())
+    print(f"----------------- HYPERPARAMETERS -----------------")
+    print(f"               Batch size: {BATCH_SIZE}")
+    print(f"            Learning rate: {LEARNING_RATE}")
+    print(f"                  Dropout: {DROPOUT}")
+    print(f"               Num epochs: {EPOCHS}")
+    print(f"              Edge option: {EDGEW}")
     
     # ==== Load up training dataset ====
     dataset = DavisKibaDataset(
@@ -112,7 +119,12 @@ def dtrain(args):
     
     
     # ==== Load model ====
-    model = DGraphDTA(dropout=DROPOUT, edge_weight_opt=EDGEW).cuda(args['gpu']) 
+    model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                       num_features_pro=320, # only esm features
+                       pro_emb_dim=54, # inital embedding size after first GCN layer
+                       dropout=DROPOUT,
+                       esm_only=True,
+                       edge_weight_opt=EDGEW).cuda(args['gpu'])
     # args.gpu is the local rank for this process
     
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
@@ -148,8 +160,8 @@ def dtrain(args):
             loss.backward()
             OPTIMIZER.step()
 
-            # Compute average training loss for the epoch
-            train_loss /= len(train_loader)
+        # Compute average training loss for the epoch
+        train_loss /= len(train_loader)
         
         # Print training and validation loss for the epoch
         print(f"Epoch {epoch}/{EPOCHS}: Train Loss: {train_loss:.4f}, Time elapsed: {time.time()-START_T}")
