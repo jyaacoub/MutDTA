@@ -1,10 +1,12 @@
 from collections import Counter, OrderedDict
 import json, pickle, re, os, abc
 import tarfile
+from typing import Iterable
 import requests
 import urllib.request
 
 import torch
+from torch.utils import data
 import torch_geometric as torchg
 import numpy as np
 import pandas as pd
@@ -20,7 +22,8 @@ from src.data_processing.processors import PDBbindProcessor
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, feature_opt='nomsa', *args, **kwargs):
+                 cmap_threshold:float, feature_opt='nomsa',
+                 subset='full', *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -43,10 +46,17 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
         `feature_opt` : bool, optional
-            choose from ['nomsa', 'msa', 'shannon']
+            Choose from ['nomsa', 'msa', 'shannon']
+        `subset` : str, optional
+            If you want to name this dataset or load an existing version of this dataset 
+            that is under a different name. For distributed training this is useful since 
+            you can save subsets and load only those samples for DDP leaving the DDP 
+            implementation untouched, by default 'full'.
+            
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
+        self.subset = subset
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
             
@@ -77,6 +87,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     @property
     def raw_dir(self) -> str:
         return self.data_root
+    
+    @property
+    def processed_dir(self) -> str:
+        return os.path.join(self.root, self.subset)
     
     @property
     def processed_file_names(self):
@@ -121,7 +135,42 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 'y': row['pkd'],
                 'protein': self._data_pro[prot_id],
                 'ligand': self._data_mol[lig_seq]}
+        
+    def save_subset(self, idxs:Iterable[int]|data.Sampler|data.DataLoader, 
+                    subset_name:str)->str:
+        """Saves a subset of the dataset that can be loaded up as its own seperate dataset"""
+        if issubclass(idxs.__class__, data.DataLoader):
+            idxs = idxs.sampler
+        if issubclass(idxs.__class__, data.Sampler):
+            idxs = idxs.indices
+        
+        # getting subset df, prots, and ligs
+        sub_df = self.df.iloc[idxs]
+        sub_prots = {k:self._data_pro[k] for k in sub_df['prot_id']}
+        sub_lig = {k:self._data_mol[k] for k in sub_df['SMILE']}
+        
+        # saving to new dir
+        path = os.path.join(self.root, subset_name)
+        os.makedirs(path, exist_ok=True)
+        sub_df.to_csv(os.path.join(path, self.processed_file_names[0]))
+        torch.save(sub_prots, os.path.join(path, self.processed_file_names[1]))
+        torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
+        return path
     
+    def load_subset(self, subset_name:str):
+        path = os.path.join(self.root, subset_name)
+        
+        # checking if processed files exist
+        assert os.path.isdir(path), f"Subset {subset_name} does not exist!"
+        
+        for f in self.processed_file_names:
+            new_fp = os.path.join(path, f)
+            assert os.path.isfile(new_fp), f"Missing processed file: {f}!"
+        
+        # all checks successfully passed, now we can load up the subset:
+        self.subset = subset_name
+        self.load()
+               
     def process(self):
         """
         This method is used to create the processed data files after feature extraction.

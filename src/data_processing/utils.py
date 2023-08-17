@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import torch
-from collections import Counter
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import InMemoryDataset
