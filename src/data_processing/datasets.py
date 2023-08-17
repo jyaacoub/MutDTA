@@ -574,7 +574,7 @@ class PlatinumDataset(BaseDataset):
                 cmap = get_contact_map(chains[t_chain])
                 np.save(self.cmap_p(i), cmap)
             
-            mut_seq, ref_seq = PDBbindProcessor.get_mutated_seq(chains[t_chain], 
+            mut_seq, ref_seq = PDBbindProcessor.get_mut_ref_seqs(chains[t_chain], 
                                                                 mut.split('/'))
             # getting mutated sequence:
             if self.mutated:

@@ -40,7 +40,8 @@ class Processor:
                 f.write(f'{k},{v}\n')
     
     @staticmethod
-    def get_mutated_seq(chain: OrderedDict, muts: List[str]) -> Tuple[str, str]:
+    def get_mut_ref_seqs(chain: OrderedDict, muts: List[str], 
+                         reversed:bool=False) -> Tuple[str, str]:
         """
         Given the protein chain dict and a list of mutations, this returns the 
         mutated and reference sequences.
@@ -50,9 +51,14 @@ class Processor:
         Parameters
         ----------
         `chain` : OrderedDict
-            The chain dict of dicts (see `pdb_get_chains`)
+            The chain dict of dicts (see `pdb_get_chains`) can be the reference or 
+            mutated chain.
         `muts` : List[str]
             List of mutations in the form '{ref}{pos}{mut}' e.g.: ['A10G', 'T20C']
+        `reversed` : bool, optional
+            If True the input chain is assumed to be the mutated chain and thus the 
+            mutations provided act in reverese to get the reference sequence, 
+            by default False.
 
         Returns
         -------
@@ -61,7 +67,10 @@ class Processor:
         """
         mut_dict = OrderedDict()
         for mut in muts:
-            ref, pos, mut = mut[0], mut[1:-1], mut[-1]
+            if reversed:
+                mut, pos, ref = mut[0], mut[1:-1], mut[-1]
+            else:
+                ref, pos, mut = mut[0], mut[1:-1], mut[-1]
             mut_dict[pos] = (ref, mut)
         
         mut_seq = ''
@@ -72,7 +81,7 @@ class Processor:
             
             ref, mut = mut_dict.get(res_num, (ref_actual, ref_actual))
             
-            assert ref == ref_actual or ref_actual == mut, \
+            assert ref == ref_actual, \
                 'Reference does not match sequence at position ' + \
                 f'{res_num}: {ref} != {ref_actual}'
             
