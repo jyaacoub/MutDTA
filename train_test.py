@@ -79,7 +79,7 @@ parser.add_argument('-lr',
     '--learning_rate',
     action='store',
     type=float,
-    default=0.0001,
+    default=1e-4,
     help='Learning rate for training (default: 0.0001)'
 )
 
