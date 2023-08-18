@@ -22,6 +22,16 @@ class Loader():
     pro_feature_opt = ['nomsa', 'msa', 'shannon']
     
     @staticmethod
+    @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt})
+    def get_model_key(model:str, data:str, pro_feature:str, edge:str, 
+                      batch_size:int, lr:float, dropout:float, n_epochs:int):
+        if model in ['EAT']: # no edgew or features for this model type
+            print('WARNING: edge weight and feature opt is not supported with the specified model.')
+            return f'{model}M_{data}D_{batch_size}B_{lr}LR_{dropout}D_{n_epochs}E'
+        else:
+            return f'{model}M_{data}D_{pro_feature}F_{edge}E_{batch_size}B_{lr}LR_{dropout}D_{n_epochs}E'
+        
+    @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt})
     def load_model(model:str, pro_feature:str, edge:str, dropout:float):
         num_feat_pro = 54 if 'msa' in pro_feature else 34

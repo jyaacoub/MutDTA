@@ -56,23 +56,21 @@ metrics = {}
 for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_opt, 
                                                      args.feature_opt, args.edge_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
-    if MODEL in ['EAT']: # no edgew or features for this model type
-        print('WARNING: edge weight and feature opt is not supported with the specified model.')
-        MODEL_KEY = f'{MODEL}M_{DATA}D_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
-    else:
-        MODEL_KEY = f'{MODEL}M_{DATA}D_{FEATURE}F_{EDGEW}E_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}D_{NUM_EPOCHS}E'
-    
+    MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,
+                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,NUM_EPOCHS)
     print(f'# {MODEL_KEY} \n')
     
+    # init paths for media and model checkpoints
     media_save_p = f'{media_save_dir}/{DATA}/'
-    print(f'    Saving media to: {media_save_p}')
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
     model_save_p = f'{model_save_dir}/{MODEL_KEY}.model'
+    
     # create paths if they dont exist already:
     os.makedirs(media_save_p, exist_ok=True)
     os.makedirs(f'{media_save_p}/train_log/', exist_ok=True)
 
-    # loading data
+
+    # ==== LOAD DATA ====
     dataset = Loader.load_dataset(DATA, FEATURE)
     print(f'# Number of samples: {len(dataset)}')
 
@@ -82,7 +80,8 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
                         batch_train=BATCH_SIZE, use_refined=False,
                         split_by_prot=True)
 
-    # loading model:
+
+    # ==== LOAD MODEL ====
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'#Device: {device}')
     model = Loader.load_model(MODEL, FEATURE, EDGEW, DROPOUT).to(device)
@@ -93,6 +92,8 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
         debug(model, train_loader, device)
         continue # skip training
     
+    
+    # ==== TRAINING ====
     # check if model has already been trained:
     logs = None
     if os.path.exists(cp_saver.save_path):
@@ -118,6 +119,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
             json.dump(logs, f, indent=4)
         
             
+    # ==== EVALUATE ====
     # testing
     loss, pred, actual = test(model, test_loader, device)
     print(f'# Test loss: {loss}')
