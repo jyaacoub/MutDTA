@@ -32,8 +32,8 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.utils import config # sets up env vars
-from src.models import train, test, CheckpointSaver, print_device_info, debug
-from src.data_processing import train_val_test_split
+from src.train_test.training import train, test
+from src.train_test.utils import  CheckpointSaver, print_device_info, debug, train_val_test_split
 from src.data_analysis import get_metrics
 from src.utils.loader import Loader
 

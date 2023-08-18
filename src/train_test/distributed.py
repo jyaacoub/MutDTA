@@ -7,14 +7,13 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
-from src.models import print_device_info
-from src.models.training import train
 from src.models.mut_dta import EsmDTA
 from src.models.prior_work import DGraphDTA
 
 from src.data_processing.datasets import DavisKibaDataset
 
-from src.distributed_train.utils import init_node, init_dist_gpu
+from src.train_test.training import train
+from src.train_test.utils import init_node, init_dist_gpu, print_device_info
 
 # distributed training fn
 def dtrain(args):
@@ -91,7 +90,7 @@ def dtrain(args):
     model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
     
     
-    # ==== train (this was modified from `models/training.py`):  ====
+    # ==== train (this was modified from `train_test/training.py`):  ====
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     

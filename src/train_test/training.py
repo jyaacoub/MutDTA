@@ -6,9 +6,9 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
-from src.data_processing.utils import train_val_test_split
+from src.train_test.utils import train_val_test_split, CheckpointSaver
 from src.models.prior_work import DGraphDTA
-from src.models.utils import BaseModel, CheckpointSaver
+from src.models.utils import BaseModel
 from torch_geometric.loader import DataLoader
 
 
