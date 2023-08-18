@@ -56,13 +56,17 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
+        if subset != 'full':
+            assert os.path.isdir(os.path.join(save_root, subset)), f"{subset} Subset does not exist,"+\
+                "please create subset before initialization."
         self.subset = subset
+        
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
-            
+        
         self.shannon = False
         
-        if feature_opt == 'nomsa':# FINISH THIS AND TRAIN PDBBIND...
+        if feature_opt == 'nomsa':
             self.aln_dir = None # none treats it as np.zeros
         elif feature_opt == 'msa':
             self.aln_dir =  aln_dir # path to sequence alignments
@@ -70,7 +74,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             self.aln_dir = aln_dir
             self.shannon = True
         else:
-            raise Exception("Invalid feature_opt please pick from nomsa, msa, shannon")
+            raise Exception(f"Invalid feature_opt '{feature_opt}' please pick from nomsa, msa, shannon")
             
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
