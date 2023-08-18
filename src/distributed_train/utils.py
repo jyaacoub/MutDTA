@@ -25,7 +25,7 @@ def handle_sigusr1(signum, frame):
     exit()    
 
 def init_node(args):    
-    args['ngpus_per_node'] = torch.cuda.device_count()
+    args.ngpus_per_node = torch.cuda.device_count()
 
     # requeue job on SLURM preemption
     signal.signal(signal.SIGUSR1, handle_sigusr1)
@@ -34,26 +34,26 @@ def init_node(args):
     cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
     stdout = subprocess.check_output(cmd.split())
     host_name = stdout.decode().splitlines()[0] # first node is the host
-    args['dist_url'] = f'tcp://{host_name}:{args["port"]}'
+    args.dist_url = f'tcp://{host_name}:{args.port}'
 
     # distributed parameters
-    args['rank'] = int(os.getenv('SLURM_NODEID')) * args['ngpus_per_node']
-    args['world_size'] = int(os.getenv('SLURM_NNODES')) * args['ngpus_per_node']
+    args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
+    args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
     
 def init_dist_gpu(args):
     job_env = submitit.JobEnvironment()
-    args['gpu'] = job_env.local_rank
-    args['rank'] = job_env.global_rank
+    args.gpu = job_env.local_rank
+    args.rank = job_env.global_rank
 
     # PyTorch calls to setup gpus for distributed training
-    dist.init_process_group(backend='gloo', init_method=args['dist_url'], 
-                            world_size=args['world_size'], rank=args['rank'])
+    dist.init_process_group(backend='gloo', init_method=args.dist_url, 
+                            world_size=args.world_size, rank=args.rank)
     
     torch.manual_seed(0)
     torch.cuda.manual_seed_all(0)
     np.random.seed(0)
     
-    torch.cuda.set_device(args['gpu'])
+    torch.cuda.set_device(args.gpu)
     # cudnn.benchmark = True # not needed since we include dropout layers
     dist.barrier()
 
@@ -63,7 +63,7 @@ def init_dist_gpu(args):
 
     # def print(*args, **kwargs):
     #     force = kwargs.pop('force', False)
-    #     if (args['rank'] == 0) or force:
+    #     if (args.rank == 0) or force:
     #         builtin_print(*args, **kwargs)
 
     # __builtin__.print = print
@@ -78,32 +78,33 @@ def dtrain(args):
     # ==== Set up distributed training environment ====
     init_dist_gpu(args)
     
-    DATA = 'davis'
-    FEATURE = 'nomsa'
-    DATA_ROOT = f'../data/{DATA}/' # where to get data from
-    BATCH_SIZE = 10
-    DROPOUT = 0.4
-    EDGEW = 'simple'
-    LEARNING_RATE = 1e-4
-    EPOCHS = 100
+    DATA = args.data_opt[0] # only one data option for now
+    FEATURE = args.feature_opt[0] # only one feature option for now
+    EDGEW = args.edge_opt[0] # only one edge option for now
+    MODEL = args.model_opt[0] # only one model option for now
+    
+    BATCH_SIZE = args.batch_size
+    DROPOUT = args.dropout
+    LEARNING_RATE = args.learning_rate
+    EPOCHS = args.num_epochs
     
     print(os.getcwd())
     print(f"----------------- HYPERPARAMETERS -----------------")
     print(f"         Local Batch size: {BATCH_SIZE}")
-    print(f"        Global Batch size: {BATCH_SIZE*args['world_size']}")
+    print(f"        Global Batch size: {BATCH_SIZE*args.world_size}")
     print(f"            Learning rate: {LEARNING_RATE}")
     print(f"                  Dropout: {DROPOUT}")
     print(f"               Num epochs: {EPOCHS}")
     print(f"              Edge option: {EDGEW}")
     
     print(f'----------------- GPU INFO ------------------------')
-    print_device_info(args['gpu'])
+    print_device_info(args.gpu)
     
     # ==== Load up training dataset ====
     dataset = DavisKibaDataset(
         save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
-        data_root=DATA_ROOT,
-        aln_dir=f'{DATA_ROOT}/aln/',
+        data_root=f'../data/{DATA}/',
+        aln_dir  =f'../data/{DATA}/aln/',
         cmap_threshold=-0.5, 
         feature_opt=FEATURE
         )
@@ -111,8 +112,8 @@ def dtrain(args):
 
     #TODO: replace this with my version of train_test split to account for prot overlap
     sampler = DistributedSampler(dataset, shuffle=True, 
-                                 num_replicas=args['world_size'],
-                                 rank=args['rank'], seed=0)
+                                 num_replicas=args.world_size,
+                                 rank=args.rank, seed=0)
     train_loader = DataLoader(dataset=dataset, 
                             sampler = sampler,
                             batch_size=BATCH_SIZE, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
@@ -122,21 +123,26 @@ def dtrain(args):
                             )
     print(f"Data loaded")
     
-    
     # ==== Load model ====
-    model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_features_pro=320, # only esm features
-                       pro_emb_dim=54, # inital embedding size after first GCN layer
-                       dropout=DROPOUT,
-                       esm_only=True,
-                       edge_weight_opt=EDGEW).cuda(args['gpu'])
+    num_feat_pro = 54 if 'msa' in FEATURE else 34
+    if MODEL == 'DG':
+        model = DGraphDTA(num_features_pro=num_feat_pro, 
+                          dropout=DROPOUT, edge_weight_opt=EDGEW)
+    elif MODEL == 'ED':
+        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                        num_features_pro=320, # only esm features
+                        pro_emb_dim=54, # inital embedding size after first GCN layer
+                        dropout=DROPOUT,
+                        esm_only=True,
+                        edge_weight_opt=EDGEW)
+    
     # args.gpu is the local rank for this process
-    
+    model.cuda(args.gpu)
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[args['gpu']])
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
     
     
-    # ==== train (this was modified from `train_test.py`):  ====
+    # ==== train (this was modified from `training.py`):  ====
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     
@@ -149,9 +155,9 @@ def dtrain(args):
         model.train()
         train_loss = 0.0
         for data in train_loader:
-            batch_pro = data['protein'].cuda(args['gpu']) 
-            batch_mol = data['ligand'].cuda(args['gpu']) 
-            labels = data['y'].reshape(-1,1).cuda(args['gpu']) 
+            batch_pro = data['protein'].cuda(args.gpu) 
+            batch_mol = data['ligand'].cuda(args.gpu) 
+            labels = data['y'].reshape(-1,1).cuda(args.gpu) 
             
             # Forward pass
             predictions = model(batch_pro, batch_mol)
@@ -170,8 +176,3 @@ def dtrain(args):
         
         # Print training and validation loss for the epoch
         print(f"Epoch {epoch}/{EPOCHS}: Train Loss: {train_loss:.4f}, Time elapsed: {time.time()-START_T}")
-        
-    
-    
-
-

@@ -1,3 +1,4 @@
+# %%
 from src.utils.arg_parse import parse_train_test_args
 args = parse_train_test_args(verbose=True)
 FORCE_TRAINING = args.train
@@ -81,11 +82,10 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(args.model_opt, args.data_o
                  feature_opt=FEATURE
                  )
     else:
-        DATA_ROOT = f'../data/{DATA}/' # where to get data from
         dataset = DavisKibaDataset(
                 save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
-                data_root=DATA_ROOT,
-                aln_dir=f'{DATA_ROOT}/aln/',
+                data_root=f'../data/{DATA}/',
+                aln_dir  =f'../data/{DATA}/aln/',
                 cmap_threshold=-0.5, 
                 feature_opt=FEATURE
                 )

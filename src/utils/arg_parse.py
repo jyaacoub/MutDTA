@@ -1,4 +1,8 @@
-import argparse
+import argparse, random
+model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
+edge_opt_choices = ['simple', 'binary']
+data_opt_choices = ['davis', 'kiba', 'PDBbind']
+feature_opt_choices = ['nomsa', 'msa', 'shannon']
 
 def add_model_args(parser: argparse.ArgumentParser):
     """
@@ -11,17 +15,11 @@ def add_model_args(parser: argparse.ArgumentParser):
         - debug
     """
     # Define the options for data_opt and FEATURE_opt
-    model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
-    data_opt_choices = ['davis', 'kiba', 'PDBbind']
-    feature_opt_choices = ['nomsa', 'msa', 'shannon']
-    edge_opt_choices = ['simple', 'binary']
         
     # Add the argument for model_opt
     parser.add_argument('-m',
         '--model_opt',
-        choices=model_opt_choices,
-        nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
-        required=True,
+        choices=model_opt_choices, nargs='+', required=True,
         help=f'Select one or more from {model_opt_choices} where I = "improved" and '+ \
             'A = "all features". For example: DG is DGraphDTA ' + \
             'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
@@ -29,32 +27,11 @@ def add_model_args(parser: argparse.ArgumentParser):
             '\n\t- EAT: EsmAttentionDTA (no graph for protein rep)' 
     )
 
-    # Add the argument for data_opt
-    parser.add_argument('-d',
-        '--data_opt',
-        choices=data_opt_choices,
-        nargs='+',  # Allows accepting multiple arguments
-        # default=data_opt_choices[0],
-        required=True,
-        help=f'Select one of {data_opt_choices} (default: {data_opt_choices[0]}).'
-    )
-
-    # Add the argument for FEATURE_opt
-    parser.add_argument('-f',
-        '--feature_opt',
-        choices=feature_opt_choices,
-        nargs='+',  # Allows accepting multiple arguments for FEATURE_opt
-        required=True,
-        help=f'Select one or more from {feature_opt_choices}.'
-    )
-
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
         '--edge_opt',
         choices=edge_opt_choices,
-        nargs='+',  # Allows accepting multiple arguments for EDGE_opt
-        default=edge_opt_choices[0:1],
-        required=False,
+        nargs='+', default=edge_opt_choices[0:1], required=False,
         help=f'Select one or more from {edge_opt_choices}. "simple" is just taking ' + \
             'the normalized values from the protein cmap, "binary" means no edge weights'
     )
@@ -84,33 +61,25 @@ def add_hyperparam_args(parser: argparse.ArgumentParser):
     # hyperparameter options
     parser.add_argument('-bs',
         '--batch_size',
-        action='store',
-        type=int,
-        default=64,
+        action='store', type=int, default=64,
         help='Batch size for training (default: 64)'
     )
 
     parser.add_argument('-lr',
         '--learning_rate',
-        action='store',
-        type=float,
-        default=1e-4,
+        action='store', type=float, default=1e-4,
         help='Learning rate for training (default: 0.0001)'
     )
 
     parser.add_argument('-do',
         '--dropout',
-        action='store',
-        type=float,
-        default=0.4,
+        action='store', type=float, default=0.4,
         help='Dropout rate for training (default: 0.4)'
     )
 
     parser.add_argument('-ne',
         '--num_epochs',
-        action='store',
-        type=int,
-        default=2000,
+        action='store', type=int, default=2000,
         help='Number of epochs for training (default: 2000)'
     )
     
@@ -119,42 +88,94 @@ def add_hyperparam_args(parser: argparse.ArgumentParser):
 def add_dataset_args(parser: argparse.ArgumentParser):
     """
     Adds the following dataset arguments to the parser:
+        - data_opt
+        - feature_opt
         - train_split
         - val_split
         - shuffle_data
         - rand_seed
     """
+
+    # Add the argument for data_opt
+    parser.add_argument('-d',
+        '--data_opt',
+        choices=data_opt_choices, nargs='+',   required=True,
+        help=f'Select one of {data_opt_choices} (default: {data_opt_choices[0]}).'
+    )
+
+    # Add the argument for FEATURE_opt
+    parser.add_argument('-f',
+        '--feature_opt',
+        choices=feature_opt_choices, nargs='+', required=True,
+        help=f'Select one or more from {feature_opt_choices}.'
+    )
     
     parser.add_argument('-ts',
         '--train_split',
-        action='store',
-        type=float,
-        default=0.8,
+        action='store', type=float, default=0.8,
         help='Percentage of data for training (default: 0.8)'
     )
     
     parser.add_argument('-vs',
         '--val_split',
-        action='store',
-        type=float,
-        default=0.1,
+        action='store', type=float, default=0.1,
         help='Percentage of data for validation (default: 0.1)'
     )
     
     parser.add_argument('-nos',
-        '--no_shuffle',
-        action='store_true',
+        '--no_shuffle', action='store_true',
         help='Dont shuffle the data before splitting (default: True)'
     )
     
     parser.add_argument('-rs',
         '--rand_seed',
-        action='store',
-        type=int,
-        default=0,
+        action='store', type=int, default=0,
         help='Random seed for shuffling (default: 0)'
     )
     
+    return parser
+
+def add_slurm_dist_args(parser: argparse.ArgumentParser):
+    parser.add_argument('-p',
+        '--port',
+        action='store', type=int, default=random.randint(49152,65535),
+        help='Port for DDP (default: random int)'
+    )
+    parser.add_argument('-od',
+        '--output_dir',
+        action='store', type=str, default="./slurm_tests/DDP/%j",
+        help='Output dir for DDP (default: ./slurm_tests/DDP/%j)'
+    )
+    parser.add_argument('-s_ng',
+        '--slurm_ngpus',
+        action='store', type=int, default=2,
+        help='Number of GPUs for DDP (default: 2)'
+    )
+    parser.add_argument('-s_nn',
+        '--slurm_nnodes',
+        action='store', type=int, default=1,
+        help='Number of nodes for DDP (default: 1)'
+    )
+    parser.add_argument('-s_nl',
+        '--slurm_nodelist',
+        action='store', type=str, default=None,
+        help='Node list for DDP (default: None)'
+    )
+    parser.add_argument('-s_t',
+        '--slurm_time',
+        action='store', type=int, default=60,
+        help='Time for DDP (default: 60)'
+    )
+    parser.add_argument('-s_m',
+        '--slurm_mem',
+        action='store', type=str, default='15GB',
+        help='Memory required for DDP (default: 15GB)'
+    )
+    parser.add_argument('-s_cp',
+        '--slurm_cpus_per_task',
+        action='store', type=int, default=2,
+        help='CPUs per task for DDP (default: 2)'
+    )
     return parser
 
 def safe_parse(parser: argparse.ArgumentParser, 
@@ -172,13 +193,14 @@ def safe_parse(parser: argparse.ArgumentParser,
         args = parser.parse_args()
     return args
 
-
-def parse_train_test_args(verbose=True):
+def parse_train_test_args(verbose=True, distributed=False):
     # Create the argument parser
     parser = argparse.ArgumentParser(description="Arguments for train test.")
     add_model_args(parser)
-    add_hyperparam_args(parser)
     add_dataset_args(parser)
+    add_hyperparam_args(parser)
+    if distributed: 
+        add_slurm_dist_args(parser)
     args = safe_parse(parser, jyp_args='-m EAT -d davis -f nomsa -e simple -D')
 
     # Model training args:
@@ -189,7 +211,7 @@ def parse_train_test_args(verbose=True):
     
     if verbose:
         # Now you can use the selected options in your code as needed
-        if args.debug: print(f'|==========|! DEBUG MODE !|==============|\n')
+        if args.debug: print(f'|============|! DEBUG MODE !|============|\n')
 
         print(f"---------------- MODEL OPT ---------------")
         print(f"     Selected og_model_opt: {model_opt}")
@@ -198,9 +220,9 @@ def parse_train_test_args(verbose=True):
         print(f"    Selected edge_opt list: {edge_opt}")
         print(f"           forced training: {args.train}\n")
 
-        print(f"-------------- HYPERPARAMETERS -------------")
-        print(f"               Batch size: {args.bs}")
-        print(f"            Learning rate: {args.lr}")
-        print(f"                  Dropout: {args.do}")
-        print(f"               Num epochs: {args.ne}\n")
+        print(f"-------------- HYPERPARAMETERS -----------")
+        print(f"               Batch size: {args.batch_size}")
+        print(f"            Learning rate: {args.learning_rate}")
+        print(f"                  Dropout: {args.dropout}")
+        print(f"               Num epochs: {args.num_epochs}\n")
     return args
