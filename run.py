@@ -14,5 +14,7 @@ train_loader, val_loader, test_loader = train_val_test_split(dataset,
                         split_by_prot=True)
 # %%
 dataset.save_subset(train_loader, 'train')
+dataset.save_subset(val_loader, 'val')
+dataset.save_subset(test_loader, 'test')
 
 # %%

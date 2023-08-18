@@ -23,7 +23,7 @@ from src.data_processing.processors import PDBbindProcessor
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
-                 subset='full', *args, **kwargs):
+                 subset=None, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -56,6 +56,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
+        subset = subset or 'full'
         if subset != 'full':
             assert os.path.isdir(os.path.join(save_root, subset)), f"{subset} Subset does not exist,"+\
                 "please create subset before initialization."

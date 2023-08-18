@@ -23,7 +23,6 @@ def add_model_args(parser: argparse.ArgumentParser):
             'and EDA is the same but with esm_only set to False. Additional options:' + \
             '\n\t- EAT: EsmAttentionDTA (no graph for protein rep)' 
     )
-
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
         '--edge_opt',
@@ -32,13 +31,11 @@ def add_model_args(parser: argparse.ArgumentParser):
         help=f'Select one or more from {Loader.edge_opt}. "simple" is just taking ' + \
             'the normalized values from the protein cmap, "binary" means no edge weights'
     )
-
     parser.add_argument('-t',
         '--train',
         action='store_true',
         help='Forces training, if already trained it will load up the state dict'
     )
-
     parser.add_argument('-D',
         '--debug',
         action='store_true',
@@ -61,25 +58,21 @@ def add_hyperparam_args(parser: argparse.ArgumentParser):
         action='store', type=int, default=64,
         help='Batch size for training (default: 64)'
     )
-
     parser.add_argument('-lr',
         '--learning_rate',
         action='store', type=float, default=1e-4,
         help='Learning rate for training (default: 0.0001)'
     )
-
     parser.add_argument('-do',
         '--dropout',
         action='store', type=float, default=0.4,
         help='Dropout rate for training (default: 0.4)'
     )
-
     parser.add_argument('-ne',
         '--num_epochs',
         action='store', type=int, default=2000,
         help='Number of epochs for training (default: 2000)'
     )
-    
     return parser
 
 def add_dataset_args(parser: argparse.ArgumentParser):
@@ -99,37 +92,31 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         choices=Loader.data_opt, nargs='+',   required=True,
         help=f'Select one of {Loader.data_opt} (default: {Loader.data_opt[0]}).'
     )
-
     # Add the argument for FEATURE_opt
     parser.add_argument('-f',
         '--feature_opt',
         choices=Loader.pro_feature_opt, nargs='+', required=True,
         help=f'Select one or more from {Loader.pro_feature_opt}.'
     )
-    
     parser.add_argument('-ts',
         '--train_split',
         action='store', type=float, default=0.8,
         help='Percentage of data for training (default: 0.8)'
     )
-    
     parser.add_argument('-vs',
         '--val_split',
         action='store', type=float, default=0.1,
         help='Percentage of data for validation (default: 0.1)'
     )
-    
     parser.add_argument('-nos',
         '--no_shuffle', action='store_true',
         help='Dont shuffle the data before splitting (default: True)'
     )
-    
     parser.add_argument('-rs',
         '--rand_seed',
         action='store', type=int, default=0,
         help='Random seed for shuffling (default: 0)'
     )
-    
     return parser
 
 def add_slurm_dist_args(parser: argparse.ArgumentParser):

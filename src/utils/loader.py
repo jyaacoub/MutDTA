@@ -79,21 +79,25 @@ class Loader():
     
     @staticmethod
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt})
-    def load_dataset(data:str, pro_feature:str):
+    def load_dataset(data:str, pro_feature:str, subset:str=None):
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{pro_feature}',
                     data_root='../data/v2020-other-PL/',
                     aln_dir='../data/PDBbind_aln', 
                     cmap_threshold=8.0,
-                    feature_opt=pro_feature
+                    feature_opt=pro_feature,
+                    subset=subset
                     )
-        else:
+        elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{pro_feature}/',
                     data_root=f'../data/{data}/',
                     aln_dir  =f'../data/{data}/aln/',
                     cmap_threshold=-0.5, 
-                    feature_opt=pro_feature
+                    feature_opt=pro_feature,
+                    subset=subset
                     )
+        else:
+            raise Exception('invalid data option?')
             
         return dataset
