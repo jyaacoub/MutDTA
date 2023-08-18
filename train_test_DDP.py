@@ -4,9 +4,10 @@ import submitit
 
 from src.utils import config # sets up env vars
 from src.utils.arg_parse import parse_train_test_args
-from src.distributed_train.utils import dtrain
+from src.distributed_train import dtrain
 
-args = parse_train_test_args(verbose=True, distributed=True)
+args = parse_train_test_args(verbose=True, distributed=True,
+                             jyp_args='-m ED -d davis -f nomsa -e simple -D')
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)

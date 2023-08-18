@@ -1,8 +1,5 @@
 import argparse, random
-model_opt_choices = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
-edge_opt_choices = ['simple', 'binary']
-data_opt_choices = ['davis', 'kiba', 'PDBbind']
-feature_opt_choices = ['nomsa', 'msa', 'shannon']
+from src.utils.loader import Loader
 
 def add_model_args(parser: argparse.ArgumentParser):
     """
@@ -19,8 +16,8 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for model_opt
     parser.add_argument('-m',
         '--model_opt',
-        choices=model_opt_choices, nargs='+', required=True,
-        help=f'Select one or more from {model_opt_choices} where I = "improved" and '+ \
+        choices=Loader.model_opt, nargs='+', required=True,
+        help=f'Select one or more from {Loader.model_opt} where I = "improved" and '+ \
             'A = "all features". For example: DG is DGraphDTA ' + \
             'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
             'and EDA is the same but with esm_only set to False. Additional options:' + \
@@ -30,9 +27,9 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
         '--edge_opt',
-        choices=edge_opt_choices,
-        nargs='+', default=edge_opt_choices[0:1], required=False,
-        help=f'Select one or more from {edge_opt_choices}. "simple" is just taking ' + \
+        choices=Loader.edge_opt,
+        nargs='+', default=Loader.edge_opt[0:1], required=False,
+        help=f'Select one or more from {Loader.edge_opt}. "simple" is just taking ' + \
             'the normalized values from the protein cmap, "binary" means no edge weights'
     )
 
@@ -99,15 +96,15 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     # Add the argument for data_opt
     parser.add_argument('-d',
         '--data_opt',
-        choices=data_opt_choices, nargs='+',   required=True,
-        help=f'Select one of {data_opt_choices} (default: {data_opt_choices[0]}).'
+        choices=Loader.data_opt, nargs='+',   required=True,
+        help=f'Select one of {Loader.data_opt} (default: {Loader.data_opt[0]}).'
     )
 
     # Add the argument for FEATURE_opt
     parser.add_argument('-f',
         '--feature_opt',
-        choices=feature_opt_choices, nargs='+', required=True,
-        help=f'Select one or more from {feature_opt_choices}.'
+        choices=Loader.pro_feature_opt, nargs='+', required=True,
+        help=f'Select one or more from {Loader.pro_feature_opt}.'
     )
     
     parser.add_argument('-ts',
@@ -193,7 +190,8 @@ def safe_parse(parser: argparse.ArgumentParser,
         args = parser.parse_args()
     return args
 
-def parse_train_test_args(verbose=True, distributed=False):
+def parse_train_test_args(verbose=True, distributed=False, 
+                          jyp_args='-m EAT -d davis -f nomsa -e simple -D'):
     # Create the argument parser
     parser = argparse.ArgumentParser(description="Arguments for train test.")
     add_model_args(parser)
@@ -201,7 +199,7 @@ def parse_train_test_args(verbose=True, distributed=False):
     add_hyperparam_args(parser)
     if distributed: 
         add_slurm_dist_args(parser)
-    args = safe_parse(parser, jyp_args='-m EAT -d davis -f nomsa -e simple -D')
+    args = safe_parse(parser, jyp_args=jyp_args)
 
     # Model training args:
     model_opt = args.model_opt

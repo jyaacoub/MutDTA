@@ -1,6 +1,7 @@
 # %%
 from src.utils.arg_parse import parse_train_test_args
-args = parse_train_test_args(verbose=True)
+args = parse_train_test_args(verbose=True,
+                             jyp_args='-m DG -d davis -f nomsa -e simple -D -bs 10')
 FORCE_TRAINING = args.train
 DEBUG = args.debug
 
@@ -32,11 +33,9 @@ from matplotlib.ticker import MaxNLocator
 
 from src.utils import config # sets up env vars
 from src.models import train, test, CheckpointSaver, print_device_info, debug
-from src.models.mut_dta import EsmDTA, EsmAttentionDTA
-from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing import train_val_test_split
-from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
 from src.data_analysis import get_metrics
+from src.utils.loader import Loader
 
 # %%
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -54,7 +53,7 @@ cp_saver = CheckpointSaver(model=None,
 
 # %% Training loop
 metrics = {}
-for DATA, FEATURE, EDGEW, MODEL in itertools.product(args.model_opt, args.data_opt, 
+for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_opt, 
                                                      args.feature_opt, args.edge_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
     if MODEL in ['EAT']: # no edgew or features for this model type
@@ -74,21 +73,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(args.model_opt, args.data_o
     os.makedirs(f'{media_save_p}/train_log/', exist_ok=True)
 
     # loading data
-    if DATA == 'PDBbind':
-        dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
-                 data_root='../data/v2020-other-PL/',
-                 aln_dir='../data/PDBbind_aln', 
-                 cmap_threshold=8.0,
-                 feature_opt=FEATURE
-                 )
-    else:
-        dataset = DavisKibaDataset(
-                save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
-                data_root=f'../data/{DATA}/',
-                aln_dir  =f'../data/{DATA}/aln/',
-                cmap_threshold=-0.5, 
-                feature_opt=FEATURE
-                )
+    dataset = Loader.load_dataset(DATA, FEATURE)
     print(f'# Number of samples: {len(dataset)}')
 
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
@@ -100,48 +85,7 @@ for DATA, FEATURE, EDGEW, MODEL in itertools.product(args.model_opt, args.data_o
     # loading model:
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'#Device: {device}')
-
-    num_feat_pro = 54 if 'msa' in FEATURE else 34
-    if MODEL == 'DG':
-        model = DGraphDTA(num_features_pro=num_feat_pro, 
-                          dropout=DROPOUT, edge_weight_opt=EDGEW)
-    elif MODEL == 'DGI':
-        model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                                  dropout=DROPOUT, edge_weight_opt=EDGEW)
-    elif MODEL == 'ED':
-        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_features_pro=320, # only esm features
-                       pro_emb_dim=54, # inital embedding size after first GCN layer
-                       dropout=DROPOUT,
-                       esm_only=True,
-                       edge_weight_opt=EDGEW)
-    elif MODEL == 'EDA':
-        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_features_pro=320+num_feat_pro, # esm features + other features
-                       pro_emb_dim=54, # inital embedding size after first GCN layer
-                       dropout=DROPOUT,
-                       esm_only=False, # false to include all feats
-                       edge_weight_opt=EDGEW)
-    elif MODEL == 'EDI':
-        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_features_pro=320,
-                       pro_emb_dim=512, # increase embedding size
-                       dropout=DROPOUT,
-                       esm_only=True,
-                       edge_weight_opt=EDGEW)
-    elif MODEL == 'EDAI':
-        model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                       num_features_pro=320 + num_feat_pro,
-                       pro_emb_dim=512,
-                       dropout=DROPOUT,
-                       esm_only=False,
-                       edge_weight_opt=EDGEW)
-    elif MODEL == 'EAT':
-        # this model only needs protein sequence, no additional features.
-        model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                                dropout=DROPOUT)
-    
-    model.to(device)
+    model = Loader.load_model(MODEL, FEATURE, EDGEW, DROPOUT).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
     
     if DEBUG: 
