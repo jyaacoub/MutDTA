@@ -187,7 +187,7 @@ class CheckpointSaver:
     def model(self):
         return self._model
     
-    @save_path.setter
+    @model.setter
     def model(self, model:BaseModel):
         self._model = model
         if model is not None:
