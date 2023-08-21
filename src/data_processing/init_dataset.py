@@ -12,29 +12,24 @@ from src.data_processing.datasets import DavisKibaDataset
 from src.train_test.utils import train_val_test_split
 
 if __name__ == "__main__":
-    datas = ['davis', 'kiba']
-    FEATUREs = ['nomsa', 'msa', 'shannon']
-    data_root_dir = '/cluster/home/t122995uhn/projects/data/' #/home/jyaacoub/projects/data/davis_kiba/
+    datas = ['davis']#, 'kiba']
+    FEATUREs = ['nomsa']#, 'msa', 'shannon']
+    # data_root_dir = '/cluster/home/t122995uhn/projects/data/'
+    data_root_dir = '/home/jyaacoub/projects/data/'
 
     for data, FEATURE in itertools.product(datas, FEATUREs):
         DATA_ROOT = f'{data_root_dir}/{data}/'
         print('\n', data, FEATURE)
         create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
-        if FEATURE == 'nomsa':
-            dataset = DavisKibaDataset(
-                    save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
-                    data_root=DATA_ROOT,
-                    aln_dir=None, # set to none == no msa provided
-                    cmap_threshold=-0.5, 
-                    shannon=False)
-        else:
+        if data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
                     data_root=DATA_ROOT,
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
-                    shannon=FEATURE=='shannon')
-        
+                    feature_opt=FEATURE,
+            )
+    
         # saving training, validation, and test sets
         train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                                 train_split=0.8, val_split=0.1, random_seed=0,
