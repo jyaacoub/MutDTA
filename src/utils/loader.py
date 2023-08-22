@@ -79,20 +79,20 @@ class Loader():
     
     @staticmethod
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt})
-    def load_dataset(data:str, pro_feature:str, subset:str=None):
+    def load_dataset(data:str, pro_feature:str, subset:str=None, path:str='../data/'):
         if data == 'PDBbind':
-            dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{pro_feature}',
-                    data_root='../data/v2020-other-PL/',
-                    aln_dir='../data/PDBbind_aln', 
+            dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset/{pro_feature}',
+                    data_root=f'{path}/v2020-other-PL/',
+                    aln_dir=f'{path}/PDBbind_aln', 
                     cmap_threshold=8.0,
                     feature_opt=pro_feature,
                     subset=subset
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
-                    save_root=f'../data/DavisKibaDataset/{data}_{pro_feature}/',
-                    data_root=f'../data/{data}/',
-                    aln_dir  =f'../data/{data}/aln/',
+                    save_root=f'{path}/DavisKibaDataset/{data}_{pro_feature}/',
+                    data_root=f'{path}/{data}/',
+                    aln_dir  =f'{path}/{data}/aln/',
                     cmap_threshold=-0.5, 
                     feature_opt=pro_feature,
                     subset=subset

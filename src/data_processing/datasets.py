@@ -58,7 +58,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         """
         subset = subset or 'full'
         if subset != 'full':
-            assert os.path.isdir(os.path.join(save_root, subset)), f"{subset} Subset does not exist,"+\
+            data_p = os.path.join(save_root, subset)
+            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
                 "please create subset before initialization."
         self.subset = subset
         

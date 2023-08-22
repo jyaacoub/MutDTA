@@ -145,7 +145,7 @@ def train_val_test_split(dataset: InMemoryDataset,
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
     def __init__(self, model:BaseModel, save_path=None, train_all=False, 
-                 patience=5, min_delta=0.03, save_freq:int=50):
+                 patience=5, min_delta=0.03, save_freq:int=50, debug=False):
         """
         Early stopping and checkpoint saving class.
 
@@ -171,6 +171,7 @@ class CheckpointSaver:
         self.patience = patience
         self.min_delta = min_delta 
         self.save_freq = save_freq
+        self.debug = debug
         
         self.new_model(model, save_path)
     
@@ -204,6 +205,7 @@ class CheckpointSaver:
         
     def early_stop(self, validation_loss, curr_epoch):
         """Check if early stopping condition is met. Call after each epoch."""
+        if self.debug: return False
         assert self.model is not None, 'model is None, please set model first'
         # save model if validation loss is lower than previous best
         if validation_loss < self.min_val_loss:

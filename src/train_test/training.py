@@ -6,15 +6,22 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
+from ray import air, tune
+from ray.air import session
+from ray.tune.schedulers import ASHAScheduler
+
+
 from src.train_test.utils import train_val_test_split, CheckpointSaver
-from src.models.prior_work import DGraphDTA
 from src.models.utils import BaseModel
+from src.models.prior_work import DGraphDTA
+from src.data_processing.datasets import BaseDataset
 from torch_geometric.loader import DataLoader
+from src.utils.loader import Loader
 
 
 def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader, 
           device: torch.device, epochs=10, lr=0.001, 
-          saver: CheckpointSaver=None, **kwargs) -> dict:
+          saver: CheckpointSaver=None, silent=False, **kwargs) -> dict:
     """
     Training loop for graph models.
     Note that **kwargs is used to pass any additional arguments to the optimizer.
@@ -55,7 +62,8 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     saver.early_stop(val_loss, 0) 
     
     # validation loss before training
-    print(f"Epoch {0}/{epochs}: Val Loss: {val_loss:.4f} ")
+    if not silent:
+        print(f"Epoch {0}/{epochs}: Val Loss: {val_loss:.4f} ")
     # we dont save it to logs since this will not be useful information
     #   - either very high or the same as prev model (redundant)
     
@@ -65,7 +73,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         train_loss = 0.0
         with tqdm(total=len(train_loader), 
                   desc=f"Epoch {epoch}/{epochs}", 
-                  unit="batch") as progress_bar:
+                  unit="batch", disable=silent) as progress_bar:
             for data in train_loader:
                 batch_pro = data['protein'].to(device)
                 batch_mol = data['ligand'].to(device)
@@ -99,12 +107,13 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
         
-        if saver.early_stop(val_loss, epoch):
+        if saver.early_stop(val_loss, epoch) and not silent:
             print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
             break
         
         # Print training and validation loss for the epoch
-        print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
+        if not silent:
+            print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
 
@@ -161,6 +170,33 @@ def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray,
         test_loss /= len(test_loader)
     
     return test_loss, pred, actual
+
+
+def train_tune(config, train_dataset:BaseDataset, val_dataset:BaseDataset):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    model = config['model_cls'](dropout=config['dropout'])
+    model.to(device)
+    
+    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], 
+                            shuffle=True,
+                            num_workers=2)
+    val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], 
+                            shuffle=True,
+                            num_workers=2)
+    
+    saver = CheckpointSaver(model, debug=True)
+    for i in range(10): # 10 epochs
+        logs = train(model, train_loader, val_loader, device, epochs=1, 
+              lr=config['lr'], silent=True, saver=saver)
+        val_loss = logs['val_loss'][0]
+
+        # Send the current training result back to Tune
+        session.report({"val_loss": val_loss})
+
+        if i % 5 == 0:
+            # This saves the model to the trial directory
+            torch.save(model.state_dict(), "./model.pth")
+    
 
 
 def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
