@@ -1,19 +1,15 @@
 import time, os
-from pathlib import Path
 
 import torch
 from torch import nn
-import torch.backends.cudnn as cudnn
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
-from src.models.mut_dta import EsmDTA
-from src.models.prior_work import DGraphDTA
-
 from src.utils.loader import Loader
+from src.data_analysis.metrics import get_metrics
 
-from src.train_test.training import train
-from src.train_test.utils import init_node, init_dist_gpu, print_device_info
+from src.train_test.training import train, test
+from src.train_test.utils import CheckpointSaver, init_node, init_dist_gpu, print_device_info
 
 # distributed training fn
 def dtrain(args):
@@ -35,6 +31,13 @@ def dtrain(args):
     LEARNING_RATE = args.learning_rate
     EPOCHS = args.num_epochs
     
+    media_save_p = f'results/model_media/{DATA}/'
+    MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
+    model_save_dir = 'results/model_checkpoints/ours/'
+    MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,
+                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,EPOCHS)
+    MODEL_KEY = "DDP-" + MODEL_KEY
+    
     print(os.getcwd())
     print(f"----------------- DISTRIBUTED ARGS -----------------")
     print(f"         Local Batch size: {BATCH_SIZE}")
@@ -48,18 +51,21 @@ def dtrain(args):
     print_device_info(args.gpu)
     
     # ==== Load up training dataset ====
-    train_dataset = Loader.load_dataset(DATA, FEATURE, subset='train')
-    sampler = DistributedSampler(train_dataset, shuffle=True, 
-                                 num_replicas=args.world_size,
-                                 rank=args.rank, seed=0)
-    
-    train_loader = DataLoader(dataset=train_dataset, 
-                            sampler = sampler,
-                            batch_size=BATCH_SIZE, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
-                            num_workers = args.slurm_cpus_per_task, # number of subproc used for data loading
-                            pin_memory = True,
-                            drop_last = True
-                            )
+    loaders = {}
+    for d in ['train', 'test', 'val']:
+        dataset = Loader.load_dataset(DATA, FEATURE, subset=d)
+        sampler = DistributedSampler(dataset, shuffle=True, 
+                                    num_replicas=args.world_size,
+                                    rank=args.rank, seed=0)
+        bs = 1 if d == 'test' else BATCH_SIZE
+        loader = DataLoader(dataset=dataset, 
+                                sampler = sampler,
+                                batch_size=bs, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
+                                num_workers = args.slurm_cpus_per_task, # number of subproc used for data loading
+                                pin_memory = True,
+                                drop_last = True
+                                )
+        loaders[d] = loader
     print(f"Data loaded")
     
     # ==== Load model ====
@@ -70,37 +76,29 @@ def dtrain(args):
     model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
     
     
-    # ==== train (this was modified from `train_test/training.py`):  ====
-    CRITERION = torch.nn.MSELoss()
-    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # ==== train ====
+    cp_saver = CheckpointSaver(model=model, save_path=f'{model_save_dir}/{MODEL_KEY}.model',
+                            train_all=False,
+                            patience=10, min_delta=0.1,
+                            save_freq=10,
+                            dist_rank=args.rank)
+    if os.path.exists(cp_saver.save_path):
+        print('# Model already trained')
+    else:
+        print("starting training:")
+        train(model, loaders['train'], loaders['val'], args.gpu, EPOCHS, 
+              LEARNING_RATE, cp_saver)
+        
+        cp_saver.save()
     
-    print("starting training:")
-    #TODO: add validation data.
-    for epoch in range(1, EPOCHS+1):
-        START_T = time.time()
-        
-        # Training loop
-        model.train()
-        train_loss = 0.0
-        for data in train_loader:
-            batch_pro = data['protein'].cuda(args.gpu) 
-            batch_mol = data['ligand'].cuda(args.gpu) 
-            labels = data['y'].reshape(-1,1).cuda(args.gpu) 
-            
-            # Forward pass
-            predictions = model(batch_pro, batch_mol)
-
-            # Compute loss
-            loss = CRITERION(predictions, labels)
-            train_loss += loss.item()
-
-            # Backward pass and optimization
-            OPTIMIZER.zero_grad()
-            loss.backward()
-            OPTIMIZER.step()
-
-        # Compute average training loss for the epoch
-        train_loss /= len(train_loader)
-        
-        # Print training and validation loss for the epoch
-        print(f"Epoch {epoch}/{EPOCHS}: Train Loss: {train_loss:.4f}, Time elapsed: {time.time()-START_T}")
+    # ==== Evaluate ====
+    loss, pred, actual = test(model, loaders['test'], args.gpu)
+    print("Test loss:", loss)
+    if args.rank == 0:
+        get_metrics(actual, pred,
+                    save_results=True,
+                    save_path=media_save_p,
+                    model_key=MODEL_KEY,
+                    csv_file=MODEL_STATS_CSV,
+                    show=False,
+                    )

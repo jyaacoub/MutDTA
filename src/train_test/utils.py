@@ -144,8 +144,8 @@ def train_val_test_split(dataset: InMemoryDataset,
 
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-    def __init__(self, model:BaseModel, save_path=None, train_all=False, 
-                 patience=5, min_delta=0.03, save_freq:int=50, debug=False):
+    def __init__(self, model:BaseModel, save_path=None, train_all=False, patience=5, 
+                 min_delta=0.03, save_freq:int=50, debug=False, dist_rank:int=None):
         """
         Early stopping and checkpoint saving class.
 
@@ -166,12 +166,16 @@ class CheckpointSaver:
         `save_freq` : int, optional
             Number of epochs between saving checkpoints. Set to None to stop this behaviour, 
             by default 50.
+        `dist_rank` : int, optional
+            Whether or not this is for a distributed run, if it is this number will indicate 
+            the rank of this particular process, by default None.
         """
         self.train_all = train_all 
         self.patience = patience
         self.min_delta = min_delta 
         self.save_freq = save_freq
         self.debug = debug
+        self.dist_rank = dist_rank
         
         self.new_model(model, save_path)
     
@@ -227,10 +231,15 @@ class CheckpointSaver:
         return False
 
     def save(self, path:str=None, silent=False):
-        path = path or self.save_path   
-        # save model default path is model class name + best epoch
-        torch.save(self.best_model_dict, path)
-        if not silent: print(f'Model saved to: {path}')
+        # only allow the main process to save models
+        if self.dist_rank is None or self.dist_rank == 0:
+            path = path or self.save_path
+            # save model default path is model class name + best epoch
+            torch.save(self.best_model_dict, path)
+            if not silent: print(f'Model saved to: {path}')
+        elif not silent:
+            print(f'WARNING: No saving on main process')
+            
         
     def __repr__(self) -> str:
         return f'save path: {self.save_path}'+ \
