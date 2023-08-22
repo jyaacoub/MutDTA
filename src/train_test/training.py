@@ -6,11 +6,6 @@ from tqdm import tqdm
 import torch
 import numpy as np
 
-from ray import air, tune
-from ray.air import session
-from ray.tune.schedulers import ASHAScheduler
-
-
 from src.train_test.utils import train_val_test_split, CheckpointSaver
 from src.models.utils import BaseModel
 from src.models.prior_work import DGraphDTA
@@ -173,6 +168,7 @@ def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray,
 
 
 def train_tune(config, train_dataset:BaseDataset, val_dataset:BaseDataset):
+    from ray.air import session
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     model = config['model_cls'](dropout=config['dropout'])
     model.to(device)

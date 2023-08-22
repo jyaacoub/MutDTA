@@ -34,8 +34,8 @@ def dtrain(args):
     media_save_p = f'results/model_media/{DATA}/'
     MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
     model_save_dir = 'results/model_checkpoints/ours/'
-    MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,
-                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,EPOCHS)
+    MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,BATCH_SIZE*args.world_size,
+                                     LEARNING_RATE,DROPOUT,EPOCHS)
     MODEL_KEY = "DDP-" + MODEL_KEY
     
     print(os.getcwd())
@@ -49,6 +49,7 @@ def dtrain(args):
     
     print(f'----------------- GPU INFO ------------------------')
     print_device_info(args.gpu)
+    
     
     # ==== Load up training dataset ====
     loaders = {}
@@ -67,6 +68,7 @@ def dtrain(args):
                                 )
         loaders[d] = loader
     print(f"Data loaded")
+    
     
     # ==== Load model ====
     # args.gpu is the local rank for this process
@@ -90,6 +92,7 @@ def dtrain(args):
               LEARNING_RATE, cp_saver)
         
         cp_saver.save()
+    
     
     # ==== Evaluate ====
     loss, pred, actual = test(model, loaders['test'], args.gpu)
