@@ -5,6 +5,7 @@ import submitit
 import numpy as np
 
 import torch
+from torch import nn
 import torch.distributed as dist
 import numpy as np
 import pandas as pd
@@ -196,7 +197,10 @@ class CheckpointSaver:
     def model(self, model:BaseModel):
         self._model = model
         if model is not None:
-            self.best_model_dict = model.state_dict()
+            if isinstance(self.best_model_dict, nn.DataParallel):
+                self.best_model_dict = model.module.state_dict()
+            else:
+                self.best_model_dict = model.state_dict()
 
     def new_model(self, model:BaseModel, save_path:str):
         """Updates internal model and resets internal state"""
@@ -215,7 +219,10 @@ class CheckpointSaver:
         if validation_loss < self.min_val_loss:
             self.min_val_loss = validation_loss
             self._counter = 0
-            self.best_model_dict = self._model.state_dict()
+            if isinstance(self.best_model_dict, nn.DataParallel):
+                self.best_model_dict = self._model.module.state_dict()
+            else:
+                self.best_model_dict = self._model.state_dict()
             self.best_epoch = curr_epoch
         
         # early stopping if validation loss doesnt improve for `patience` epochs
