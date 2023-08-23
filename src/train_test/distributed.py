@@ -39,6 +39,18 @@ def dtrain(args):
     MODEL_KEY = "DDP-" + MODEL_KEY
     
     print(os.getcwd())
+    print(f"---------------- MODEL OPT ---------------")
+    print(f"     Selected og_model_opt: {args.model_opt}")
+    print(f"         Selected data_opt: {args.data_opt}")
+    print(f" Selected feature_opt list: {args.feature_opt}")
+    print(f"    Selected edge_opt list: {args.edge_opt}")
+    print(f"           forced training: {args.train}\n")
+
+    print(f"-------------- HYPERPARAMETERS -----------")
+    print(f"            Learning rate: {args.learning_rate}")
+    print(f"                  Dropout: {args.dropout}")
+    print(f"               Num epochs: {args.num_epochs}\n")
+    
     print(f"----------------- DISTRIBUTED ARGS -----------------")
     print(f"         Local Batch size: {BATCH_SIZE}")
     print(f"        Global Batch size: {BATCH_SIZE*args.world_size}")

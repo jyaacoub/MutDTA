@@ -7,9 +7,8 @@ from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
 args = parse_train_test_args(verbose=True, distributed=True,
-                             # 16 * 4 = 64 batch size
-                             jyp_args='-m DG -d davis -f nomsa -e simple -bs 16 ' + \
-                                      '-s_t 1200 -s_m 10GB -s_nn 1 -s_ng 4') #slurm args
+            # includes slurm arguments "s_*"
+            jyp_args='-m DG -d davis -f nomsa -e binary -bs 32 -s_t 1200 -s_m 10GB -s_nn 1 -s_ng 2')
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)

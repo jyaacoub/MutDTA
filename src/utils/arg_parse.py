@@ -188,25 +188,23 @@ def parse_train_test_args(verbose=True, distributed=False,
         add_slurm_dist_args(parser)
     args = safe_parse(parser, jyp_args=jyp_args)
 
-    # Model training args:
-    model_opt = args.model_opt
-    data_opt = args.data_opt
-    feature_opt = args.feature_opt
-    edge_opt = args.edge_opt
+    # Model training args
     
     if verbose:
         # Now you can use the selected options in your code as needed
         if args.debug: print(f'|============|! DEBUG MODE !|============|\n')
-
+        global_bs = args.batch_size
+        if distributed:
+            global_bs *= args.slurm_nnodes * args.slurm_ngpus
         print(f"---------------- MODEL OPT ---------------")
-        print(f"     Selected og_model_opt: {model_opt}")
-        print(f"         Selected data_opt: {data_opt}")
-        print(f" Selected feature_opt list: {feature_opt}")
-        print(f"    Selected edge_opt list: {edge_opt}")
+        print(f"     Selected og_model_opt: {args.model_opt}")
+        print(f"         Selected data_opt: {args.data_opt}")
+        print(f" Selected feature_opt list: {args.feature_opt}")
+        print(f"    Selected edge_opt list: {args.edge_opt}")
         print(f"           forced training: {args.train}\n")
 
         print(f"-------------- HYPERPARAMETERS -----------")
-        print(f"               Batch size: {args.batch_size}")
+        print(f"               Batch size: {global_bs}")
         print(f"            Learning rate: {args.learning_rate}")
         print(f"                  Dropout: {args.dropout}")
         print(f"               Num epochs: {args.num_epochs}\n")

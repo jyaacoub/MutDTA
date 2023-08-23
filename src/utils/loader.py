@@ -3,6 +3,7 @@ from functools import wraps
 from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
+from src.utils import config # sets up os env for HF
 
 def validate_args(valid_options):
     def decorator(func):
