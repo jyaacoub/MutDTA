@@ -96,14 +96,17 @@ def dtrain(args):
                             patience=10, min_delta=0.1,
                             save_freq=10,
                             dist_rank=args.rank)
-    if os.path.exists(cp_saver.save_path):
-        print('# Model already trained')
-    else:
-        print("starting training:")
-        train(model, loaders['train'], loaders['val'], args.gpu, EPOCHS, 
-              LEARNING_RATE, cp_saver)
-        
-        cp_saver.save()
+    if os.path.exists(cp_saver.save_path + '_tmp'):
+        print('# Model already trained, loading checkpoint')
+        # load ckpnt
+        model.load_state_dict(torch.load(cp_saver.save_path, 
+                                         map_location=args.gpu))
+    
+    print("starting training:")
+    train(model, loaders['train'], loaders['val'], args.gpu, EPOCHS, 
+            LEARNING_RATE, cp_saver)
+    
+    cp_saver.save()
     
     
     # ==== Evaluate ====

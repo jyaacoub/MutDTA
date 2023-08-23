@@ -7,8 +7,8 @@ from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
 args = parse_train_test_args(verbose=True, distributed=True,
-            # includes slurm arguments "s_*"
-            jyp_args='-m DG -d davis -f nomsa -e binary -bs 32 -s_t 1200 -s_m 10GB -s_nn 1 -s_ng 2')
+            # includes slurm arguments "s_*" # 3days == 4320 mins
+            jyp_args='-m DG -d davis -f nomsa -e binary -bs 32 -s_t 2160 -s_m 10GB -s_nn 1 -s_ng 2')
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
@@ -25,7 +25,7 @@ executor.update_parameters(
     slurm_gpus_per_node=f'v100:{args.slurm_ngpus}',
     tasks_per_node=args.slurm_ngpus,
     
-    slurm_job_name=f'Test_gpu_{args.slurm_ngpus}',
+    slurm_job_name=f'DDP-{args.model_opt[0]}_{args.data_opt[0]}_{args.slurm_ngpus}',
     slurm_partition="gpu",
     slurm_account='kumargroup_gpu',
     slurm_mem=args.slurm_mem,
