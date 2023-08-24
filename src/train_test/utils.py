@@ -197,7 +197,7 @@ class CheckpointSaver:
     def model(self, model:BaseModel):
         self._model = model
         if model is not None:
-            if isinstance(self.best_model_dict, nn.DataParallel):
+            if isinstance(model, nn.DataParallel):
                 self.best_model_dict = model.module.state_dict()
             else:
                 self.best_model_dict = model.state_dict()
@@ -219,7 +219,7 @@ class CheckpointSaver:
         if validation_loss < self.min_val_loss:
             self.min_val_loss = validation_loss
             self._counter = 0
-            if isinstance(self.best_model_dict, nn.DataParallel):
+            if isinstance(self._model, nn.DataParallel):
                 self.best_model_dict = self._model.module.state_dict()
             else:
                 self.best_model_dict = self._model.state_dict()
@@ -245,7 +245,7 @@ class CheckpointSaver:
             torch.save(self.best_model_dict, path)
             if not silent: print(f'Model saved to: {path}')
         elif not silent:
-            print(f'WARNING: No saving on main process')
+            print(f'WARNING: No saving on non-main process')
             
         
     def __repr__(self) -> str:

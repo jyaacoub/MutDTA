@@ -96,11 +96,12 @@ def dtrain(args):
                             patience=10, min_delta=0.1,
                             save_freq=10,
                             dist_rank=args.rank)
-    if os.path.exists(cp_saver.save_path + '_tmp'):
+    if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
         print('# Model already trained, loading checkpoint')
         # load ckpnt
-        model.load_state_dict(torch.load(cp_saver.save_path, 
-                                         map_location=args.gpu))
+        model.load_state_dict(torch.load(cp_saver.save_path + '_tmp', 
+                                map_location=torch.device(f'cuda:{args.gpu}')))
+    torch.distributed.barrier()
     
     print("starting training:")
     train(model, loaders['train'], loaders['val'], args.gpu, EPOCHS, 
