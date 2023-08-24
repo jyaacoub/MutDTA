@@ -1,81 +1,53 @@
 #%%
-from src.data_processing.datasets import PlatinumDataset
-PlatinumDataset('./data/plat', './data/plat')
-
-
-#%%
-import os, random, itertools, math, pickle, json, time
-import config
-
-
-from tqdm import tqdm
-import pandas as pd
-import numpy as np
-
-
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-
-from src.models.prior_work import DGraphDTA, DGraphDTAImproved
+from src.train_test.training import train_tune
+from src.models.prior_work import DGraphDTA
 from src.models.mut_dta import EsmDTA, EsmAttentionDTA
-from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
-from src.data_processing.utils import train_val_test_split
-from src.models import train, test, CheckpointSaver
-from src.models.utils import print_device_info
-from src.data_analysis import get_metrics
-from src.feature_extraction.protein import multi_save_cmaps
-import torch
-from src.models import debug
+from src.utils.loader import Loader
+from src.utils import config
+import pickle
 
-device = torch.device('cuda:0')
 
-#%% 
+#%%
+import ray
+from ray import tune
+ray.init(num_cpus=6, num_gpus=3)
+
+
+# %%
+MODEL = 'EDI'
+PRO_FEATURE = 'nomsa'
 DATA = 'davis'
-FEATURE = 'nomsa'
-DATA_ROOT = f'../data/{DATA}/' # where to get data from
-TRAIN_SPLIT, VAL_SPLIT, RAND_SEED, BATCH_SIZE = 0.8, 0.1, 0, 4
-dataset = DavisKibaDataset(
-        save_root=f'../data/DavisKibaDataset/{DATA}_{FEATURE}/',
-        data_root=DATA_ROOT,
-        aln_dir=f'{DATA_ROOT}/aln/',
-        cmap_threshold=-0.5, 
-        feature_opt=FEATURE
-        )
-#%%
-train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-        train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
-        shuffle_dataset=True, random_seed=RAND_SEED, 
-        batch_train=BATCH_SIZE, use_refined=False,
-        split_by_prot=True
-        )
+data_root = "/cluster/home/t122995uhn/projects/data"# WARNING: HARD CODED PATH
 
-# %%
-mdl = EsmAttentionDTA().to(device)
-debug(mdl, train_loader, device)
-
-# %%
-self = mdl
-for data in train_loader: break
-
-data = data['protein'].to(device)
+config = {    
+    "edge": tune.grid_search(['simple', 'binary']),
+    "dropout": tune.grid_search([0.1, 0.2, 0.4, 0.5]),
+    
+    "lr": tune.grid_search([1e-4, 1e-3, 1e-2]),
+    "batch_size": tune.grid_search([4, 5, 6, 10, 12]),
+}
 
 #%%
-# cls and sep tokens are added to the sequence by the tokenizer
-seq_tok = self.esm_tok(data.pro_seq, 
-                        return_tensors='pt', 
-                        padding=True) # [B, L_max+2]
-seq_tok['input_ids'] = seq_tok['input_ids'].to(data.x.device)
-seq_tok['attention_mask'] = seq_tok['attention_mask'].to(data.x.device)
+train_dataset = Loader.load_dataset(DATA, PRO_FEATURE, subset='train', path=data_root) 
+val_dataset = Loader.load_dataset(DATA, PRO_FEATURE, subset='val', path=data_root)
 
-esm_emb = self.esm_mdl(**seq_tok).last_hidden_state # [B, L_max+2, emb_dim]
-
-#%%
-x1 = self.pro_encode(esm_emb, 
-                    src_key_padding_mask=~seq_tok['attention_mask'].bool().T)
-
-# [B, L_max+2, emb_dim]
-# pool data -> [B, emb_dim]
-x2 = torch.mean(x1, dim=1)
-print(x2.shape)
-
+tuner = tune.Tuner(
+    tune.with_resources(
+        tune.with_parameters(train_tune, model=MODEL, pro_feature=PRO_FEATURE,
+                             train_dataset=train_dataset, 
+                             val_dataset=val_dataset),
+        resources={"cpu": 2, "gpu": 1}
+    ),
+    tune_config=tune.TuneConfig(
+        metric="val_loss",
+        mode="min",
+    ),
+    param_space=config,
+)
 # %%
+results = tuner.fit()
+print(results)
+print(results.get_best_result())
+
+with open(f'{MODEL}_{PRO_FEATURE}_{DATA}-rayTuneResults.pickle', 'wb') as handle:
+    pickle.dump(results, handle)
