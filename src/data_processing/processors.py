@@ -82,7 +82,7 @@ class Processor:
         return mut_seq, ref_seq
             
     @staticmethod    
-    def pdb_get_chains(pdb_file: str, check_missing=False) -> OrderedDict:
+    def pdb_get_chains(pdb_file: str, check_missing=False, model=1) -> OrderedDict:
         """
         Reads a pdb file and returns a dict of dicts with the following structure:
             {chain: {residue: {atom: np.array([x,y,z])}}}
@@ -93,12 +93,15 @@ class Processor:
             Path to pdb file
         `check_missing` : bool, optional
             Throws error if missing residues, by default True
+        `model`: int, optional
+            Model number to focus on
 
         Returns
         -------
         OrderedDict
             Dict of dicts with the chain as the key and the value is a dict with the residue as the key
         """
+        assert model == 1, 'Model selection not supported, only first model is read!'
         
         # read and filter
         with open(pdb_file, 'r') as f:
@@ -107,6 +110,7 @@ class Processor:
             curr_res, prev_res = None, None
             curr_chain, prev_chain = None, None
             for line in lines:
+                if line[:6].strip() == 'ENDMDL': break # only get first model
                 if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
                 
                 prev_res, curr_res = curr_res, int(line[22:26])
