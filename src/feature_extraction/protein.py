@@ -47,7 +47,7 @@ def get_target_edge(target_sequence:str, contact_map:str or np.array,
     # threshold
     # array of points for edge index (2,L) where L < seq_len**2
     if threshold >= 0.0:
-        # NOTE: for real cmaps self loop is implied since the diagonal is already 0
+        # NOTE: for real cmaps self loop is implied since the diagonal is 0
         edge_index = np.array(np.where(contact_map <= threshold))
         edge_weight = contact_map[edge_index[0], edge_index[1]]
         # normalize to be between 6A and 14A
@@ -95,7 +95,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     Tuple[np.array]
         tuple of (target_feature, target_edge_index)
     """
-    edge_index, edge_weight = get_target_edge(target_sequence, contact_map, threshold)
+    edge_index, _ = get_target_edge(target_sequence, contact_map, threshold)
     # getting node features
     
     # aln_dir = 'data/' + dataset + '/aln'
@@ -127,7 +127,33 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
-    return target_feature, edge_index, edge_weight
+    return target_feature, edge_index
+
+def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10):
+    """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
+    from prody import parsePDB, calcANM, calcCrossCorr
+
+    pdb = parsePDB(pdb_fp, subset='calpha').getHierView()
+    
+    anm = None
+    for chain in pdb:
+        if chain.getSequence() == target_seq:
+            anm, _ = calcANM(chain, selstr='calpha', n_modes=n_modes)
+            break
+    
+    if anm is None:
+        raise ValueError(f"No matching chain found in pdb file ({pdb_fp})")
+    else:
+        # norm=True normalizes it from -1.0 to 1.0
+        cc = calcCrossCorr(anm[:n_modes], n_cpu=1, norm=True)
+    
+    return cc
+
+def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, n_modes:int=10):
+    cc = get_cross_correlation(pdb_fp, target_seq, n_modes)
+    
+    
+    
 
 def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
     """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
