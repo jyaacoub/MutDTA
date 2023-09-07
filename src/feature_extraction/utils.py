@@ -26,7 +26,9 @@ class ResInfo():
         'LEU': 'L', 'LYS': 'K', 'MET': 'M', 'PHE': 'F',
         
         'PRO': 'P', 'SER': 'S', 'THR': 'T', 'TRP': 'W',
-        'TYR': 'Y', 'VAL': 'V'
+        'TYR': 'Y', 'VAL': 'V',
+        
+        # Non-standard amino acids:
     }
     code_to_pep = {v: k for k, v in pep_to_code.items()}
     

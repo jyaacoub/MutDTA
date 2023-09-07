@@ -9,6 +9,7 @@ import os, math
 import pandas as pd
 from src.feature_extraction.utils import ResInfo, one_hot
 from src.data_processing.processors import Processor
+from prody import AtomGroup
 
 ########################################################################
 ###################### Protein Feature Extraction ######################
@@ -305,21 +306,15 @@ def residue_features(residue):
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
 
-def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
-                display=False, title="Residue Contact Map") -> np.array:
+def get_contact_map(chain: AtomGroup, display=False, title="Residue Contact Map") -> np.array:
     """
     Given the residue chain dict this will return the residue contact map for that structure.
         See: `get_sequence` for details on getting the residue chain dict.
 
     Parameters
     ----------
-    `residues` : OrderedDict
-        Residue chain dict extracted from pdb file.
-    `CA_only` : bool, optional
-        If true then only use alpha carbon for distance calculation. Otherwise follow DGraphDTA 
-        definition using CB for all except glycine, by default True
-    `check_missing` : bool, optional
-        Checks to ensure no residues are missing, by default False
+    `chain` : AtomGroup
+        AtomGroup chain parsed from pdb file.
     `display` : bool, optional
         If true will display the contact map, by default False
     `title` : str, optional
@@ -337,25 +332,7 @@ def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
     """
     
     # getting coords from residues
-    coords = []
-    if CA_only:
-        for res in residues.values():
-            coords.append(res["CA"])
-    else:
-        for code in residues:
-            res = residues[code]
-            try:
-                coords.append(res["CB"] if res["name"] != "GLY" else res["CA"])
-            except KeyError as e:
-                # CB missing in residue that is not GLY
-                if check_missing:
-                    print(e)
-                    print(code)
-                    print(res)
-                    raise e
-                else:
-                    coords.append(res['CA'])
-                
+    coords = chain.getCoords()
     
     # Main loop to calc matrix
     m = np.zeros((len(coords), len(coords)), np.float32)
@@ -374,36 +351,11 @@ def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
         
     return m
 
-def get_sequence(pdb_file: str, check_missing=False, 
-                select_largest=True) -> Tuple[str, OrderedDict]:
+def get_sequence(pdb_file: str) -> Tuple[str, OrderedDict]:
     """
-    Given a pdb file path this will return the residue sequence for that structure
-    (could be missing residues) and the residue dict in order of seq# that contains coords.
-
-    Args:
-        pdb_file (str): path to .pdb file to process.
-        check_missing (bool, optional): Adds check to ensure all residues are available. 
-                                Defaults to False.
-        select_largest (bool, optional): If True, only the largest chain is used. Otherwise
-                    returns all chains. Defaults to True.
-        
-    Returns:
-        Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
-        
-    """
-    # getting residue chain dict
-    chains = Processor.pdb_get_chains(pdb_file, check_missing)
-    
-    return_chain = next(iter(chains.values())) # first chain
-    # getting sequence of largest chain
-    if select_largest:
-        return_chain = max(chains.values(), key=lambda x: len(x))
-        
-    seq = '' # sequence of residues based on pdb file
-    for res in return_chain:
-        seq += ResInfo.pep_to_code[return_chain[res]["name"]]
-            
-    return seq, return_chain
+    Deprecated please use `chain = Processor.pdb_get_chain(pdb_file)` instead.
+    """    
+    pass
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
@@ -436,38 +388,29 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     """
     seqs = {}
     for code in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
-        seqs[code], res = get_sequence(pdb_p(code), 
-                                check_missing=check_missing, 
-                                select_largest=True)
+        chain = Processor.pdb_get_chain(pdb_p(code))
+        seqs[code] = chain.getSequence()
         # only get cmap if it doesnt exist
         if not os.path.isfile(cmap_p(code)):
-            cmap = get_contact_map(res,
-                            CA_only=CA_only, # CB is needed by DGraphDTA
-                            check_missing=check_missing)
+            cmap = get_contact_map(chain)
             np.save(cmap_p(code), cmap)
         
     return seqs
 
 def _save_cmap(args):
-    pdb_f, cmap_f, CA_only, check_missing = args
-    
+    pdb_f, cmap_f, = args
     # skip if already created
     if os.path.isfile(cmap_f): return
-    _, res = get_sequence(pdb_f, check_missing=check_missing)
-    cmap = get_contact_map(res,
-                    CA_only=CA_only, # CB is needed by DGraphDTA
-                    check_missing=check_missing)
+    cmap = get_contact_map(Processor.pdb_get_chain(pdb_f))
     np.save(cmap_f, cmap)
     
 def multi_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
-                      CA_only=False,
-                      check_missing=False,
                       processes=8) -> dict:
     
         
-    args = [[pdb_p(code), cmap_p(code), CA_only, check_missing] for code in pdbcodes]
+    args = [[pdb_p(code), cmap_p(code)] for code in pdbcodes]
     with Pool(processes=processes) as pool:
         print('Starting process')
         list(tqdm(pool.imap(_save_cmap, args),
@@ -485,46 +428,4 @@ def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     raise NotImplementedError("This function is not complete (see yumika)")
 
 if __name__ == "__main__":
-    from tqdm import tqdm
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import os
-
-    PDBbind = '/cluster/projects/kumargroup/jean/data/refined-set'
-    path = lambda c: f'{PDBbind}/{c}/{c}_protein.pdb'
-    cmap_p = lambda c: f'{PDBbind}/{c}/{c}_contact_CA.npy'
-
-    # %% main loop to create and save contact maps
-    cmaps = {}
-    for code in tqdm(os.listdir(PDBbind)[32:100]):
-        if os.path.isdir(os.path.join(PDBbind, code)) and code not in ["index", "readme"]:
-            try:
-                cmap, _ = get_contact_map(path(code), CA_only=True)
-                cmaps[code] = cmap
-            except Exception as e:
-                print(code)
-                raise e
-            # np.save(cmap_p(code), cmap)
-            
-    #%% Displaying:
-    r,c = 10,10
-    f, ax = plt.subplots(r,c, figsize=(15, 15))
-    i=0
-    threshold = None
-    for i, code in enumerate(cmaps.keys()):
-        cmap = cmaps[code] if threshold is None else cmaps[code] < threshold
-        ax[i//c][i%c].imshow(cmap)
-        ax[i//c][i%c].set_title(code)
-        ax[i//c][i%c].axis('off')
-        i+=1
-        
-        
-    #%% Create and save just sequences:
-    df_x = pd.read_csv('data/PDBbind/kd_ki/X.csv', index_col=0) 
-    df_seq = pd.DataFrame(index=df_x.index, columns=['seq'])
-    for code in tqdm(df_x.index, 'Getting experimental sequences'):
-        seq, _ = get_sequence(path(code), check_missing=False, raw=False, select_largest=True)
-        df_seq.loc[code]['seq'] = seq
-        
-    # save sequences
-    df_seq.to_csv('data/PDBbind/kd_ki/pdb_seq_lrgst.csv')
+    print("hi")

@@ -651,17 +651,17 @@ class PlatinumDataset(BaseDataset):
             pdb = row['affin.pdb_id']
             t_chain = row['affin.chain']
             
-            # getting sequence from pdb file:
+            # Getting sequence from pdb file:
             pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chains = PDBbindProcessor.pdb_get_chains(pdb_fp, check_missing=False)
+            chain = PDBbindProcessor.pdb_get_chain(pdb_fp, model=0, t_chain=t_chain) #TODO: replace with Prody call
             
-            # getting and saving contact map:
+            # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
-                cmap = get_contact_map(chains[t_chain])
+                cmap = get_contact_map(chain)
                 np.save(self.cmap_p(i), cmap)
             
-            mut_seq, ref_seq = PDBbindProcessor.get_mutated_seq(chains[t_chain], 
-                                                                mut.split('/'))
+            mut_seq = PDBbindProcessor.get_mutated_seq(chain, mut.split('/'))
+            ref_seq = chain.getSequence()
             # getting mutated sequence:
             if self.mutated:
                 prot_seq[i] = (pdb, mut_seq)

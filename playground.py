@@ -10,9 +10,8 @@ import pickle
 
 import numpy as np
 import pandas as pd
-from src.feature_extraction.protein import get_sequence
+from src.data_processing.processors import Processor
 from prody import parsePDB, calcANM
-from prody import delNonstdAminoacid
 
 # delNonstdAminoacid('SEP')
 
@@ -24,7 +23,8 @@ hv = parsePDB('../data/v2020-other-PL/5swg/5swg_protein.pdb', subset='calpha').g
 for c in hv: print(c)
 
 #%%
-seq_mine, ch = get_sequence('../data/v2020-other-PL/5swg/5swg_protein.pdb')
+ch = Processor.pdb_get_chain('../data/v2020-other-PL/5swg/5swg_protein.pdb', model=1)
+seq_mine = ch.getSequence()
 seq_real = hv['A'].getSequence()
 for i, c in enumerate(seq_real):
     if seq_real[i] != seq_mine[i]:
