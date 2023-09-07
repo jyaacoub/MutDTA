@@ -1,3 +1,69 @@
+#%%
+# from src.feature_extraction.process_msa import create_pfm_np_files
+
+# create_pfm_np_files('../data/PDBbind_aln/', processes=4)
+
+#%%
+from src.utils.loader import Loader
+from src.utils import config
+import pickle
+
+import numpy as np
+import pandas as pd
+from src.feature_extraction.protein import get_sequence
+from prody import parsePDB, calcANM
+from prody import delNonstdAminoacid
+
+# delNonstdAminoacid('SEP')
+
+
+td = Loader.load_dataset('PDBbind', 'nomsa',
+                                    path="/cluster/home/t122995uhn/projects/data") 
+
+hv = parsePDB('../data/v2020-other-PL/5swg/5swg_protein.pdb', subset='calpha').getHierView()
+for c in hv: print(c)
+
+#%%
+seq_mine, ch = get_sequence('../data/v2020-other-PL/5swg/5swg_protein.pdb')
+seq_real = hv['A'].getSequence()
+for i, c in enumerate(seq_real):
+    if seq_real[i] != seq_mine[i]:
+        print(f'{i}: MISMATCH')
+        print(f'\t{seq_real[i-3:i+3]}')
+        print(f'\t{seq_mine[i-3:i+3]}')
+        break
+
+
+#%%
+from prody import parsePDB, calcANM
+from src.feature_extraction.protein import calcCrossCorr
+
+idx=1
+pdb_fp = td.pdb_p(td[idx]['code'])
+target_seq = td[idx]['protein'].pro_seq
+n_modes=10
+
+pdb = parsePDB(pdb_fp, subset='calpha').getHierView()
+    
+anm = None
+for chain in pdb:
+    if chain.getSequence() == target_seq:
+        anm, _ = calcANM(chain, selstr='calpha', n_modes=n_modes)
+        break
+    
+if anm is None:
+    raise ValueError(f"No matching chain found in pdb file ({pdb_fp})")
+else:
+    # norm=True normalizes it from -1.0 to 1.0
+    cc = calcCrossCorr(anm[:n_modes], n_cpu=2, norm=True)
+
+
+
+
+
+
+
+###########################################################################################
 #%% selecting chain A to run ANM on:
 from prody import parsePDB, calcANM, calcCrossCorr
 import matplotlib.pyplot as plt

@@ -23,6 +23,7 @@ from src.data_processing.processors import PDBbindProcessor
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
+                 edge_opt='anm',
                  subset=None, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -45,8 +46,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
-        `feature_opt` : bool, optional
+        `feature_opt` : str, optional
             Choose from ['nomsa', 'msa', 'shannon']
+        `edge_opt` : str, optional
+            Choose from ['anm', 'af2']
         `subset` : str, optional
             If you want to name this dataset or load an existing version of this dataset 
             that is under a different name. For distributed training this is useful since 
@@ -78,11 +81,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         else:
             raise Exception(f"Invalid feature_opt '{feature_opt}' please pick from nomsa, msa, shannon")
             
+        assert edge_opt in ['anm'], f'Invalid edge_opt {edge_opt}'
+        self.edge_opt = edge_opt
+        
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
     @abc.abstractmethod
     def pdb_p(self, code):
+        """path to pdbfile for a particular protein"""
         raise NotImplementedError
     
     @abc.abstractmethod
@@ -212,13 +219,14 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
             pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
-                                                      pro_seq, n_modes=10)
+                                                      pro_seq, n_modes=10, n_cpu=2,
+                                                      edge_opt=self.edge_opt)
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
                 
             pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(pro_edge),
-                                # edge_weight=torch.Tensor(pro_edge_weight),
+                                edge_weight=torch.Tensor(pro_edge_weight),
                                 pro_seq=pro_seq, # protein sequence for downstream esm model
                                 prot_id=prot_id)
             processed_prots[prot_id] = pro

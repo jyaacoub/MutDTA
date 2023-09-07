@@ -129,9 +129,102 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     
     return target_feature, edge_index
 
-def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10):
+
+################## Temporary fix until issue is resolved (https://github.com/prody/ProDy/issues/1749) ##################
+from prody import Mode, NMA, ModeSet, calcCovariance
+from prody.utilities import div0
+import time
+def calcCrossCorr(modes, n_cpu=1, norm=True):
+    """Returns cross-correlations matrix.  For a 3-d model, cross-correlations
+    matrix is an NxN matrix, where N is the number of atoms.  Each element of
+    this matrix is the trace of the submatrix corresponding to a pair of atoms.
+    Covariance matrix may be calculated using all modes or a subset of modes
+    of an NMA instance.  For large systems, calculation of cross-correlations
+    matrix may be time consuming.  Optionally, multiple processors may be
+    employed to perform calculations by passing ``n_cpu=2`` or more."""
+
+    if not isinstance(n_cpu, int):
+        raise TypeError('n_cpu must be an integer')
+    elif n_cpu < 1:
+        raise ValueError('n_cpu must be equal to or greater than 1')
+
+    if not isinstance(modes, (Mode, NMA, ModeSet)):
+        if isinstance(modes, list):
+            try:
+                is3d = modes[0].is3d()
+            except:
+                raise TypeError('modes must be a list of Mode or Vector instances, '
+                            'not {0}'.format(type(modes)))
+        else:
+            raise TypeError('modes must be a Mode, NMA, or ModeSet instance, '
+                            'not {0}'.format(type(modes)))
+    else:
+        is3d = modes.is3d()
+    if is3d:
+        model = modes
+        if isinstance(modes, (Mode, ModeSet)):
+            model = modes._model
+            if isinstance(modes, (Mode)):
+                indices = [modes.getIndex()]
+                n_modes = 1
+            else:
+                indices = modes.getIndices()
+                n_modes = len(modes)
+        else:
+            n_modes = len(modes)
+            indices = np.arange(n_modes)
+        array = model._getArray()
+        n_atoms = model._n_atoms
+        variances = model._vars
+        if n_cpu == 1:
+            s = (n_modes, n_atoms, 3)
+            arvar = (array[:, indices]*variances[indices]).T.reshape(s)
+            array = array[:, indices].T.reshape(s)
+            covariance = np.tensordot(array.transpose(2, 0, 1),
+                                      arvar.transpose(0, 2, 1),
+                                      axes=([0, 1], [1, 0]))
+        else:
+            import multiprocessing
+            n_cpu = min(multiprocessing.cpu_count(), n_cpu)
+            queue = multiprocessing.Queue()
+            size = n_modes // n_cpu
+            for i in range(n_cpu):
+                if n_cpu - i == 1:
+                    indices = modes.getIndices()[i*size:]
+                else:
+                    indices = modes.getIndices()[i*size:(i+1)*size]
+                process = multiprocessing.Process(
+                    target=_crossCorrelations,
+                    args=(queue, n_atoms, array, variances, indices))
+                process.start()
+            while queue.qsize() < n_cpu:
+                time.sleep(0.05)
+            covariance = queue.get()
+            while queue.qsize() > 0:
+                covariance += queue.get()
+    else:
+        covariance = calcCovariance(modes)
+    if norm:
+        diag = np.power(covariance.diagonal(), 0.5)
+        D = np.outer(diag, diag)
+        covariance = div0(covariance, D)
+    return covariance
+
+def _crossCorrelations(queue, n_atoms, array, variances, indices):
+    """Calculate covariance-matrix for a subset of modes."""
+
+    n_modes = len(indices)
+    arvar = (array[:, indices] * variances[indices]).T.reshape((n_modes,
+                                                                n_atoms, 3))
+    array = array[:, indices].T.reshape((n_modes, n_atoms, 3))
+    covariance = np.tensordot(array.transpose(2, 0, 1),
+                              arvar.transpose(0, 2, 1),
+                              axes=([0, 1], [1, 0]))
+    queue.put(covariance)
+
+def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
     """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
-    from prody import parsePDB, calcANM, calcCrossCorr
+    from prody import parsePDB, calcANM
 
     pdb = parsePDB(pdb_fp, subset='calpha').getHierView()
     
@@ -145,15 +238,20 @@ def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10):
         raise ValueError(f"No matching chain found in pdb file ({pdb_fp})")
     else:
         # norm=True normalizes it from -1.0 to 1.0
-        cc = calcCrossCorr(anm[:n_modes], n_cpu=1, norm=True)
+        cc = calcCrossCorr(anm[:n_modes], n_cpu=n_cpu, norm=True)
     
     return cc
 
-def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, n_modes:int=10):
-    cc = get_cross_correlation(pdb_fp, target_seq, n_modes)
-    
-    
-    
+def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, 
+                            n_modes:int=5, n_cpu=4, edge_opt='anm'):
+    # edge weights should be returned as a list of Z weights
+    # where Z is the number of edges (|E|)
+    if edge_opt == 'anm':
+        # shape of |V|x|V| (V=vertices |V|=len(target_seq))
+        cc = get_cross_correlation(pdb_fp, target_seq, n_modes, n_cpu=n_cpu)
+        return cc[edge_index[0], edge_index[1]]
+    else:
+        raise ValueError(f'Invalid edge_opt {edge_opt}')
 
 def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
     """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
