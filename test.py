@@ -1,4 +1,7 @@
 #%%
+
+#%%
+from src.utils import config
 import torch
 from torch_geometric.loader import DataLoader
 
@@ -9,13 +12,12 @@ from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.utils.loader import Loader
 
 
-
-MODEL = 'DG'
+MODEL = 'EDI'
 DATA = 'davis'
 FEATURE = 'nomsa'
-EDGE = 'simple'
-BATCH_SIZE = 16
-LEARNING_RATE = 0.0001
+EDGE = 'binary'
+BATCH_SIZE = 32
+LEARNING_RATE = 1e-4
 DROPOUT = 0.4
 EPOCHS = 2000
 checkpoint_p = lambda x: f'results/model_checkpoints/ours/{x}.model_tmp'
@@ -27,6 +29,8 @@ MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGE,
                                      BATCH_SIZE,LEARNING_RATE,DROPOUT,EPOCHS)
 MODEL_KEY = 'DDP-' + MODEL_KEY
+
+print(checkpoint_p(MODEL_KEY))
 
 # %%
 test_dataset = Loader.load_dataset(DATA, FEATURE, subset='test', path='../data')

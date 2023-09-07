@@ -99,6 +99,6 @@ class Loader():
                     subset=subset
                     )
         else:
-            raise Exception('invalid data option?')
+            raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
             
         return dataset
