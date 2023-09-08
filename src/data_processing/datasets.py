@@ -662,6 +662,7 @@ class PlatinumDataset(BaseDataset):
             
             mut_seq = PDBbindProcessor.get_mutated_seq(chain, mut.split('/'))
             ref_seq = chain.getSequence()
+            
             # getting mutated sequence:
             if self.mutated:
                 prot_seq[i] = (pdb, mut_seq)
