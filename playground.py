@@ -1,6 +1,6 @@
 #%%
 import pandas as pd
-
+code = "3eql"
 df_old = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/old_nomsa/full/XY.csv', index_col=0)
 df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa/full/XY.csv', index_col=0)
 
@@ -14,7 +14,8 @@ dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
                     edge_opt='anm',
-                    feature_opt=FEATURE
+                    feature_opt=FEATURE,
+                    overwrite=True
                     )
 
 #%%

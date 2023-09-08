@@ -24,7 +24,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
                  edge_opt='anm',
-                 subset=None, *args, **kwargs):
+                 subset=None, 
+                 overwrite=False, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -83,6 +84,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         assert edge_opt in ['anm'], f'Invalid edge_opt {edge_opt}'
         self.edge_opt = edge_opt
+        self.overwrite = overwrite
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
@@ -214,10 +216,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                         total=len(unique_df)):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
-            extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
+            try:
+                extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
+            except AssertionError as e:
+                raise Exception(f"error on protein creation for code {code}") from e
             pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
                                                       pro_seq, n_modes=10, n_cpu=2,
                                                       edge_opt=self.edge_opt)
@@ -372,7 +377,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         #TODO: replace this to save cmaps by protID instead
         seqs = create_save_cmaps(pdb_codes,
                           pdb_p=self.pdb_p,
-                          cmap_p=self.cmap_p)
+                          cmap_p=self.cmap_p,
+                          overwrite=self.overwrite)
         
         assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
         df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])

@@ -359,7 +359,8 @@ def get_sequence(pdb_file: str) -> Tuple[str, OrderedDict]:
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
-                      cmap_p: Callable[[str], str]) -> dict:
+                      cmap_p: Callable[[str], str],
+                      overwrite:bool=False) -> dict:
     """
     Given a list of PDBcodes, this will create and save the contact maps for each.
     Example path callable functions:
@@ -385,7 +386,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         chain = Processor.pdb_get_chain(pdb_p(code))
         seqs[code] = chain.getSequence()
         # only get cmap if it doesnt exist
-        if not os.path.isfile(cmap_p(code)):
+        if not os.path.isfile(cmap_p(code)) or overwrite:
             cmap = get_contact_map(chain)
             np.save(cmap_p(code), cmap)
     return seqs
