@@ -1,7 +1,26 @@
 #%%
-# from src.feature_extraction.process_msa import create_pfm_np_files
+import pandas as pd
 
-# create_pfm_np_files('../data/PDBbind_aln/', processes=4)
+df_old = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/old_nomsa/full/XY.csv', index_col=0)
+df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa/full/XY.csv', index_col=0)
+
+df_old['prot_seq'].eq(df['prot_seq'])
+
+#%% checking to see if current seq match with MSA generated alignments
+from src.data_processing.datasets import PDBbindDataset
+FEATURE='nomsa' # msa not working due to refactoring that caused change in sequences used
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
+                    data_root=f'../data/v2020-other-PL/',
+                    aln_dir=f'../data/PDBbind_aln',
+                    cmap_threshold=8.0,
+                    edge_opt='anm',
+                    feature_opt=FEATURE
+                    )
+
+#%%
+from src.feature_extraction.process_msa import create_pfm_np_files
+
+create_pfm_np_files('../data/PDBbind_aln/', processes=4)
 
 #%%
 from src.utils.loader import Loader

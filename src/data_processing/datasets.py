@@ -199,7 +199,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if not os.path.isfile(self.processed_paths[0]):
             self.df = self.pre_process()
         else:
-            self.df = pd.read_csv(self.processed_paths[0])
+            self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
         print(f'Number of codes: {len(self.df)}')
         
@@ -366,6 +366,17 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             pdb_codes = valid_codes
         
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
+            
+        
+        ############# Getting protein seq & contact maps: #############
+        #TODO: replace this to save cmaps by protID instead
+        seqs = create_save_cmaps(pdb_codes,
+                          pdb_p=self.pdb_p,
+                          cmap_p=self.cmap_p)
+        
+        assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
+        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
+        df_seq.index.name = 'PDBCode'
         
         ############## Get ligand info #############
         # Extracting SMILE strings:
@@ -379,17 +390,6 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         if  num_missing > 0:
             print(f'\t{num_missing} ligands failed to get SMILEs')
             pdb_codes = list(df_smi.index)
-            
-        
-        ############# Getting protein seq & contact maps: #############
-        #TODO: replace this to save cmaps by protID instead
-        seqs = create_save_cmaps(pdb_codes,
-                          pdb_p=self.pdb_p,
-                          cmap_p=self.cmap_p)
-        
-        assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
-        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
-        df_seq.index.name = 'PDBCode'
         
         ############# MERGE #############
         df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
@@ -653,7 +653,7 @@ class PlatinumDataset(BaseDataset):
             
             # Getting sequence from pdb file:
             pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chain = PDBbindProcessor.pdb_get_chain(pdb_fp, model=0, t_chain=t_chain) #TODO: replace with Prody call
+            chain = PDBbindProcessor.pdb_get_chain(pdb_fp, model=0, t_chain=t_chain) 
             
             # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
