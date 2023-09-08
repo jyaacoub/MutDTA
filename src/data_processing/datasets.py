@@ -1,10 +1,12 @@
 from collections import Counter, OrderedDict
 import json, pickle, re, os, abc
 import tarfile
+from typing import Iterable
 import requests
 import urllib.request
 
 import torch
+from torch.utils import data
 import torch_geometric as torchg
 import numpy as np
 import pandas as pd
@@ -12,7 +14,7 @@ from tqdm import tqdm
 
 from src.feature_extraction.utils import ResInfo
 from src.feature_extraction.ligand import smile_to_graph
-from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
+from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
 
@@ -20,7 +22,9 @@ from src.data_processing.processors import PDBbindProcessor
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
-                 cmap_threshold:float, feature_opt='nomsa', *args, **kwargs):
+                 cmap_threshold:float, feature_opt='nomsa',
+                 edge_opt='anm',
+                 subset=None, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -42,17 +46,32 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
-        `feature_opt` : bool, optional
-            choose from ['nomsa', 'msa', 'shannon']
+        `feature_opt` : str, optional
+            Choose from ['nomsa', 'msa', 'shannon']
+        `edge_opt` : str, optional
+            Choose from ['anm', 'af2']
+        `subset` : str, optional
+            If you want to name this dataset or load an existing version of this dataset 
+            that is under a different name. For distributed training this is useful since 
+            you can save subsets and load only those samples for DDP leaving the DDP 
+            implementation untouched, by default 'full'.
+            
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
+        subset = subset or 'full'
+        if subset != 'full':
+            data_p = os.path.join(save_root, subset)
+            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
+                "please create subset before initialization."
+        self.subset = subset
+        
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
-            
+        
         self.shannon = False
         
-        if feature_opt == 'nomsa':# FINISH THIS AND TRAIN PDBBIND...
+        if feature_opt == 'nomsa':
             self.aln_dir = None # none treats it as np.zeros
         elif feature_opt == 'msa':
             self.aln_dir =  aln_dir # path to sequence alignments
@@ -60,10 +79,18 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             self.aln_dir = aln_dir
             self.shannon = True
         else:
-            raise Exception("Invalid feature_opt please pick from nomsa, msa, shannon")
+            raise Exception(f"Invalid feature_opt '{feature_opt}' please pick from nomsa, msa, shannon")
             
+        assert edge_opt in ['anm'], f'Invalid edge_opt {edge_opt}'
+        self.edge_opt = edge_opt
+        
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
+    
+    @abc.abstractmethod
+    def pdb_p(self, code):
+        """path to pdbfile for a particular protein"""
+        raise NotImplementedError
     
     @abc.abstractmethod
     def cmap_p(self, code):
@@ -77,6 +104,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     @property
     def raw_dir(self) -> str:
         return self.data_root
+    
+    @property
+    def processed_dir(self) -> str:
+        return os.path.join(self.root, self.subset)
     
     @property
     def processed_file_names(self):
@@ -121,10 +152,49 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 'y': row['pkd'],
                 'protein': self._data_pro[prot_id],
                 'ligand': self._data_mol[lig_seq]}
+        
+    def save_subset(self, idxs:Iterable[int]|data.Sampler|data.DataLoader, 
+                    subset_name:str)->str:
+        """Saves a subset of the dataset that can be loaded up as its own seperate dataset"""
+        if issubclass(idxs.__class__, data.DataLoader):
+            idxs = idxs.sampler
+        if issubclass(idxs.__class__, data.Sampler):
+            idxs = idxs.indices
+        
+        # getting subset df, prots, and ligs
+        sub_df = self.df.iloc[idxs]
+        sub_prots = {k:self._data_pro[k] for k in sub_df['prot_id']}
+        sub_lig = {k:self._data_mol[k] for k in sub_df['SMILE']}
+        
+        # saving to new dir
+        path = os.path.join(self.root, subset_name)
+        os.makedirs(path, exist_ok=True)
+        sub_df.to_csv(os.path.join(path, self.processed_file_names[0]))
+        torch.save(sub_prots, os.path.join(path, self.processed_file_names[1]))
+        torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
+        return path
     
+    def load_subset(self, subset_name:str):
+        path = os.path.join(self.root, subset_name)
+        
+        # checking if processed files exist
+        assert os.path.isdir(path), f"Subset {subset_name} does not exist!"
+        
+        for f in self.processed_file_names:
+            new_fp = os.path.join(path, f)
+            assert os.path.isfile(new_fp), f"Missing processed file: {f}!"
+        
+        # all checks successfully passed, now we can load up the subset:
+        self.subset = subset_name
+        self.load()
+               
     def process(self):
         """
         This method is used to create the processed data files after feature extraction.
+        
+        Note about protein and ligand duplicates:
+        - We create graphs using the pdb/sdf file from the first instance of that prot_id/smile in the csv
+          all future instances will just reference back to that in `self.__getitem__`
         """
         if not os.path.isfile(self.processed_paths[0]):
             self.df = self.pre_process()
@@ -133,34 +203,39 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
         print(f'Number of codes: {len(self.df)}')
         
-        # creating the dataset:
+        ###### Get Protein Graphs ######
         processed_prots = {}
-        errors = []
-        unique_df = self.df[['prot_id', 'prot_seq']].drop_duplicates()
+        
+        unique_pro = self.df[['prot_id']].drop_duplicates()
+        unique_df = self.df.loc[unique_pro.index]
         for code, (prot_id, pro_seq) in tqdm(
-                        unique_df.iterrows(), 
+                        unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
                         total=len(unique_df)):
-            if prot_id not in processed_prots:
-                pro_feat = torch.Tensor()
-                # extra_feat is Lx54 or Lx34 (if shannon=True)
-                extra_feat, pro_edge, pro_edge_weight = target_to_graph(pro_seq, np.load(self.cmap_p(code)), 
-                                                                threshold=self.cmap_threshold,
-                                                                aln_file=self.aln_p(code),
-                                                                shannon=self.shannon)
-                pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
-                    
-                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge),
-                                    edge_weight=torch.Tensor(pro_edge_weight),
-                                    pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id)
-                processed_prots[prot_id] = pro
+            pro_feat = torch.Tensor() # for adding additional features
+            # extra_feat is Lx54 or Lx34 (if shannon=True)
+            extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
+                                                            threshold=self.cmap_threshold,
+                                                            aln_file=self.aln_p(code),
+                                                            shannon=self.shannon)
+            pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
+                                                      pro_seq, n_modes=10, n_cpu=2,
+                                                      edge_opt=self.edge_opt)
+            
+            pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
+                
+            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                edge_index=torch.LongTensor(pro_edge),
+                                edge_weight=torch.Tensor(pro_edge_weight),
+                                pro_seq=pro_seq, # protein sequence for downstream esm model
+                                prot_id=prot_id)
+            processed_prots[prot_id] = pro
         
+        ###### Get Ligand Graphs ######
         processed_ligs = {}
+        errors = []
         for lig_seq in tqdm(self.df['SMILE'].unique(), 
                             desc='Creating ligand graphs'):
-                
             if lig_seq not in processed_ligs:
                 try:
                     mol_feat, mol_edge = smile_to_graph(lig_seq)
@@ -175,6 +250,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         print(f'{len(errors)} codes failed to create graphs')
         
+        ###### Save ######
         print('Saving...')
         torch.save(processed_prots, self.processed_paths[1])
         torch.save(processed_ligs, self.processed_paths[2])
@@ -209,6 +285,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
+    
+    def pdb_p(self, code):
+        return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, code, f'{code}.npy')
@@ -259,42 +338,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pd.DataFrame
             The XY.csv dataframe.
         """
-        pdb_codes = os.listdir(self.data_root)
-        # filter out readme and index folders
-        pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
-        
-        # creating MSA:
-        #NOTE: assuming MSAs are already created, since this would take a long time to do.
-        # create_aln_files(df_seq, self.aln_p)
-        if self.aln_dir is not None:
-            valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
-            # filters out those that do not have aln file #NOTE: TEMPORARY
-            print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
-            pdb_codes = valid_codes
-        
-        assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
-        
-        # Extracting SMILE strings:
-        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
-                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
-        df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
-        df_smi.index.name = 'PDBCode'
-        
-        df_smi = df_smi[df_smi.SMILE.notna()]
-        num_missing = len(pdb_codes) - len(df_smi)
-        if  num_missing > 0:
-            print(f'\t{num_missing} ligands failed to get SMILEs')
-            pdb_codes = list(df_smi.index)
-            
-        # Getting protein seq & contact maps:
-        seqs = create_save_cmaps(pdb_codes,
-                          pdb_p=lambda x: f'{self.data_root}/{x}/{x}_protein.pdb',
-                          cmap_p=self.cmap_p)
-        
-        assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
-        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
-        df_seq.index.name = 'PDBCode'
-        
+        ############# Read index files to get binding and protID data #############
         # Get binding data:
         df_binding = PDBbindProcessor.get_binding_data(self.raw_paths[0]) # _data.2020
         df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
@@ -307,7 +351,47 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         missing_pid = df_pid.prot_id == '------'
         df_pid[missing_pid] = df_pid[missing_pid].assign(prot_id = df_pid[missing_pid].index)
         
-        # merging dataframes:
+        ############# get pdb codes based on data root dir #############
+        pdb_codes = os.listdir(self.data_root)
+        # filter out readme and index folders
+        pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
+        
+        ############# creating MSA: #############
+        #NOTE: assuming MSAs are already created, since this would take a long time to do.
+        # create_aln_files(df_seq, self.aln_p)
+        if self.aln_dir is not None:
+            valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
+            # filters out those that do not have aln file
+            print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
+            pdb_codes = valid_codes
+        
+        assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
+        
+        ############## Get ligand info #############
+        # Extracting SMILE strings:
+        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
+                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
+        df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
+        df_smi.index.name = 'PDBCode'
+        
+        df_smi = df_smi[df_smi.SMILE.notna()]
+        num_missing = len(pdb_codes) - len(df_smi)
+        if  num_missing > 0:
+            print(f'\t{num_missing} ligands failed to get SMILEs')
+            pdb_codes = list(df_smi.index)
+            
+        
+        ############# Getting protein seq & contact maps: #############
+        #TODO: replace this to save cmaps by protID instead
+        seqs = create_save_cmaps(pdb_codes,
+                          pdb_p=self.pdb_p,
+                          cmap_p=self.cmap_p)
+        
+        assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
+        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
+        df_seq.index.name = 'PDBCode'
+        
+        ############# MERGE #############
         df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
         df = df.merge(df_smi, on='PDBCode') # + smiles
         df = df.merge(df_seq, on='PDBCode') # + prot_seq
@@ -347,6 +431,8 @@ class DavisKibaDataset(BaseDataset):
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                                feature_opt=feature_opt, *args, **kwargs)
+    # def pdb_p(self, code):
+    #     return super().pdb_p(code) #TODO: download pdb structures using protID
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
@@ -429,7 +515,7 @@ class DavisKibaDataset(BaseDataset):
         prot_c = [c for c in prot_c if codes[c] not in invalid_codes]
         
         # creating binding dataframe:
-        #code,SMILE,pkd,prot_seq
+        #   code,SMILE,pkd,prot_seq
         df = pd.DataFrame({
            'code': [codes[c] for c in prot_c],
            'SMILE': [ligand_seq[r] for r in lig_r],
@@ -565,17 +651,18 @@ class PlatinumDataset(BaseDataset):
             pdb = row['affin.pdb_id']
             t_chain = row['affin.chain']
             
-            # getting sequence from pdb file:
+            # Getting sequence from pdb file:
             pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chains = PDBbindProcessor.pdb_get_chains(pdb_fp, check_missing=False)
+            chain = PDBbindProcessor.pdb_get_chain(pdb_fp, model=0, t_chain=t_chain) #TODO: replace with Prody call
             
-            # getting and saving contact map:
+            # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
-                cmap = get_contact_map(chains[t_chain])
+                cmap = get_contact_map(chain)
                 np.save(self.cmap_p(i), cmap)
             
-            mut_seq, ref_seq = PDBbindProcessor.get_mut_ref_seqs(chains[t_chain], 
-                                                                mut.split('/'))
+            mut_seq = PDBbindProcessor.get_mutated_seq(chain, mut.split('/'))
+            ref_seq = chain.getSequence()
+            
             # getting mutated sequence:
             if self.mutated:
                 prot_seq[i] = (pdb, mut_seq)

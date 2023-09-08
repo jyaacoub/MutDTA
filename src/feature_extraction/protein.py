@@ -9,6 +9,7 @@ import os, math
 import pandas as pd
 from src.feature_extraction.utils import ResInfo, one_hot
 from src.data_processing.processors import Processor
+from prody import AtomGroup
 
 ########################################################################
 ###################### Protein Feature Extraction ######################
@@ -47,7 +48,7 @@ def get_target_edge(target_sequence:str, contact_map:str or np.array,
     # threshold
     # array of points for edge index (2,L) where L < seq_len**2
     if threshold >= 0.0:
-        # NOTE: for real cmaps self loop is implied since the diagonal is already 0
+        # NOTE: for real cmaps self loop is implied since the diagonal is 0
         edge_index = np.array(np.where(contact_map <= threshold))
         edge_weight = contact_map[edge_index[0], edge_index[1]]
         # normalize to be between 6A and 14A
@@ -95,7 +96,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     Tuple[np.array]
         tuple of (target_feature, target_edge_index)
     """
-    edge_index, edge_weight = get_target_edge(target_sequence, contact_map, threshold)
+    edge_index, _ = get_target_edge(target_sequence, contact_map, threshold)
     # getting node features
     
     # aln_dir = 'data/' + dataset + '/aln'
@@ -127,7 +128,131 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
     target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     
-    return target_feature, edge_index, edge_weight
+    return target_feature, edge_index
+
+
+################## Temporary fix until issue is resolved (https://github.com/prody/ProDy/issues/1749) ##################
+from prody import Mode, NMA, ModeSet, calcCovariance
+from prody.utilities import div0
+import time
+def calcCrossCorr(modes, n_cpu=1, norm=True):
+    """Returns cross-correlations matrix.  For a 3-d model, cross-correlations
+    matrix is an NxN matrix, where N is the number of atoms.  Each element of
+    this matrix is the trace of the submatrix corresponding to a pair of atoms.
+    Covariance matrix may be calculated using all modes or a subset of modes
+    of an NMA instance.  For large systems, calculation of cross-correlations
+    matrix may be time consuming.  Optionally, multiple processors may be
+    employed to perform calculations by passing ``n_cpu=2`` or more."""
+
+    if not isinstance(n_cpu, int):
+        raise TypeError('n_cpu must be an integer')
+    elif n_cpu < 1:
+        raise ValueError('n_cpu must be equal to or greater than 1')
+
+    if not isinstance(modes, (Mode, NMA, ModeSet)):
+        if isinstance(modes, list):
+            try:
+                is3d = modes[0].is3d()
+            except:
+                raise TypeError('modes must be a list of Mode or Vector instances, '
+                            'not {0}'.format(type(modes)))
+        else:
+            raise TypeError('modes must be a Mode, NMA, or ModeSet instance, '
+                            'not {0}'.format(type(modes)))
+    else:
+        is3d = modes.is3d()
+    if is3d:
+        model = modes
+        if isinstance(modes, (Mode, ModeSet)):
+            model = modes._model
+            if isinstance(modes, (Mode)):
+                indices = [modes.getIndex()]
+                n_modes = 1
+            else:
+                indices = modes.getIndices()
+                n_modes = len(modes)
+        else:
+            n_modes = len(modes)
+            indices = np.arange(n_modes)
+        array = model._getArray()
+        n_atoms = model._n_atoms
+        variances = model._vars
+        if n_cpu == 1:
+            s = (n_modes, n_atoms, 3)
+            arvar = (array[:, indices]*variances[indices]).T.reshape(s)
+            array = array[:, indices].T.reshape(s)
+            covariance = np.tensordot(array.transpose(2, 0, 1),
+                                      arvar.transpose(0, 2, 1),
+                                      axes=([0, 1], [1, 0]))
+        else:
+            import multiprocessing
+            n_cpu = min(multiprocessing.cpu_count(), n_cpu)
+            queue = multiprocessing.Queue()
+            size = n_modes // n_cpu
+            for i in range(n_cpu):
+                if n_cpu - i == 1:
+                    indices = modes.getIndices()[i*size:]
+                else:
+                    indices = modes.getIndices()[i*size:(i+1)*size]
+                process = multiprocessing.Process(
+                    target=_crossCorrelations,
+                    args=(queue, n_atoms, array, variances, indices))
+                process.start()
+            while queue.qsize() < n_cpu:
+                time.sleep(0.05)
+            covariance = queue.get()
+            while queue.qsize() > 0:
+                covariance += queue.get()
+    else:
+        covariance = calcCovariance(modes)
+    if norm:
+        diag = np.power(covariance.diagonal(), 0.5)
+        D = np.outer(diag, diag)
+        covariance = div0(covariance, D)
+    return covariance
+
+def _crossCorrelations(queue, n_atoms, array, variances, indices):
+    """Calculate covariance-matrix for a subset of modes."""
+
+    n_modes = len(indices)
+    arvar = (array[:, indices] * variances[indices]).T.reshape((n_modes,
+                                                                n_atoms, 3))
+    array = array[:, indices].T.reshape((n_modes, n_atoms, 3))
+    covariance = np.tensordot(array.transpose(2, 0, 1),
+                              arvar.transpose(0, 2, 1),
+                              axes=([0, 1], [1, 0]))
+    queue.put(covariance)
+
+def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
+    """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
+    from prody import parsePDB, calcANM
+
+    pdb = parsePDB(pdb_fp, subset='calpha').getHierView()
+    
+    anm = None
+    for chain in pdb:
+        if chain.getSequence() == target_seq:
+            anm, _ = calcANM(chain, selstr='calpha', n_modes=n_modes)
+            break
+    
+    if anm is None:
+        raise ValueError(f"No matching chain found in pdb file ({pdb_fp})")
+    else:
+        # norm=True normalizes it from -1.0 to 1.0
+        cc = calcCrossCorr(anm[:n_modes], n_cpu=n_cpu, norm=True)
+    
+    return cc
+
+def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, 
+                            n_modes:int=5, n_cpu=4, edge_opt='anm'):
+    # edge weights should be returned as a list of Z weights
+    # where Z is the number of edges (|E|)
+    if edge_opt == 'anm':
+        # shape of |V|x|V| (V=vertices |V|=len(target_seq))
+        cc = get_cross_correlation(pdb_fp, target_seq, n_modes, n_cpu=n_cpu)
+        return cc[edge_index[0], edge_index[1]]
+    else:
+        raise ValueError(f'Invalid edge_opt {edge_opt}')
 
 def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.array, int]:
     """ Returns position frequency matrix of amino acids based on MSA for each node in sequence"""
@@ -181,21 +306,15 @@ def residue_features(residue):
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
 
-def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
-                display=False, title="Residue Contact Map") -> np.array:
+def get_contact_map(chain: AtomGroup, display=False, title="Residue Contact Map") -> np.array:
     """
     Given the residue chain dict this will return the residue contact map for that structure.
         See: `get_sequence` for details on getting the residue chain dict.
 
     Parameters
     ----------
-    `residues` : OrderedDict
-        Residue chain dict extracted from pdb file.
-    `CA_only` : bool, optional
-        If true then only use alpha carbon for distance calculation. Otherwise follow DGraphDTA 
-        definition using CB for all except glycine, by default True
-    `check_missing` : bool, optional
-        Checks to ensure no residues are missing, by default False
+    `chain` : AtomGroup
+        AtomGroup chain parsed from pdb file.
     `display` : bool, optional
         If true will display the contact map, by default False
     `title` : str, optional
@@ -213,25 +332,7 @@ def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
     """
     
     # getting coords from residues
-    coords = []
-    if CA_only:
-        for res in residues.values():
-            coords.append(res["CA"])
-    else:
-        for code in residues:
-            res = residues[code]
-            try:
-                coords.append(res["CB"] if res["name"] != "GLY" else res["CA"])
-            except KeyError as e:
-                # CB missing in residue that is not GLY
-                if check_missing:
-                    print(e)
-                    print(code)
-                    print(res)
-                    raise e
-                else:
-                    coords.append(res['CA'])
-                
+    coords = chain.getCoords()
     
     # Main loop to calc matrix
     m = np.zeros((len(coords), len(coords)), np.float32)
@@ -250,36 +351,11 @@ def get_contact_map(residues: OrderedDict, CA_only=True, check_missing=False,
         
     return m
 
-def get_sequence(pdb_file: str, check_missing=False, 
-                select_largest=True) -> Tuple[str, OrderedDict]:
+def get_sequence(pdb_file: str) -> Tuple[str, OrderedDict]:
     """
-    Given a pdb file path this will return the residue sequence for that structure
-    (could be missing residues) and the residue dict in order of seq# that contains coords.
-
-    Args:
-        pdb_file (str): path to .pdb file to process.
-        check_missing (bool, optional): Adds check to ensure all residues are available. 
-                                Defaults to False.
-        select_largest (bool, optional): If True, only the largest chain is used. Otherwise
-                    returns all chains. Defaults to True.
-        
-    Returns:
-        Tuple[str, OrderedDict]: the sequence of residues and the residue dict in order of seq#.
-        
-    """
-    # getting residue chain dict
-    chains = Processor.pdb_get_chains(pdb_file, check_missing)
-    
-    return_chain = next(iter(chains.values())) # first chain
-    # getting sequence of largest chain
-    if select_largest:
-        return_chain = max(chains.values(), key=lambda x: len(x))
-        
-    seq = '' # sequence of residues based on pdb file
-    for res in return_chain:
-        seq += ResInfo.pep_to_code[return_chain[res]["name"]]
-            
-    return seq, return_chain
+    Deprecated please use `chain = Processor.pdb_get_chain(pdb_file)` instead.
+    """    
+    pass
 
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
@@ -312,38 +388,29 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     """
     seqs = {}
     for code in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
-        seqs[code], res = get_sequence(pdb_p(code), 
-                                check_missing=check_missing, 
-                                select_largest=True)
+        chain = Processor.pdb_get_chain(pdb_p(code))
+        seqs[code] = chain.getSequence()
         # only get cmap if it doesnt exist
         if not os.path.isfile(cmap_p(code)):
-            cmap = get_contact_map(res,
-                            CA_only=CA_only, # CB is needed by DGraphDTA
-                            check_missing=check_missing)
+            cmap = get_contact_map(chain)
             np.save(cmap_p(code), cmap)
         
     return seqs
 
 def _save_cmap(args):
-    pdb_f, cmap_f, CA_only, check_missing = args
-    
+    pdb_f, cmap_f, = args
     # skip if already created
     if os.path.isfile(cmap_f): return
-    _, res = get_sequence(pdb_f, check_missing=check_missing)
-    cmap = get_contact_map(res,
-                    CA_only=CA_only, # CB is needed by DGraphDTA
-                    check_missing=check_missing)
+    cmap = get_contact_map(Processor.pdb_get_chain(pdb_f))
     np.save(cmap_f, cmap)
     
 def multi_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
-                      CA_only=False,
-                      check_missing=False,
                       processes=8) -> dict:
     
         
-    args = [[pdb_p(code), cmap_p(code), CA_only, check_missing] for code in pdbcodes]
+    args = [[pdb_p(code), cmap_p(code)] for code in pdbcodes]
     with Pool(processes=processes) as pool:
         print('Starting process')
         list(tqdm(pool.imap(_save_cmap, args),
@@ -361,46 +428,4 @@ def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     raise NotImplementedError("This function is not complete (see yumika)")
 
 if __name__ == "__main__":
-    from tqdm import tqdm
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import os
-
-    PDBbind = '/cluster/projects/kumargroup/jean/data/refined-set'
-    path = lambda c: f'{PDBbind}/{c}/{c}_protein.pdb'
-    cmap_p = lambda c: f'{PDBbind}/{c}/{c}_contact_CA.npy'
-
-    # %% main loop to create and save contact maps
-    cmaps = {}
-    for code in tqdm(os.listdir(PDBbind)[32:100]):
-        if os.path.isdir(os.path.join(PDBbind, code)) and code not in ["index", "readme"]:
-            try:
-                cmap, _ = get_contact_map(path(code), CA_only=True)
-                cmaps[code] = cmap
-            except Exception as e:
-                print(code)
-                raise e
-            # np.save(cmap_p(code), cmap)
-            
-    #%% Displaying:
-    r,c = 10,10
-    f, ax = plt.subplots(r,c, figsize=(15, 15))
-    i=0
-    threshold = None
-    for i, code in enumerate(cmaps.keys()):
-        cmap = cmaps[code] if threshold is None else cmaps[code] < threshold
-        ax[i//c][i%c].imshow(cmap)
-        ax[i//c][i%c].set_title(code)
-        ax[i//c][i%c].axis('off')
-        i+=1
-        
-        
-    #%% Create and save just sequences:
-    df_x = pd.read_csv('data/PDBbind/kd_ki/X.csv', index_col=0) 
-    df_seq = pd.DataFrame(index=df_x.index, columns=['seq'])
-    for code in tqdm(df_x.index, 'Getting experimental sequences'):
-        seq, _ = get_sequence(path(code), check_missing=False, raw=False, select_largest=True)
-        df_seq.loc[code]['seq'] = seq
-        
-    # save sequences
-    df_seq.to_csv('data/PDBbind/kd_ki/pdb_seq_lrgst.csv')
+    print("hi")

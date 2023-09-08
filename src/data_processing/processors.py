@@ -24,6 +24,7 @@ from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
 
 from src.feature_extraction.utils import ResInfo
+from prody import AtomGroup
 
 class Processor:    
     @staticmethod
@@ -40,8 +41,8 @@ class Processor:
                 f.write(f'{k},{v}\n')
     
     @staticmethod
-    def get_mut_ref_seqs(chain: OrderedDict, muts: List[str], 
-                         reversed:bool=False) -> Tuple[str, str]:
+    def get_mutated_seq(chain:AtomGroup, muts:List[str], 
+                         reversed:bool=False) -> Tuple[str, str]: # TODO FIX THIS to use AtomGroup
         """
         Given the protein chain dict and a list of mutations, this returns the 
         mutated and reference sequences.
@@ -65,6 +66,7 @@ class Processor:
         Tuple[str, str]
             The mutated and reference sequences, respectively.
         """
+        # prepare the mutations:
         mut_dict = OrderedDict()
         for mut in muts:
             if reversed:
@@ -72,89 +74,51 @@ class Processor:
             else:
                 ref, pos, mut = mut[0], mut[1:-1], mut[-1]
             mut_dict[pos] = (ref, mut)
-        
-        mut_seq = ''
-        ref_seq = ''
-        for res_id, res in chain.items():
-            ref_actual = ResInfo.pep_to_code[res['name']]
-            res_num = res_id.split('_')[0] # remove icode
+
+        # apply mutations
+        mut_seq = list(chain.getSequence())
+        mut_done = []
+        for i, res in enumerate(chain):
+            pos = str(res.getResnum())
+            if pos in mut_dict: # should always be the case unless mutation passed in is incorrect (see check below)
+                ref, mut = mut_dict[pos] 
+                assert ref == mut_seq[i], f"source ref '{mut_seq[i]}' doesnt match with mutation ref '{ref}'"
+                mut_seq[i] = mut
+                mut_done.append(pos)
+                
+        # check    
+        for m in mut_dict:
+            if m not in mut_done:
+                raise Exception('Mutation sequence translation failed (due to no res at target position).')
             
-            ref, mut = mut_dict.get(res_num, (ref_actual, ref_actual))
-            
-            assert ref == ref_actual, \
-                'Reference does not match sequence at position ' + \
-                f'{res_num}: {ref} != {ref_actual}'
-            
-            mut_seq += mut
-            ref_seq += ref
-            
-        return mut_seq, ref_seq
+        return ''.join(mut_seq)
             
     @staticmethod    
-    def pdb_get_chains(pdb_file: str, check_missing=False) -> OrderedDict:
+    def pdb_get_chain(pdb_file: str, model=1, t_chain=None) -> AtomGroup:
         """
-        Reads a pdb file and returns a dict of dicts with the following structure:
-            {chain: {residue: {atom: np.array([x,y,z])}}}
+        Reads a pdb file and returns a ProDy AtomGroup for the selected chain
 
         Parameters
         ----------
         `pdb_file` : str
             Path to pdb file
-        `check_missing` : bool, optional
-            Throws error if missing residues, by default True
+        `model`: int, optional
+            Model number to read, by default 1.
+        `t_chain`: str, optional
+            The target chain to parse, set to None to select the largest chain, by default None.
 
         Returns
         -------
-        OrderedDict
-            Dict of dicts with the chain as the key and the value is a dict with the residue as the key
+        AtomGroup
+            representing the chain selected
         """
+        from prody import parsePDB
+        pdb = parsePDB(pdb_file, subset='calpha', model=model, chain=t_chain)
         
-        # read and filter
-        with open(pdb_file, 'r') as f:
-            lines = f.readlines()
-            chains = OrderedDict() # chain dict of dicts
-            curr_res, prev_res = None, None
-            curr_chain, prev_chain = None, None
-            for line in lines:
-                if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
+        if t_chain is None:
+            pdb = max(list(pdb.getHierView()), key=lambda x: len(x)).getAtomGroup()
                 
-                prev_res, curr_res = curr_res, int(line[22:26])
-                prev_chain, curr_chain = curr_chain, line[21]
-                
-                # make sure res# is in order and not missing
-                if check_missing:
-                    # some might be negative (https://proteopedia.org/wiki/index.php/Unusual_sequence_numbering#Starts_With_Zero_Or_Negative_Numbers)
-                    # which may or may not include a zero at the point of transition
-                    if prev_chain != curr_chain or prev_res == -1: # new chain or neg number issue^
-                        prev_res = None
-                    assert prev_res is None or \
-                        curr_res == prev_res or \
-                        curr_res == prev_res+1, \
-                            f"Invalid order or missing residues: {prev_res} -> {curr_res} in {pdb_file}"
-                                
-                # only want CA and CB atoms
-                atm_type = line[12:16].strip()
-                if atm_type not in ['CA', 'CB']: continue
-                icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
-                                # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
-                
-                # Glycine has no CB atom, so only CA is saved
-                res_key = f"{curr_res}_{icode}"            
-                chains.setdefault(curr_chain, OrderedDict())
-                assert atm_type not in chains[curr_chain].get(res_key, {}), \
-                        f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
-                
-                # adding atom to residue
-                x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
-                chains[curr_chain].setdefault(res_key, OrderedDict())[atm_type] = np.array([x,y,z])
-                
-                # Saving residue name
-                res_name = line[17:20].strip()
-                assert ("name" not in chains[curr_chain].get(res_key, {})) or \
-                    (chains[curr_chain][res_key]["name"] == res_name), \
-                                            f"Inconsistent residue name for residue {res_key} in {pdb_file}"
-                chains[curr_chain][res_key]["name"] = res_name
-        return chains
+        return pdb
 
 class PDBbindProcessor(Processor):
     @staticmethod
