@@ -213,3 +213,22 @@ Same as **2.2A** but change `conf_dir` in `src/docking/sbatch/multi_dock.sh` to 
 
 ## 3. Data analysis
 Follow the same steps as in [**5. Data analysis**](#5-data-analysis) above.
+
+
+# Flexible Docking
+For flexible docking we need to also run `prepare_flexreceptor4.py` during our preparation stage [**3. Prepare receptor**](#3-preparing-receptor-and-ligand-pdbqt-files). 
+
+For this we just pass the additional `-f` argument to specify the flexible docking option. This will extra PDB files with the name `<code>_pocket.pdb` from which the script will select to be flexible residues.
+```
+Usage: ./src/docking/bash_scripts/PDBbind_prepare.sh path ADT template [OPTIONS]
+       path     - path to PDBbind dir containing pdb for protein to convert to pdbqt.
+       ADT - path to MGL root  (e.g.: '~/mgltools_x86_64Linux2_1.5.7/')
+       template - path to conf template file (create empty file if you want vina defaults).
+Options:
+       -sl --shortlist: path to csv file containing a list of pdbcodes to process.
+              Doesn't matter what the file is as long as the first column contains the pdbcodes.
+       -cd --config-dir: path to store new configurations in.
+              Default is to store it with the prepared receptor as <PDBCode>_conf.txt
+       -f --flex: optional, runs prepare_flexreceptor4.py with all residues in <code>_pocket.pdb
+              as flexible.
+```

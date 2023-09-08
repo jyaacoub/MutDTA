@@ -11,6 +11,7 @@ lifelines # used for concordance index calc
 # model building
 torch
 torch_geometric
+transformers # huggingface needed for esm
 
 # optional:
 torchsummary 
@@ -18,3 +19,4 @@ tabulate # for torch_geometric.nn.summary
 ipykernel
 plotly
 requests
+ray[tune]

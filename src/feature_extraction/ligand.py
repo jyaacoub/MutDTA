@@ -26,7 +26,6 @@ def atom_features(atom):
 def smile_to_graph(smile):
     try:
         mol = Chem.MolFromSmiles(smile)
-        c_size = mol.GetNumAtoms()
     except AttributeError as e:
         # adding to stack trace
         raise ValueError(f'rdkit failed to convert SMILE: {smile}') from e
@@ -49,7 +48,7 @@ def smile_to_graph(smile):
     mol_adj += np.eye(mol_adj.shape[0])
     # converting edge matrix to edge index for pytorch geometric
     index_row, index_col = np.where(mol_adj >= 0.5)
-    edge_index = np.array([[i,j] for i,j in zip(index_row, index_col)])
+    edge_index = np.array([index_row, index_col])
     # print('smile_to_graph')
     # print(np.array(features).shape)
-    return c_size, features, edge_index
+    return features, edge_index
