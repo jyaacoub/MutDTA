@@ -7,8 +7,7 @@ from tqdm import tqdm
 
 import os, math
 import pandas as pd
-from src.feature_extraction.utils import ResInfo, one_hot
-from src.data_processing.processors import Processor
+from src.utils.residue import ResInfo, one_hot, Chain
 from prody import AtomGroup
 
 ########################################################################
@@ -306,15 +305,15 @@ def residue_features(residue):
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
 
-def get_contact_map(chain: AtomGroup, display=False, title="Residue Contact Map") -> np.array:
+def get_contact_map(chain: Chain, display=False, title="Residue Contact Map") -> np.array:
     """
     Given the residue chain dict this will return the residue contact map for that structure.
         See: `get_sequence` for details on getting the residue chain dict.
 
     Parameters
     ----------
-    `chain` : AtomGroup
-        AtomGroup chain parsed from pdb file.
+    `chain` : Chain
+        Chain chain parsed from pdb file.
     `display` : bool, optional
         If true will display the contact map, by default False
     `title` : str, optional
@@ -353,7 +352,7 @@ def get_contact_map(chain: AtomGroup, display=False, title="Residue Contact Map"
 
 def get_sequence(pdb_file: str) -> Tuple[str, OrderedDict]:
     """
-    Deprecated please use `chain = Processor.pdb_get_chain(pdb_file)` instead.
+    Deprecated please use `chain = Chain(pdb_file)` instead.
     """    
     pass
 
@@ -383,7 +382,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     """
     seqs = {}
     for code in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
-        chain = Processor.pdb_get_chain(pdb_p(code))
+        chain = Chain(pdb_p(code))
         seqs[code] = chain.getSequence()
         # only get cmap if it doesnt exist
         if not os.path.isfile(cmap_p(code)) or overwrite:
@@ -395,7 +394,7 @@ def _save_cmap(args):
     pdb_f, cmap_f, = args
     # skip if already created
     if os.path.isfile(cmap_f): return
-    cmap = get_contact_map(Processor.pdb_get_chain(pdb_f))
+    cmap = get_contact_map(Chain(pdb_f))
     np.save(cmap_f, cmap)
     
 def multi_save_cmaps(pdbcodes: Iterable[str], 

@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from src.feature_extraction.utils import ResInfo
+from src.utils.residue import ResInfo
 from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
@@ -659,7 +659,7 @@ class PlatinumDataset(BaseDataset):
             
             # Getting sequence from pdb file:
             pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chain = PDBbindProcessor.pdb_get_chain(pdb_fp, model=0, t_chain=t_chain) 
+            chain = PDBbindProcessor.pdb_get_chain(pdb_fp)[t_chain] 
             
             # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):

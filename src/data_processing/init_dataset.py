@@ -36,7 +36,8 @@ if __name__ == "__main__":
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
                     edge_opt='anm',
-                    feature_opt=FEATURE
+                    feature_opt=FEATURE,
+                    overwrite=True
                     )
             
     
