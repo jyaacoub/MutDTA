@@ -8,9 +8,8 @@ dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
         data_root=f'../data/v2020-other-PL/',
         aln_dir=f'../data/PDBbind_aln',
         cmap_threshold=8.0,
-        edge_opt='binary',
-        feature_opt=FEATURE,
-        overwrite=True
+        edge_opt='anm',
+        feature_opt=FEATURE
         )
 
 #%%

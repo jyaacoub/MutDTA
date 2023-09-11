@@ -11,6 +11,19 @@ from src.feature_extraction.process_msa import create_pfm_np_files
 from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset
 from src.train_test.utils import train_val_test_split
 
+# for multiprocess create cmaps run the following (davis and kiba already have cmaps from pscons4; but we can create cmaps from kiba using providied uniprotid)
+# from src.feature_extraction.protein import multi_save_cmaps
+# import os
+# data_root = f'../data/v2020-other-PL/'
+
+# pdb_codes = os.listdir(data_root)
+# # filter out readme and index folders
+# pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
+# pdb_p = lambda x: os.path.join(data_root, x, f'{x}_protein.pdb')
+# cmap_p = lambda x: os.path.join(data_root, x, f'{x}.npy')
+
+# multi_save_cmaps(pdb_codes, pdb_p, cmap_p, processes=4)
+
 if __name__ == "__main__":
     datas = ['PDBbind']#, 'kiba']
     FEATUREs = ['nomsa']#, 'msa', 'shannon']
@@ -21,7 +34,7 @@ if __name__ == "__main__":
         print('\n', data, FEATURE)
         if data in ['davis', 'kiba']:
             DATA_ROOT = f'{data_root_dir}/{data}/'
-            create_pfm_np_files(DATA_ROOT+'/aln/', processes=4)
+            create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) # position frequency matrix creation -> important for msa feature
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
                     data_root=DATA_ROOT,
@@ -37,7 +50,7 @@ if __name__ == "__main__":
                     cmap_threshold=8.0,
                     edge_opt='anm',
                     feature_opt=FEATURE,
-                    overwrite=True
+                    overwrite=False # overwrite old cmap.npy files
                     )
             
     

@@ -224,23 +224,15 @@ def _crossCorrelations(queue, n_atoms, array, variances, indices):
 
 def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
     """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
-    from prody import parsePDB, calcANM
+    from prody import calcANM
 
-    pdb = parsePDB(pdb_fp, subset='calpha').getHierView()
-    
-    anm = None
-    for chain in pdb:
-        if chain.getSequence() == target_seq:
-            anm, _ = calcANM(chain, selstr='calpha', n_modes=n_modes)
-            break
-    
-    if anm is None:
-        raise ValueError(f"No matching chain found in pdb file ({pdb_fp})")
-    else:
-        # norm=True normalizes it from -1.0 to 1.0
-        cc = calcCrossCorr(anm[:n_modes], n_cpu=n_cpu, norm=True)
-    
-    return cc
+    chain = Chain(pdb_fp)
+    #WARNING: assuming the target_chain is always the max len chain!
+    assert chain.getSequence() == target_seq, f'Target seq is not chain seq {pdb_fp}'
+    anm = calcANM(chain.hessian, selstr='calpha', n_modes=n_modes)
+
+    # norm=True normalizes it from -1.0 to 1.0    
+    return calcCrossCorr(anm[:n_modes], n_cpu=n_cpu, norm=True)
 
 def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, 
                             n_modes:int=5, n_cpu=4, edge_opt='anm'):

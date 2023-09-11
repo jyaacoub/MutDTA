@@ -232,12 +232,18 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                       edge_opt=self.edge_opt)
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
-                
-            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                edge_index=torch.LongTensor(pro_edge),
-                                edge_weight=torch.Tensor(pro_edge_weight),
-                                pro_seq=pro_seq, # protein sequence for downstream esm model
-                                prot_id=prot_id)
+            
+            if pro_edge_weight is None:
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge),
+                                    pro_seq=pro_seq, # protein sequence for downstream esm model
+                                    prot_id=prot_id)
+            else:
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge),
+                                    edge_weight=torch.Tensor(pro_edge_weight),
+                                    pro_seq=pro_seq, # protein sequence for downstream esm model
+                                    prot_id=prot_id)
             processed_prots[prot_id] = pro
         
         ###### Get Ligand Graphs ######
