@@ -18,7 +18,7 @@ def validate_args(valid_options):
 
 class Loader():
     model_opt = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
-    edge_opt = ['simple', 'binary']
+    edge_opt = ['simple', 'binary', 'anm']
     data_opt = ['davis', 'kiba', 'PDBbind']
     pro_feature_opt = ['nomsa', 'msa', 'shannon']
     

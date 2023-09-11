@@ -3,12 +3,15 @@ import os
 import submitit
 
 from src.utils import config # sets up env vars
+from src.utils.loader import Loader
 from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
+Loader.data_opt
+
 args = parse_train_test_args(verbose=True, distributed=True,
             # includes slurm arguments "s_*" # 3days == 4320 mins
-            jyp_args='-m DG -d davis -f nomsa -e binary -bs 8 -s_t 720 -s_m 10GB -s_nn 1 -s_ng 4')
+            jyp_args='-m DG -d PDBbind -f nomsa -e anm -bs 8 -s_t 720 -s_m 10GB -s_nn 1 -s_ng 3')
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)

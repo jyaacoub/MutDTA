@@ -17,12 +17,13 @@ from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
+from src.utils.loader import Loader
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
-    FEATURE_OPTIONS = ['nomsa', 'msa', 'shannon']
-    EDGE_OPTIONS = ['anm', 'binary']
+    FEATURE_OPTIONS = Loader.pro_feature_opt
+    EDGE_OPTIONS = Loader.edge_opt
     
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
@@ -53,7 +54,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         `feature_opt` : str, optional
             Choose from ['nomsa', 'msa', 'shannon']
         `edge_opt` : str, optional
-            Choose from ['anm', 'af2']
+            Choose from ['simple', 'binary', 'anm', 'af2']
         `subset` : str, optional
             If you want to name this dataset or load an existing version of this dataset 
             that is under a different name. For distributed training this is useful since 

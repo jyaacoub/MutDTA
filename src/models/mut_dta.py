@@ -11,17 +11,21 @@ from torch_geometric.utils import dropout_adj
 from torch_geometric.nn import summary
 from torch_geometric import data as geo_data
 
-from src.models.utils import BaseModel
-
 from transformers import AutoTokenizer, EsmModel
 from transformers.utils import logging
 
+from src.utils.loader import Loader
+from src.models.utils import BaseModel
+
 class EsmAttentionDTA(BaseModel):
+    """
+    Non-Graph attention-based model. This model only uses ESM embeddings as the protein features.
+    """
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, 
                  num_features_mol=78, nhead_mol=8,
                  output_dim=320, dropout=0.2):
-        super(EsmAttentionDTA, self).__init__()
+        super(EsmAttentionDTA, self).__init__(pro_feat=None, edge_weight_opt=None)
 
         # Mol graph:
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
@@ -107,10 +111,9 @@ class EsmAttentionDTA(BaseModel):
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
-                 output_dim=128, dropout=0.2, esm_only=True, edge_weight_opt='binary'):
-        assert edge_weight_opt in ['simple', 'binary']
+                 output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary'):
         
-        super(EsmDTA, self).__init__()
+        super(EsmDTA, self).__init__(pro_feat, edge_weight_opt)
 
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
         self.mol_conv2 = GCNConv(num_features_mol, num_features_mol * 2)
@@ -136,13 +139,10 @@ class EsmDTA(BaseModel):
         # combined layers
         self.fc1 = nn.Linear(2 * output_dim, 1024)
         self.fc2 = nn.Linear(1024, 512)
-        self.out = nn.Linear(512, 1) # 1 output (binding affinity)
-
-        self.esm_only = esm_only
-        self.edge_weight = edge_weight_opt == 'simple'
-            
+        self.out = nn.Linear(512, 1) # 1 output (binding affinity)            
     
     def forward_pro(self, data):
+        #### ESM emb ####
         # cls and sep tokens are added to the sequence by the tokenizer
         seq_tok = self.esm_tok(data.pro_seq, 
                                return_tensors='pt', 
@@ -171,6 +171,7 @@ class EsmDTA(BaseModel):
             target_x = torch.cat((esm_emb, data.x), axis=1)
             #  ->> [B*L, emb_dim+feat_dim]
 
+        #### Graph NN ####
         ei = data.edge_index
         ew = data.edge_weight if self.edge_weight else None
 
