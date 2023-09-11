@@ -1,5 +1,5 @@
 import argparse, random
-from src.utils.loader import Loader
+from src.utils import config as cfg
 
 def add_model_args(parser: argparse.ArgumentParser):
     """
@@ -16,8 +16,8 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for model_opt
     parser.add_argument('-m',
         '--model_opt',
-        choices=Loader.model_opt, nargs='+', required=True,
-        help=f'Select one or more from {Loader.model_opt} where I = "improved" and '+ \
+        choices=cfg.MODEL_OPT, nargs='+', required=True,
+        help=f'Select one or more from {cfg.MODEL_OPT} where I = "improved" and '+ \
             'A = "all features". For example: DG is DGraphDTA ' + \
             'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
             'and EDA is the same but with esm_only set to False. Additional options:' + \
@@ -26,9 +26,9 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
         '--edge_opt',
-        choices=Loader.edge_opt,
-        nargs='+', default=Loader.edge_opt[0:1], required=False,
-        help=f'Select one or more from {Loader.edge_opt}. "simple" is just taking ' + \
+        choices=cfg.EDGE_OPT,
+        nargs='+', default=cfg.EDGE_OPT[0:1], required=False,
+        help=f'Select one or more from {cfg.EDGE_OPT}. "simple" is just taking ' + \
             'the normalized values from the protein cmap, "binary" means no edge weights'
     )
     parser.add_argument('-t',
@@ -89,14 +89,14 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     # Add the argument for data_opt
     parser.add_argument('-d',
         '--data_opt',
-        choices=Loader.data_opt, nargs='+',   required=True,
-        help=f'Select one of {Loader.data_opt} (default: {Loader.data_opt[0]}).'
+        choices=cfg.DATA_OPT, nargs='+',   required=True,
+        help=f'Select one of {cfg.DATA_OPT} (default: {cfg.DATA_OPT[0]}).'
     )
     # Add the argument for FEATURE_opt
     parser.add_argument('-f',
         '--feature_opt',
-        choices=Loader.pro_feature_opt, nargs='+', required=True,
-        help=f'Select one or more from {Loader.pro_feature_opt}.'
+        choices=cfg.PRO_FEAT_OPT, nargs='+', required=True,
+        help=f'Select one or more from {cfg.PRO_FEAT_OPT}.'
     )
     parser.add_argument('-ts',
         '--train_split',

@@ -3,7 +3,7 @@ from functools import wraps
 from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
-from src.utils import config # sets up os env for HF
+from src.utils import config  as cfg # sets up os env for HF
 
 def validate_args(valid_options):
     def decorator(func):
@@ -17,10 +17,10 @@ def validate_args(valid_options):
     return decorator
 
 class Loader():
-    model_opt = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
-    edge_opt = ['simple', 'binary', 'anm']
-    data_opt = ['davis', 'kiba', 'PDBbind']
-    pro_feature_opt = ['nomsa', 'msa', 'shannon']
+    model_opt = cfg.MODEL_OPT
+    edge_opt = cfg.EDGE_OPT
+    data_opt = cfg.DATA_OPT
+    pro_feature_opt = cfg.PRO_FEAT_OPT
     
     @staticmethod
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt})

@@ -17,13 +17,13 @@ from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
-from src.utils.loader import Loader
+from src.utils import config as cfg
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
-    FEATURE_OPTIONS = Loader.pro_feature_opt
-    EDGE_OPTIONS = Loader.edge_opt
+    FEATURE_OPTIONS = cfg.PRO_FEAT_OPT
+    EDGE_OPTIONS = cfg.EDGE_OPT
     
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',

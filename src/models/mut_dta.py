@@ -14,7 +14,6 @@ from torch_geometric import data as geo_data
 from transformers import AutoTokenizer, EsmModel
 from transformers.utils import logging
 
-from src.utils.loader import Loader
 from src.models.utils import BaseModel
 
 class EsmAttentionDTA(BaseModel):

@@ -3,11 +3,9 @@ import os
 import submitit
 
 from src.utils import config # sets up env vars
-from src.utils.loader import Loader
 from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
-Loader.data_opt
 
 args = parse_train_test_args(verbose=True, distributed=True,
             # includes slurm arguments "s_*" # 3days == 4320 mins

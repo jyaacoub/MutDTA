@@ -1,5 +1,5 @@
 from torch import nn
-from src.utils.loader import Loader
+from src.utils import config as cfg
 
 class BaseModel(nn.Module):
     """
@@ -7,7 +7,7 @@ class BaseModel(nn.Module):
     """
     def __init__(self, pro_feat, edge_weight_opt, *args, **kwargs) -> None:
         edge_weight_opt = edge_weight_opt or 'binary' # None -> binary
-        assert edge_weight_opt in Loader.edge_opt
+        assert edge_weight_opt in cfg.EDGE_OPT
         self.edge_weight = not (edge_weight_opt == 'binary')
         self.esm_only = pro_feat == 'esm_only'
         
