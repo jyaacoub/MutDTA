@@ -118,7 +118,7 @@ class Chain:
             t_chain (_type_, optional): target chain to focus on. Defaults to None.
         """
         # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
-        self._chains = self._pdb_get_chain(pdb_file, model)
+        self._chains = self._pdb_get_chains(pdb_file, model)
         
         # if t_chain is not specified then set it to be the largest chain
         self.t_chain = t_chain or max(self._chains, key=lambda x: len(self._chains[x]))
@@ -235,7 +235,7 @@ class Chain:
         return ''.join(mut_seq)
     
     @staticmethod
-    def _pdb_get_chain(pdb_file: str, model:int=1) -> OrderedDict:
+    def _pdb_get_chains(pdb_file: str, model:int=1) -> OrderedDict:
         """
         Reads a pdb file and returns a dict of dicts with the following structure:
             {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}

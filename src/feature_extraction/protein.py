@@ -350,12 +350,6 @@ def get_contact_map(chain: Chain, display=False, title="Residue Contact Map") ->
         
     return m
 
-def get_sequence(pdb_file: str) -> Tuple[str, OrderedDict]:
-    """
-    Deprecated please use `chain = Chain(pdb_file)` instead.
-    """    
-    pass
-
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],

@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from src.utils.residue import ResInfo
+from src.utils.residue import Chain, ResInfo
 from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
@@ -659,14 +659,14 @@ class PlatinumDataset(BaseDataset):
             
             # Getting sequence from pdb file:
             pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chain = PDBbindProcessor.pdb_get_chain(pdb_fp)[t_chain] 
+            chain = Chain(pdb_fp, t_chain=t_chain)
             
             # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
                 cmap = get_contact_map(chain)
                 np.save(self.cmap_p(i), cmap)
             
-            mut_seq = PDBbindProcessor.get_mutated_seq(chain, mut.split('/'))
+            mut_seq = chain.get_mutated_seq(chain, mut.split('/'), reversed=False)
             ref_seq = chain.getSequence()
             
             # getting mutated sequence:

@@ -1,4 +1,36 @@
 #%%
+import timeit
+from src.utils.residue import Chain
+from prody import parsePDB, calcANM, calcCrossCorr
+
+code = "1a1e"
+pdb_fp = f"/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb"
+
+res_mine = timeit.timeit(
+    stmt="pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); ccm = calcCrossCorr(mine[:5], n_cpu=1, norm=True)",
+    setup="from __main__ import code, pdb_fp, Chain, calcANM, calcCrossCorr",
+    number=10
+)
+
+res_prody = timeit.timeit(
+    stmt="pdb = parsePDB(pdb_fp, subset='calpha').getHierView(); anm, _ = calcANM(pdb['A'], selstr='calpha', n_modes=5); cc = calcCrossCorr(anm[:5], n_cpu=1, norm=True)",
+    setup="from __main__ import code, pdb_fp, parsePDB, calcANM, calcCrossCorr",
+    number=10
+)
+
+print(res_mine, res_prody)
+
+# %%
+import numpy as np
+from prody import AtomGroup
+
+ag = AtomGroup('test')
+ag.addCoordset((np.random.rand(25,3) -0.5) * 100) # random coords to mimic what it would look like
+
+
+# how to add sequence info?
+
+# %%
 import pandas as pd
 code = "3eql"
 df_old = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/old_nomsa/full/XY.csv', index_col=0)
