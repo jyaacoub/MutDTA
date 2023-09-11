@@ -151,8 +151,7 @@ class Chain:
         assert len(chain_ID) == 1, f"Invalid chain ID {chain_ID}"
         # reset so that they are updated on next getter calls
         self.reset_attributes()
-        self._t_chain = chain_ID.upper()
-        
+        self._t_chain = chain_ID        
     
     def getSequence(self) -> str:
         """
@@ -179,7 +178,10 @@ class Chain:
             coords = []
             # chain has format: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}
             for res in self.chain.values():
-                coords.append(res["CA"])
+                if "CA" in res:
+                    coords.append(res["CA"])
+                else:
+                    coords.append(res["CB"])
             self._coords = np.array(coords)
         return self._coords
 

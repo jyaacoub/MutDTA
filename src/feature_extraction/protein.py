@@ -246,7 +246,9 @@ def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str,
                             n_modes:int=5, n_cpu=4, edge_opt='anm'):
     # edge weights should be returned as a list of Z weights
     # where Z is the number of edges (|E|)
-    if edge_opt == 'anm':
+    if edge_opt is None or edge_opt == 'binary':
+        return None
+    elif edge_opt == 'anm':
         # shape of |V|x|V| (V=vertices |V|=len(target_seq))
         cc = get_cross_correlation(pdb_fp, target_seq, n_modes, n_cpu=n_cpu)
         return cc[edge_index[0], edge_index[1]]
@@ -385,10 +387,13 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     return seqs
 
 def _save_cmap(args):
-    pdb_f, cmap_f, = args
+    pdb_f, cmap_f, overwrite = args
     # skip if already created
-    if os.path.isfile(cmap_f): return
-    cmap = get_contact_map(Chain(pdb_f))
+    if os.path.isfile(cmap_f) and not overwrite: return
+    try:
+        cmap = get_contact_map(Chain(pdb_f))
+    except KeyError as e:
+        raise KeyError(f'Error with {pdb_f}') from e
     np.save(cmap_f, cmap)
     
 def multi_save_cmaps(pdbcodes: Iterable[str], 
@@ -396,8 +401,8 @@ def multi_save_cmaps(pdbcodes: Iterable[str],
                       cmap_p: Callable[[str], str],
                       processes=8) -> dict:
     
-        
-    args = [[pdb_p(code), cmap_p(code)] for code in pdbcodes]
+    #pdb_f, cmap_f, overwrite
+    args = [[pdb_p(code), cmap_p(code), True] for code in pdbcodes]
     with Pool(processes=processes) as pool:
         print('Starting process')
         list(tqdm(pool.imap(_save_cmap, args),

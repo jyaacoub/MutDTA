@@ -1,4 +1,38 @@
 #%%
+from src.data_processing.datasets import PDBbindDataset
+
+FEATURE='nomsa'
+
+
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
+        data_root=f'../data/v2020-other-PL/',
+        aln_dir=f'../data/PDBbind_aln',
+        cmap_threshold=8.0,
+        edge_opt='binary',
+        feature_opt=FEATURE,
+        overwrite=True
+        )
+
+#%%
+from src.feature_extraction.protein import multi_save_cmaps
+import os
+data_root = f'../data/v2020-other-PL/'
+
+pdb_codes = os.listdir(data_root)
+# filter out readme and index folders
+pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
+pdb_p = lambda x: os.path.join(data_root, x, f'{x}_protein.pdb')
+cmap_p = lambda x: os.path.join(data_root, x, f'{x}.npy')
+
+multi_save_cmaps(pdb_codes, pdb_p, cmap_p, processes=4)
+
+#%%
+from src.utils.residue import Chain
+fp = '../data/v2020-other-PL/4no9/4no9_protein.pdb'
+c = Chain(fp)
+
+
+#%%
 import timeit
 from src.utils.residue import Chain
 from prody import parsePDB, calcANM, calcCrossCorr

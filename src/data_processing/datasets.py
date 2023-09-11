@@ -21,9 +21,12 @@ from src.data_processing.processors import PDBbindProcessor
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
+    FEATURE_OPTIONS = ['nomsa', 'msa', 'shannon']
+    EDGE_OPTIONS = ['anm', 'binary']
+    
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
-                 edge_opt='anm',
+                 edge_opt='binary',
                  subset=None, 
                  overwrite=False, *args, **kwargs):
         """
@@ -72,6 +75,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         self.shannon = False
         
+        assert feature_opt in self.FEATURE_OPTIONS, \
+            f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
         if feature_opt == 'nomsa':
             self.aln_dir = None # none treats it as np.zeros
         elif feature_opt == 'msa':
@@ -79,10 +84,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         elif feature_opt == 'shannon':
             self.aln_dir = aln_dir
             self.shannon = True
-        else:
-            raise Exception(f"Invalid feature_opt '{feature_opt}' please pick from nomsa, msa, shannon")
             
-        assert edge_opt in ['anm'], f'Invalid edge_opt {edge_opt}'
+        assert edge_opt in self.EDGE_OPTIONS, \
+            f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
         self.overwrite = overwrite
         

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from rdkit import Chem
 import networkx as nx
-from src.feature_extraction import one_hot
+from src.utils.residue import one_hot
 
 ########################################################################
 ###################### Ligand Feature Extraction #######################
