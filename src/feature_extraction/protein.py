@@ -233,7 +233,7 @@ def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
 
     
     cc = calcCrossCorr(anm[:n_modes], n_cpu=n_cpu)
-    cc_min, cc_max = min(cc), max(cc)
+    cc_min, cc_max = cc.min(), cc.max()
     # min-max normalization into [0,1] range
     return (cc-cc_min)/(cc_max-cc_min)
 
