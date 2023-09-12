@@ -125,7 +125,7 @@ def add_slurm_dist_args(parser: argparse.ArgumentParser):
         action='store', type=int, default=random.randint(49152,65535),
         help='Port for DDP (default: random int)'
     )
-    parser.add_argument('-od',
+    parser.add_argument('-odir',
         '--output_dir',
         action='store', type=str, default="./slurm_tests/DDP/%j",
         help='Output dir for DDP (default: ./slurm_tests/DDP/%j)'
@@ -197,15 +197,15 @@ def parse_train_test_args(verbose=True, distributed=False,
         if distributed:
             global_bs *= args.slurm_nnodes * args.slurm_ngpus
         print(f"---------------- MODEL OPT ---------------")
-        print(f"     Selected og_model_opt: {args.model_opt}")
-        print(f"         Selected data_opt: {args.data_opt}")
-        print(f" Selected feature_opt list: {args.feature_opt}")
-        print(f"    Selected edge_opt list: {args.edge_opt}")
-        print(f"           forced training: {args.train}\n")
+        print(f"   Selected model_opt: {args.model_opt}")
+        print(f"    Selected data_opt: {args.data_opt}")
+        print(f" Selected feature_opt: {args.feature_opt}")
+        print(f"    Selected edge_opt: {args.edge_opt}")
+        print(f"      forced training: {args.train}\n")
 
         print(f"-------------- HYPERPARAMETERS -----------")
-        print(f"               Batch size: {global_bs}")
-        print(f"            Learning rate: {args.learning_rate}")
-        print(f"                  Dropout: {args.dropout}")
-        print(f"               Num epochs: {args.num_epochs}\n")
+        print(f"   Global Batch size: {global_bs}")
+        print(f"       Learning rate: {args.learning_rate}")
+        print(f"             Dropout: {args.dropout}")
+        print(f"          Num epochs: {args.num_epochs}\n")
     return args

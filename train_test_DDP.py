@@ -9,10 +9,16 @@ from src.train_test import dtrain
 
 args = parse_train_test_args(verbose=True, distributed=True,
             # includes slurm arguments "s_*" # 3days == 4320 mins
-            jyp_args='-m DG -d PDBbind -f nomsa -e anm -bs 8 -s_t 720 -s_m 10GB -s_nn 1 -s_ng 3')
+            jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
+                ' -m DG -d PDBbind -lr 0.00001 -f nomsa -e anm -bs 16'+ \
+                ' -s_t 720 -s_m 10GB -s_nn 1 -s_ng 4')
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
+
+# Model name and dataset cannot be added since we can provide a list of them
+args.output_dir += f'_{"-".join(args.model_opt)}_{"-".join(args.data_opt)}_{"-".join(args.edge_opt)}'
+print("out_dir:", args.output_dir)
 
 # %% SETUP SLURM EXECUTOR
 executor = submitit.AutoExecutor(folder=args.output_dir, 
