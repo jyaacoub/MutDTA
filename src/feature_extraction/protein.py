@@ -231,8 +231,11 @@ def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
     assert chain.getSequence() == target_seq, f'Target seq is not chain seq {pdb_fp}'
     anm = calcANM(chain.hessian, selstr='calpha', n_modes=n_modes)
 
-    # norm=True normalizes it from -1.0 to 1.0    
-    return calcCrossCorr(anm[:n_modes], n_cpu=n_cpu, norm=True)
+    
+    cc = calcCrossCorr(anm[:n_modes], n_cpu=n_cpu)
+    cc_min, cc_max = min(cc), max(cc)
+    # min-max normalization into [0,1] range
+    return (cc-cc_min)/(cc_max-cc_min)
 
 def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, 
                             n_modes:int=5, n_cpu=4, edge_opt='anm'):
