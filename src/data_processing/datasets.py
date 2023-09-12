@@ -12,12 +12,12 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from src.utils.residue import Chain, ResInfo
+from src.utils import config as cfg
+from src.utils.residue import Chain
 from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
-from src.utils import config as cfg
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
@@ -64,20 +64,17 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
-        subset = subset or 'full'
-        if subset != 'full':
-            data_p = os.path.join(save_root, subset)
-            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
-                "please create subset before initialization."
-        self.subset = subset
         
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
+        self.overwrite = overwrite
         
-        self.shannon = False
-        
+        # checking feature and edge options
         assert feature_opt in self.FEATURE_OPTIONS, \
             f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
+            
+        self.shannon = False
+        self.feature_opt = feature_opt
         if feature_opt == 'nomsa':
             self.aln_dir = None # none treats it as np.zeros
         elif feature_opt == 'msa':
@@ -89,7 +86,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         assert edge_opt in self.EDGE_OPTIONS, \
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
-        self.overwrite = overwrite
+        
+        # Validating subset
+        subset = subset or 'full'
+        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}') # e.g.: path/to/root/nomsa_anm
+        if subset != 'full':
+            data_p = os.path.join(save_root, subset)
+            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
+                "please create subset before initialization."
+        self.subset = subset
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()

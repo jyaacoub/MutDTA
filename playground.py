@@ -3,14 +3,17 @@ from src.data_processing.datasets import PDBbindDataset
 
 FEATURE='nomsa'
 
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
+                    data_root=f'../data/v2020-other-PL/',
+                    aln_dir=f'../data/PDBbind_aln',
+                    cmap_threshold=8.0,
+                    edge_opt='anm',
+                    feature_opt=FEATURE,
+                    overwrite=False, # overwrite old cmap.npy files
+                    subset='train'
+                    )
+            
 
-dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
-        data_root=f'../data/v2020-other-PL/',
-        aln_dir=f'../data/PDBbind_aln',
-        cmap_threshold=8.0,
-        edge_opt='anm',
-        feature_opt=FEATURE
-        )
 
 #%%
 from src.feature_extraction.protein import multi_save_cmaps
@@ -38,7 +41,9 @@ from prody import parsePDB, calcANM, calcCrossCorr
 
 code = "1a1e"
 pdb_fp = f"/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb"
+pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); cc = calcCrossCorr(mine[:5], n_cpu=1, norm=True)
 
+#%%
 res_mine = timeit.timeit(
     stmt="pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); ccm = calcCrossCorr(mine[:5], n_cpu=1, norm=True)",
     setup="from __main__ import code, pdb_fp, Chain, calcANM, calcCrossCorr",

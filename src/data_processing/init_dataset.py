@@ -33,7 +33,7 @@ if __name__ == "__main__":
     for data, FEATURE in itertools.product(datas, FEATUREs):
         print('\n', data, FEATURE)
         if data in ['davis', 'kiba']:
-            DATA_ROOT = f'{data_root_dir}/{data}/'
+            DATA_ROOT = f'{data_root_dir}/'
             create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) # position frequency matrix creation -> important for msa feature
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
@@ -44,7 +44,7 @@ if __name__ == "__main__":
             )
         elif data == 'PDBbind':
             # create_pfm_np_files('../data/PDBbind_aln/', processes=4)
-            dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
+            dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
                     data_root=f'../data/v2020-other-PL/',
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,

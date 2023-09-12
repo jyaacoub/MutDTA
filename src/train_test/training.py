@@ -108,7 +108,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         # Print training and validation loss for the epoch
         if not silent:
-            print(f"Epoch {epoch}/{epochs}: Train Loss: {train_loss:.4f}, "+\
+            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
 
