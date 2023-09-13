@@ -1,4 +1,8 @@
 #%%
+from src.utils.loader import Loader
+d = Loader.load_dataset(data='PDBbind', pro_feature='nomsa', edge_opt='anm', subset='train')
+
+#%%
 from src.data_processing.datasets import PDBbindDataset
 
 FEATURE='nomsa'
@@ -7,9 +11,8 @@ dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
                     data_root=f'../data/v2020-other-PL/',
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
-                    edge_opt='anm',
                     feature_opt=FEATURE,
-                    overwrite=False, # overwrite old cmap.npy files
+                    edge_opt='anm',
                     subset='train'
                     )
             
@@ -106,7 +109,7 @@ from prody import parsePDB, calcANM
 # delNonstdAminoacid('SEP')
 
 
-td = Loader.load_dataset('PDBbind', 'nomsa',
+td = Loader.load_dataset('PDBbind', 'nomsa', 'binary',
                                     path="/cluster/home/t122995uhn/projects/data") 
 
 hv = parsePDB('../data/v2020-other-PL/5swg/5swg_protein.pdb', subset='calpha').getHierView()

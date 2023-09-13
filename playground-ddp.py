@@ -17,10 +17,11 @@ ray.init(num_cpus=6, num_gpus=3)
 MODEL = 'EDI'
 PRO_FEATURE = 'nomsa'
 DATA = 'davis'
+EDGE = 'simple'
 data_root = "/cluster/home/t122995uhn/projects/data"# WARNING: HARD CODED PATH
 
-config = {    
-    "edge": tune.grid_search(['simple', 'binary']),
+config = {
+    "edge": tune.grid_search(['weighted', 'binary']),
     "dropout": tune.grid_search([0.1, 0.2, 0.4, 0.5]),
     
     "lr": tune.grid_search([1e-4, 1e-3, 1e-2]),
@@ -28,8 +29,8 @@ config = {
 }
 
 #%%
-train_dataset = Loader.load_dataset(DATA, PRO_FEATURE, subset='train', path=data_root) 
-val_dataset = Loader.load_dataset(DATA, PRO_FEATURE, subset='val', path=data_root)
+train_dataset = Loader.load_dataset(DATA, PRO_FEATURE, EDGE, subset='train', path=data_root) 
+val_dataset = Loader.load_dataset(DATA, PRO_FEATURE, EDGE, subset='val', path=data_root)
 
 tuner = tune.Tuner(
     tune.with_resources(

@@ -71,7 +71,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
 
 
     # ==== LOAD DATA ====
-    dataset = Loader.load_dataset(DATA, FEATURE)
+    dataset = Loader.load_dataset(DATA, FEATURE, EDGEW)
     print(f'# Number of samples: {len(dataset)}')
 
     train_loader, val_loader, test_loader = train_val_test_split(dataset, 
