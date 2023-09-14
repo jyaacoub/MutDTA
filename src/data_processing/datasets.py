@@ -15,7 +15,7 @@ from tqdm import tqdm
 from src.utils import config as cfg
 from src.utils.residue import Chain
 from src.feature_extraction.ligand import smile_to_graph
-from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
+from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
@@ -687,7 +687,7 @@ class PlatinumDataset(BaseDataset):
             
             # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
-                cmap = get_contact_map(chain)
+                cmap = chain.get_contact_map()
                 np.save(self.cmap_p(i), cmap)
             
             mut_seq = chain.get_mutated_seq(chain, mut.split('/'), reversed=False)

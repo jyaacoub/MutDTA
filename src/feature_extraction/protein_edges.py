@@ -56,8 +56,6 @@ def get_target_edge(target_sequence:str, contact_map:str or np.array,
     return edge_index, edge_weight
 
 
-
-
 ################## Temporary fix until issue is resolved (https://github.com/prody/ProDy/issues/1749) ##################
 from prody import Mode, NMA, ModeSet, calcCovariance
 from prody.utilities import div0
@@ -179,5 +177,6 @@ def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str,
         return cc[edge_index[0], edge_index[1]]
     elif edge_opt == 'af2':
         pass
+        
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')

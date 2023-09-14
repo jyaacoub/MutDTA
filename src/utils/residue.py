@@ -1,3 +1,4 @@
+from matplotlib import pyplot as plt
 import numpy as np
 
 # one hot encoding
@@ -101,7 +102,6 @@ class ResInfo():
     pl = normalize_add_x(pl)
     hydrophobic_ph2 = normalize_add_x(hydrophobic_ph2)
     hydrophobic_ph7 = normalize_add_x(hydrophobic_ph7)
-
 
 
 from collections import OrderedDict
@@ -336,4 +336,47 @@ class Chain:
                 kirchhoff[i, i] = kirchhoff[i, i] + g
                 kirchhoff[j, j] = kirchhoff[j, j] + g
         return hessian
+    
+    def get_contact_map(self, display=False, title="Residue Contact Map") -> np.array:
+        """
+        Returns the residue contact map for that structure.
+            See: `get_sequence` for details on getting the residue chain dict.
+
+        Parameters
+        ----------
+        `display` : bool, optional
+            If true will display the contact map, by default False
+        `title` : str, optional
+            Title for cmap plot, by default "Residue Contact Map"
+
+        Returns
+        -------
+        Tuple[np.array]
+            residue contact map as a matrix
+
+        Raises
+        ------
+        KeyError
+            KeyError if a non-glycine residue is missing CB atom.
+        """
+        
+        # getting coords from residues
+        coords = self.getCoords()
+        
+        # Main loop to calc matrix
+        m = np.zeros((len(coords), len(coords)), np.float32)
+        for row, r1 in enumerate(coords):
+            for col, r2 in enumerate(coords):
+                # lower triangle is all we need
+                if col >= row: break
+                m[row, col] = np.sqrt(np.sum((r1-r2)**2)) # L2 distance
+                # duplicating for visual purposes
+                m[col, row] = m[row, col]
+        
+        if display:
+            plt.imshow(m)
+            plt.title(title)
+            plt.show()
+            
+        return m
     

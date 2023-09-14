@@ -80,51 +80,6 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
 ######################################################################
 #################### CONTACT MAP EXTRACTION/PREP: ####################
 ######################################################################
-def get_contact_map(chain: Chain, display=False, title="Residue Contact Map") -> np.array:
-    """
-    Given the residue chain dict this will return the residue contact map for that structure.
-        See: `get_sequence` for details on getting the residue chain dict.
-
-    Parameters
-    ----------
-    `chain` : Chain
-        Chain chain parsed from pdb file.
-    `display` : bool, optional
-        If true will display the contact map, by default False
-    `title` : str, optional
-        Title for cmap plot, by default "Residue Contact Map"
-
-    Returns
-    -------
-    Tuple[np.array, str]
-        residue contact map as a matrix
-
-    Raises
-    ------
-    KeyError
-        KeyError if a non-glycine residue is missing CB atom.
-    """
-    
-    # getting coords from residues
-    coords = chain.getCoords()
-    
-    # Main loop to calc matrix
-    m = np.zeros((len(coords), len(coords)), np.float32)
-    for row, r1 in enumerate(coords):
-        for col, r2 in enumerate(coords):
-            # lower triangle is all we need
-            if col >= row: break
-            m[row, col] = np.sqrt(np.sum((r1-r2)**2)) # L2 distance
-            # duplicating for visual purposes
-            m[col, row] = m[row, col]
-    
-    if display:
-        plt.imshow(m)
-        plt.title(title)
-        plt.show()
-        
-    return m
-
 def create_save_cmaps(pdbcodes: Iterable[str], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
@@ -155,7 +110,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         seqs[code] = chain.getSequence()
         # only get cmap if it doesnt exist
         if not os.path.isfile(cmap_p(code)) or overwrite:
-            cmap = get_contact_map(chain)
+            cmap = chain.get_contact_map()
             np.save(cmap_p(code), cmap)
     return seqs
 
@@ -164,7 +119,7 @@ def _save_cmap(args):
     # skip if already created
     if os.path.isfile(cmap_f) and not overwrite: return
     try:
-        cmap = get_contact_map(Chain(pdb_f))
+        cmap = Chain(pdb_f).get_contact_map()
     except KeyError as e:
         raise KeyError(f'Error with {pdb_f}') from e
     np.save(cmap_f, cmap)
