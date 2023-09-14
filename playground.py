@@ -1,7 +1,100 @@
 #%%
-# from src.feature_extraction.process_msa import create_pfm_np_files
+from src.utils.loader import Loader
+d = Loader.load_dataset(data='PDBbind', pro_feature='nomsa', edge_opt='anm', subset='train')
 
-# create_pfm_np_files('../data/PDBbind_aln/', processes=4)
+#%%
+from src.data_processing.datasets import PDBbindDataset
+
+FEATURE='nomsa'
+
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
+                    data_root=f'../data/v2020-other-PL/',
+                    aln_dir=f'../data/PDBbind_aln',
+                    cmap_threshold=8.0,
+                    feature_opt=FEATURE,
+                    edge_opt='anm',
+                    subset='train'
+                    )
+            
+
+
+#%%
+from src.feature_extraction.protein import multi_save_cmaps
+import os
+data_root = f'../data/v2020-other-PL/'
+
+pdb_codes = os.listdir(data_root)
+# filter out readme and index folders
+pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
+pdb_p = lambda x: os.path.join(data_root, x, f'{x}_protein.pdb')
+cmap_p = lambda x: os.path.join(data_root, x, f'{x}.npy')
+
+multi_save_cmaps(pdb_codes, pdb_p, cmap_p, processes=4)
+
+#%%
+from src.utils.residue import Chain
+fp = '../data/v2020-other-PL/4no9/4no9_protein.pdb'
+c = Chain(fp)
+
+
+#%%
+import timeit
+from src.utils.residue import Chain
+from prody import parsePDB, calcANM, calcCrossCorr
+
+code = "1a1e"
+pdb_fp = f"/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb"
+pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); cc = calcCrossCorr(mine[:5], n_cpu=1, norm=True)
+
+#%%
+res_mine = timeit.timeit(
+    stmt="pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); ccm = calcCrossCorr(mine[:5], n_cpu=1, norm=True)",
+    setup="from __main__ import code, pdb_fp, Chain, calcANM, calcCrossCorr",
+    number=10
+)
+
+res_prody = timeit.timeit(
+    stmt="pdb = parsePDB(pdb_fp, subset='calpha').getHierView(); anm, _ = calcANM(pdb['A'], selstr='calpha', n_modes=5); cc = calcCrossCorr(anm[:5], n_cpu=1, norm=True)",
+    setup="from __main__ import code, pdb_fp, parsePDB, calcANM, calcCrossCorr",
+    number=10
+)
+
+print(res_mine, res_prody)
+
+# %%
+import numpy as np
+from prody import AtomGroup
+
+ag = AtomGroup('test')
+ag.addCoordset((np.random.rand(25,3) -0.5) * 100) # random coords to mimic what it would look like
+
+
+# how to add sequence info?
+
+# %%
+import pandas as pd
+code = "3eql"
+df_old = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/old_nomsa/full/XY.csv', index_col=0)
+df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa/full/XY.csv', index_col=0)
+
+df_old['prot_seq'].eq(df['prot_seq'])
+
+#%% checking to see if current seq match with MSA generated alignments
+from src.data_processing.datasets import PDBbindDataset
+FEATURE='nomsa' # msa not working due to refactoring that caused change in sequences used
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
+                    data_root=f'../data/v2020-other-PL/',
+                    aln_dir=f'../data/PDBbind_aln',
+                    cmap_threshold=8.0,
+                    edge_opt='anm',
+                    feature_opt=FEATURE,
+                    overwrite=True
+                    )
+
+#%%
+from src.feature_extraction.process_msa import create_pfm_np_files
+
+create_pfm_np_files('../data/PDBbind_aln/', processes=4)
 
 #%%
 from src.utils.loader import Loader
@@ -16,7 +109,7 @@ from prody import parsePDB, calcANM
 # delNonstdAminoacid('SEP')
 
 
-td = Loader.load_dataset('PDBbind', 'nomsa',
+td = Loader.load_dataset('PDBbind', 'nomsa', 'binary',
                                     path="/cluster/home/t122995uhn/projects/data") 
 
 hv = parsePDB('../data/v2020-other-PL/5swg/5swg_protein.pdb', subset='calpha').getHierView()

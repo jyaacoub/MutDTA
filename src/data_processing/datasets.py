@@ -12,19 +12,26 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from src.feature_extraction.utils import ResInfo
+from src.utils import config as cfg
+from src.utils.residue import Chain
 from src.feature_extraction.ligand import smile_to_graph
-from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
+from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
+from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
+    FEATURE_OPTIONS = cfg.PRO_FEAT_OPT
+    EDGE_OPTIONS = cfg.EDGE_OPT
+    
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
-                 edge_opt='anm',
-                 subset=None, *args, **kwargs):
+                 edge_opt='binary', 
+                 af_conf_dir=None,
+                 subset=None, 
+                 overwrite=False, *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -49,7 +56,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         `feature_opt` : str, optional
             Choose from ['nomsa', 'msa', 'shannon']
         `edge_opt` : str, optional
-            Choose from ['anm', 'af2']
+            Choose from ['simple', 'binary', 'anm', 'af2']
+        `af_conf_dir`: str, optional
+            Directory containing output confirmations from af run, default is None.
         `subset` : str, optional
             If you want to name this dataset or load an existing version of this dataset 
             that is under a different name. For distributed training this is useful since 
@@ -59,18 +68,17 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
-        subset = subset or 'full'
-        if subset != 'full':
-            data_p = os.path.join(save_root, subset)
-            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
-                "please create subset before initialization."
-        self.subset = subset
         
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
+        self.overwrite = overwrite
         
+        # checking feature and edge options
+        assert feature_opt in self.FEATURE_OPTIONS, \
+            f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
+            
         self.shannon = False
-        
+        self.feature_opt = feature_opt
         if feature_opt == 'nomsa':
             self.aln_dir = None # none treats it as np.zeros
         elif feature_opt == 'msa':
@@ -78,11 +86,22 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         elif feature_opt == 'shannon':
             self.aln_dir = aln_dir
             self.shannon = True
-        else:
-            raise Exception(f"Invalid feature_opt '{feature_opt}' please pick from nomsa, msa, shannon")
             
-        assert edge_opt in ['anm'], f'Invalid edge_opt {edge_opt}'
+        assert edge_opt in self.EDGE_OPTIONS, \
+            f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
+        
+        assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
+        self.af_conf_dir = af_conf_dir
+        
+        # Validating subset
+        subset = subset or 'full'
+        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}') # e.g.: path/to/root/nomsa_anm
+        if subset != 'full':
+            data_p = os.path.join(save_root, subset)
+            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
+                "please create subset before initialization."
+        self.subset = subset
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
@@ -199,7 +218,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if not os.path.isfile(self.processed_paths[0]):
             self.df = self.pre_process()
         else:
-            self.df = pd.read_csv(self.processed_paths[0])
+            self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
         print(f'Number of codes: {len(self.df)}')
         
@@ -214,21 +233,31 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                         total=len(unique_df)):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
-            extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
+            try:
+                extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
+            except AssertionError as e:
+                raise Exception(f"error on protein creation for code {code}") from e
             pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
                                                       pro_seq, n_modes=10, n_cpu=2,
-                                                      edge_opt=self.edge_opt)
+                                                      edge_opt=self.edge_opt,
+                                                      af_conf=self.af_conf_dir)
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
-                
-            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                edge_index=torch.LongTensor(pro_edge),
-                                edge_weight=torch.Tensor(pro_edge_weight),
-                                pro_seq=pro_seq, # protein sequence for downstream esm model
-                                prot_id=prot_id)
+            
+            if pro_edge_weight is None:
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge),
+                                    pro_seq=pro_seq, # protein sequence for downstream esm model
+                                    prot_id=prot_id)
+            else:
+                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                    edge_index=torch.LongTensor(pro_edge),
+                                    edge_weight=torch.Tensor(pro_edge_weight),
+                                    pro_seq=pro_seq, # protein sequence for downstream esm model
+                                    prot_id=prot_id)
             processed_prots[prot_id] = pro
         
         ###### Get Ligand Graphs ######
@@ -366,6 +395,18 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             pdb_codes = valid_codes
         
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
+            
+        
+        ############# Getting protein seq & contact maps: #############
+        #TODO: replace this to save cmaps by protID instead
+        seqs = create_save_cmaps(pdb_codes,
+                          pdb_p=self.pdb_p,
+                          cmap_p=self.cmap_p,
+                          overwrite=self.overwrite)
+        
+        assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
+        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
+        df_seq.index.name = 'PDBCode'
         
         ############## Get ligand info #############
         # Extracting SMILE strings:
@@ -379,17 +420,6 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         if  num_missing > 0:
             print(f'\t{num_missing} ligands failed to get SMILEs')
             pdb_codes = list(df_smi.index)
-            
-        
-        ############# Getting protein seq & contact maps: #############
-        #TODO: replace this to save cmaps by protID instead
-        seqs = create_save_cmaps(pdb_codes,
-                          pdb_p=self.pdb_p,
-                          cmap_p=self.cmap_p)
-        
-        assert len(seqs) == len(pdb_codes), 'Some codes failed to create contact maps'
-        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
-        df_seq.index.name = 'PDBCode'
         
         ############# MERGE #############
         df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
@@ -653,14 +683,14 @@ class PlatinumDataset(BaseDataset):
             
             # Getting sequence from pdb file:
             pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chain = PDBbindProcessor.pdb_get_chain(pdb_fp, model=0, t_chain=t_chain) #TODO: replace with Prody call
+            chain = Chain(pdb_fp, t_chain=t_chain)
             
             # Getting and saving contact map:
             if not os.path.isfile(self.cmap_p(pdb)):
                 cmap = get_contact_map(chain)
                 np.save(self.cmap_p(i), cmap)
             
-            mut_seq = PDBbindProcessor.get_mutated_seq(chain, mut.split('/'))
+            mut_seq = chain.get_mutated_seq(chain, mut.split('/'), reversed=False)
             ref_seq = chain.getSequence()
             
             # getting mutated sequence:

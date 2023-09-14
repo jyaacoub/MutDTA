@@ -24,8 +24,7 @@ class DGraphDTA(BaseModel):
     """
     def __init__(self, num_features_pro=54, num_features_mol=78, output_dim=128, dropout=0.2,
                  edge_weight_opt='binary'):
-        assert edge_weight_opt in ['binary', 'simple']
-        super(DGraphDTA, self).__init__()
+        super(DGraphDTA, self).__init__(pro_feat=None, edge_weight_opt=edge_weight_opt)
 
         print('DGraphDTA Loaded')
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
@@ -48,8 +47,6 @@ class DGraphDTA(BaseModel):
         self.fc1 = nn.Linear(2 * output_dim, 1024)
         self.fc2 = nn.Linear(1024, 512)
         self.out = nn.Linear(512, 1)
-        
-        self.edge_weight = edge_weight_opt == 'simple'
     
     def forward_pro(self, data):
         # get protein input

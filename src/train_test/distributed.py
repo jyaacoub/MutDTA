@@ -66,7 +66,7 @@ def dtrain(args):
     # ==== Load up training dataset ====
     loaders = {}
     for d in ['train', 'test', 'val']:
-        dataset = Loader.load_dataset(DATA, FEATURE, subset=d)
+        dataset = Loader.load_dataset(DATA, FEATURE, EDGEW, subset=d)
         sampler = DistributedSampler(dataset, shuffle=True, 
                                     num_replicas=args.world_size,
                                     rank=args.rank, seed=0)

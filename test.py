@@ -33,7 +33,7 @@ MODEL_KEY = 'DDP-' + MODEL_KEY
 print(checkpoint_p(MODEL_KEY))
 
 # %%
-test_dataset = Loader.load_dataset(DATA, FEATURE, subset='test', path='../data')
+test_dataset = Loader.load_dataset(DATA, FEATURE, EDGE, subset='test', path='../data')
 test_loader = DataLoader(test_dataset, 1, shuffle=False)
 
 

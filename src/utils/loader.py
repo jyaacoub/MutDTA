@@ -3,7 +3,7 @@ from functools import wraps
 from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
-from src.utils import config # sets up os env for HF
+from src.utils import config  as cfg # sets up os env for HF
 
 def validate_args(valid_options):
     def decorator(func):
@@ -17,10 +17,10 @@ def validate_args(valid_options):
     return decorator
 
 class Loader():
-    model_opt = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
-    edge_opt = ['simple', 'binary']
-    data_opt = ['davis', 'kiba', 'PDBbind']
-    pro_feature_opt = ['nomsa', 'msa', 'shannon']
+    model_opt = cfg.MODEL_OPT
+    edge_opt = cfg.EDGE_OPT
+    data_opt = cfg.DATA_OPT
+    pro_feature_opt = cfg.PRO_FEAT_OPT
     
     @staticmethod
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt})
@@ -79,15 +79,17 @@ class Loader():
         return model
     
     @staticmethod
-    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt})
-    def load_dataset(data:str, pro_feature:str, subset:str=None, path:str='../data/'):
+    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge': edge_opt})
+    def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str='../data/'):
         if data == 'PDBbind':
-            dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset/{pro_feature}',
+            dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
                     data_root=f'{path}/v2020-other-PL/',
                     aln_dir=f'{path}/PDBbind_aln', 
                     cmap_threshold=8.0,
                     feature_opt=pro_feature,
-                    subset=subset
+                    edge_opt=edge_opt,
+                    subset=subset,
+                    
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
