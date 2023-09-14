@@ -7,6 +7,6 @@ confProDy(verbosity='none') # stop printouts from prody
 
 
 MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
-EDGE_OPT = ['simple', 'binary', 'anm']
+EDGE_OPT = ['simple', 'binary', 'anm', 'af2']
 DATA_OPT = ['davis', 'kiba', 'PDBbind']
 PRO_FEAT_OPT = ['nomsa', 'msa', 'shannon']

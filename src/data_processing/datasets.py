@@ -15,7 +15,8 @@ from tqdm import tqdm
 from src.utils import config as cfg
 from src.utils.residue import Chain
 from src.feature_extraction.ligand import smile_to_graph
-from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph, get_target_edge_weights
+from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
+from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
 
@@ -27,7 +28,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
-                 edge_opt='binary',
+                 edge_opt='binary', 
+                 af_conf_dir=None,
                  subset=None, 
                  overwrite=False, *args, **kwargs):
         """
@@ -55,6 +57,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             Choose from ['nomsa', 'msa', 'shannon']
         `edge_opt` : str, optional
             Choose from ['simple', 'binary', 'anm', 'af2']
+        `af_conf_dir`: str, optional
+            Directory containing output confirmations from af run, default is None.
         `subset` : str, optional
             If you want to name this dataset or load an existing version of this dataset 
             that is under a different name. For distributed training this is useful since 
@@ -86,6 +90,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         assert edge_opt in self.EDGE_OPTIONS, \
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
+        
+        assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
+        self.af_conf_dir = af_conf_dir
         
         # Validating subset
         subset = subset or 'full'
@@ -235,7 +242,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 raise Exception(f"error on protein creation for code {code}") from e
             pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
                                                       pro_seq, n_modes=10, n_cpu=2,
-                                                      edge_opt=self.edge_opt)
+                                                      edge_opt=self.edge_opt,
+                                                      af_conf=self.af_conf_dir)
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
