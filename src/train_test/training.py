@@ -3,8 +3,9 @@ import gc
 from typing import Tuple
 
 from tqdm import tqdm
-import torch
 import numpy as np
+import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from src.train_test.utils import train_val_test_split, CheckpointSaver
 from src.models.utils import BaseModel
@@ -15,8 +16,10 @@ from src.utils.loader import Loader
 
 
 def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader, 
-          device: torch.device, epochs=10, lr=0.001, 
-          saver: CheckpointSaver=None, silent=False, **kwargs) -> dict:
+          device: torch.device, saver: CheckpointSaver=None, 
+          silent=False, 
+          epochs=10, lr_0=0.1, lr_e=1e-5, step_size=25, last_epoch=-1,
+          **kwargs) -> dict:
     """
     Training loop for graph models.
     Note that **kwargs is used to pass any additional arguments to the optimizer.
@@ -31,14 +34,18 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         Data loader for validation set.
     `device` : torch.device
         Device to train on.
-    `epochs` : int, optional
-        number of epochs, by default 10
-    `lr` : float, optional
-        learning rate, by default 0.001
     `saver` : CheckpointSaver, optional
         CheckpointSaver object that decides when to stop training and saves checkpoint 
         of best performant version of the model if none provided then will train for 
         all epochs, by default None
+    `epochs` : int, optional
+        number of epochs, by default 10
+    `lr_0` : float, optional
+        Starting learning rate, by default 0.1
+    `lr_e`: float, optional
+        End learning rate
+    `last_epoch` : int, optional
+        Starting point for scheduler if continuing from prev run, by default -1
         
     Returns
     -------
@@ -47,7 +54,10 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     """
     saver = saver or CheckpointSaver(model, train_all=True)
     CRITERION = torch.nn.MSELoss()
-    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr, **kwargs)
+    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
+    # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=10, 
+                                  threshold=0.0001, min_lr=1e-6, factor=0.5)
 
     logs = {'train_loss': [], 'val_loss': []}
     
@@ -85,6 +95,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
                 OPTIMIZER.zero_grad()
                 loss.backward()
                 OPTIMIZER.step()
+                SCHEDULER.step()
 
                 # Update tqdm progress bar
                 progress_bar.set_postfix({"Train Loss": train_loss / (progress_bar.n + 1)})
