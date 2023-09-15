@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
+import os
 
 # one hot encoding
 def one_hot(x, allowable_set, cap=False):
@@ -119,11 +120,15 @@ class Chain:
         """
         # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
         self._chains = self._pdb_get_chains(pdb_file, model)
+        self.pdb_file = pdb_file
         
         # if t_chain is not specified then set it to be the largest chain
         self.t_chain = t_chain or max(self._chains, key=lambda x: len(self._chains[x]))
         
         self.reset_attributes()
+        
+    def __repr__(self):
+        return f'<Chain {os.path.basename(self.pdb_file).split(".")[0]}:{self.t_chain}>'
         
     def reset_attributes(self):
         self._seq = None        
@@ -361,22 +366,18 @@ class Chain:
         """
         
         # getting coords from residues
-        coords = self.getCoords()
-        
-        # Main loop to calc matrix
-        m = np.zeros((len(coords), len(coords)), np.float32)
-        for row, r1 in enumerate(coords):
-            for col, r2 in enumerate(coords):
-                # lower triangle is all we need
-                if col >= row: break
-                m[row, col] = np.sqrt(np.sum((r1-r2)**2)) # L2 distance
-                # duplicating for visual purposes
-                m[col, row] = m[row, col]
+        coords = self.getCoords() # shape == (L,3) where L is the sequence length
+    
+        # Calculate the pairwise distance matrix
+        pairwise_distances = np.sqrt(np.sum((coords[:, np.newaxis] - coords) ** 2, axis=-1))
+
+        # Fill the upper triangle and the diagonal of the distance matrix
+        np.fill_diagonal(pairwise_distances, 0)
         
         if display:
-            plt.imshow(m)
+            plt.imshow(pairwise_distances)
             plt.title(title)
             plt.show()
             
-        return m
+        return pairwise_distances
     
