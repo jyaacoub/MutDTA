@@ -48,28 +48,28 @@ class Loader():
                         num_features_pro=320, # only esm features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
-                        esm_only=True,
+                        pro_feat='esm_only',
                         edge_weight_opt=edge)
         elif model == 'EDA':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320+num_feat_pro, # esm features + other features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
-                        esm_only=False, # false to include all feats
+                        pro_feat='all', # to include all feats
                         edge_weight_opt=edge)
         elif model == 'EDI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320,
                         pro_emb_dim=512, # increase embedding size
                         dropout=dropout,
-                        esm_only=True,
+                        pro_feat='esm_only',
                         edge_weight_opt=edge)
         elif model == 'EDAI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320 + num_feat_pro,
                         pro_emb_dim=512,
                         dropout=dropout,
-                        esm_only=False,
+                        pro_feat='all',
                         edge_weight_opt=edge)
         elif model == 'EAT':
             # this model only needs protein sequence, no additional features.
