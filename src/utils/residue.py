@@ -127,6 +127,9 @@ class Chain:
         
         self.reset_attributes()
         
+    def __len__(self):
+        return len(self.getSequence())
+    
     def __repr__(self):
         return f'<Chain {os.path.basename(self.pdb_file).split(".")[0]}:{self.t_chain}>'
         
@@ -189,6 +192,44 @@ class Chain:
                     coords.append(res["CB"])
             self._coords = np.array(coords)
         return self._coords
+    
+    @staticmethod
+    def align_coords(c1:np.array,c2:np.array) -> tuple[np.array, np.array]:
+        """Aligns the given two 3D coordinate sets"""
+        # Calculate the centroid (center of mass) of each set of coordinates
+        centroid1 = np.mean(c1, axis=0)
+        centroid2 = np.mean(c2, axis=0)
+
+        # Translate both sets of coordinates to their respective centroids
+        c1_centered = c1 - centroid1
+        c2_centered = c2 - centroid2
+
+        # Calculate the covariance matrix
+        covariance_matrix = np.dot(c2_centered.T, c1_centered)
+
+        # Use singular value decomposition (SVD) to find the optimal rotation matrix
+        u, _, vt = np.linalg.svd(covariance_matrix)
+        rotation_matrix = np.dot(u, vt)
+
+        # Apply the calculated rotation matrix to c2_centered
+        c2_aligned = np.dot(c2_centered, rotation_matrix)
+        return c1_centered, c2_aligned
+    
+    def TM_score(self, template:'Chain'):
+        # getting and aligning coords
+        c1, c2 = self.align_coords(self.getCoords(), template.getCoords())
+        
+        # Calculating score:
+        L = len(c1)
+        # d0 is less than 0.5 for L < 22 
+        # and nan for L < 15 (root of a negative number)
+        d0 = 1.24 * np.power(L - 15, 1/3) - 1.8
+        d0 = max(0.5, d0) 
+
+        # compute the distance for each pair of atoms
+        di = np.sum((c1 - c2) ** 2, 1) # sum along first axis
+        return np.sum(1 / (1 + (di / d0) ** 2)) / L
+        
 
     def get_mutated_seq(self, muts:list[str], reversed:bool=False) -> tuple[str, str]:
         """
