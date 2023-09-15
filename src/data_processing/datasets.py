@@ -1,4 +1,5 @@
 from collections import Counter, OrderedDict
+from glob import glob
 import json, pickle, re, os, abc
 import tarfile
 from typing import Iterable
@@ -238,12 +239,17 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
+                if self.edge_opt == 'af2':
+                    af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
+                else:
+                    af_confs = None
+                pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
+                                                        pro_seq, n_modes=10, n_cpu=2,
+                                                        edge_opt=self.edge_opt,
+                                                        af_confs=af_confs)
             except AssertionError as e:
-                raise Exception(f"error on protein creation for code {code}") from e
-            pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
-                                                      pro_seq, n_modes=10, n_cpu=2,
-                                                      edge_opt=self.edge_opt,
-                                                      af_conf=self.af_conf_dir)
+                raise Exception(f"error on protein graph creation for code {code}") from e
+            
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
