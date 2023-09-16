@@ -18,7 +18,7 @@ from src.utils.loader import Loader
 def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader, 
           device: torch.device, saver: CheckpointSaver=None, 
           silent=False, 
-          epochs=10, lr_0=0.1, lr_e=1e-5, step_size=25, last_epoch=-1,
+          epochs=10, lr_0=0.1,
           **kwargs) -> dict:
     """
     Training loop for graph models.
@@ -56,7 +56,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
     # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
-    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=10, 
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=5, 
                                   threshold=0.0001, min_lr=1e-6, factor=0.5)
 
     logs = {'train_loss': [], 'val_loss': []}
@@ -95,7 +95,6 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
                 OPTIMIZER.zero_grad()
                 loss.backward()
                 OPTIMIZER.step()
-                SCHEDULER.step()
 
                 # Update tqdm progress bar
                 progress_bar.set_postfix({"Train Loss": train_loss / (progress_bar.n + 1)})
@@ -109,6 +108,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         # Validation loop
         val_loss = test(model, val_loader, device, CRITERION)[0]
+        SCHEDULER.step(val_loss)
 
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
@@ -194,7 +194,7 @@ def train_tune(config, model:str, pro_feature:str, train_dataset:BaseDataset, va
     saver = CheckpointSaver(model, debug=True)
     for i in range(10): # 10 epochs
         logs = train(model, train_loader, val_loader, device, epochs=1, 
-              lr=config['lr'], silent=True, saver=saver)
+              lr_0=config['lr'], silent=True, saver=saver)
         val_loss = logs['val_loss'][0]
 
         # Send the current training result back to Tune
@@ -235,7 +235,7 @@ def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
                             shuffle_dataset=True, random_seed=RAND_SEED, 
                             batch_size=BATCH_SIZE)
         logs = train(model, train_loader, val_loader, device, 
-                epochs=NUM_EPOCHS, lr=LEARNING_RATE)
+                epochs=NUM_EPOCHS, lr_0=LEARNING_RATE)
 
         loss, pred, actual = test(model, test_loader, device)
         model_results[MODEL_KEY] = {'test_loss': loss, 

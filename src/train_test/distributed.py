@@ -104,8 +104,8 @@ def dtrain(args):
     torch.distributed.barrier()
     
     print("starting training:")
-    train(model, loaders['train'], loaders['val'], args.gpu, EPOCHS, 
-            LEARNING_RATE, cp_saver)
+    train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
+          device=args.gpu, saver=cp_saver, epochs=EPOCHS, lr_0=LEARNING_RATE)
     
     cp_saver.save()
     

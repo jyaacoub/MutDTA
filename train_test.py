@@ -109,7 +109,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     if not os.path.exists(cp_saver.save_path) or FORCE_TRAINING:
         # training
         logs = train(model, train_loader, val_loader, device, 
-                    epochs=NUM_EPOCHS, lr=LEARNING_RATE, saver=cp_saver)
+                    epochs=NUM_EPOCHS, lr_0=LEARNING_RATE, saver=cp_saver)
         cp_saver.save()
         # load best model for testing
         model.load_state_dict(cp_saver.best_model_dict) 
