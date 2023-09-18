@@ -56,8 +56,9 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
     # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
-    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=5, 
-                                  threshold=0.0001, min_lr=1e-6, factor=0.5)
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=10, 
+                                  threshold=0.001, min_lr=1e-5, factor=0.6,
+                                  verbose=True)
 
     logs = {'train_loss': [], 'val_loss': []}
     
@@ -119,7 +120,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         # Print training and validation loss for the epoch
         if not silent:
-            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']}: Train Loss: {train_loss:.4f}, "+\
+            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']:.1f}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
 
