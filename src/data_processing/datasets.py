@@ -1,6 +1,7 @@
 from collections import Counter, OrderedDict
 from glob import glob
 import json, pickle, re, os, abc
+import shutil
 import tarfile
 from typing import Iterable
 import requests
@@ -12,6 +13,7 @@ import torch_geometric as torchg
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from data_processing.downloaders import Downloader
 
 from src.utils import config as cfg
 from src.utils.residue import Chain
@@ -471,8 +473,8 @@ class DavisKibaDataset(BaseDataset):
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                                feature_opt=feature_opt, *args, **kwargs)
-    # def pdb_p(self, code):
-    #     return super().pdb_p(code) #TODO: download pdb structures using protID
+    def pdb_p(self, code):
+        return os.path.join(self.data_root, f'structures/{code}.pdb')
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
@@ -507,6 +509,51 @@ class DavisKibaDataset(BaseDataset):
         return ['proteins.txt',
                 'ligands_can.txt',
                 'Y']
+    
+    def download_structures(self):
+        # proteins.txt file:
+        unique_prots = json.load(open(self.raw_file_names[0], 'r')).keys()
+        # [...]
+        # TODO: send unique prots to uniprot for structure search
+        # TODO: make flexible depending on which dataset is being used (kiba vs davis have different needs)
+        
+        ##### Map to PDB structural files
+        # downloaded from https://www.uniprot.org/id-mapping/bcf1665e2612ea050140888440f39f7df822d780/overview
+        df = pd.read_csv(f'{self.data_root}/kiba_mapping_pdb.tsv', sep='\t')
+        # getting only first hit for each unique PDB-ID
+        df = df.loc[df[['From']].drop_duplicates().index]
+
+        # getting missing/unmapped prot ids
+        missing = [prot_id for prot_id in unique_prots if prot_id not in df['From'].values]
+
+        ##### download pdb files
+        save_dir = f'{self.data_root}/structures'
+        Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+
+        # retrieve missing structures from AlphaFold:
+        Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+
+        # NOTE: some uniprotIDs map to the same structure, so we copy them to ensure each has its own file.
+
+        # copying to new uniprot id file names
+        for i, row in df.iterrows():
+            uniprot = row['From']
+            pdb = row['To']
+            # finding pdb file
+            f_in = f'{save_dir}/{pdb}.pdb'
+            f_out = f'{save_dir}/{uniprot}.pdb'
+            if not os.path.isfile(f_in):
+                print('Missing', f_in)
+            elif not os.path.isfile(f_out):
+                shutil.copy(f_in, f_out)
+
+
+        # removing old pdb files.
+        for i, row in df.iterrows():
+            pdb = row['To']
+            f_in = f'{save_dir}/{pdb}.pdb'
+            if os.path.isfile(f_in):
+                os.remove(f_in)
     
     def pre_process(self):
         """
@@ -557,7 +604,7 @@ class DavisKibaDataset(BaseDataset):
         # creating binding dataframe:
         #   code,SMILE,pkd,prot_seq
         df = pd.DataFrame({
-           'code': [codes[c] for c in prot_c],
+           'code': [codes[c] for c in prot_c], 
            'SMILE': [ligand_seq[r] for r in lig_r],
            'prot_seq': [prot_seq[c] for c in prot_c]
         })
@@ -569,12 +616,14 @@ class DavisKibaDataset(BaseDataset):
         else:
             df['pkd'] = affinity_mat[lig_r, prot_c]
             
-        # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id)
+        # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id/name)
         # Note: this means the code is not unique (unlike pdbbind)
         df['prot_id'] = df['code']
         df.set_index('code', inplace=True,
                      verify_integrity=False)
         
+        # NOTE: codes are not unique but its okay since we use idx positions when getting 
+        # binding info (see BaseDataset.__getitem__)
         df.to_csv(self.processed_paths[0])
         return df
     

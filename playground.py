@@ -1,4 +1,60 @@
 #%%
+from src.data_processing.downloaders import Downloader
+import pandas as pd
+import json, shutil, os
+
+root_dir = '/cluster/home/t122995uhn/projects/data/kiba_tmp'
+
+unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r')).keys()
+# [...]
+# send unique prots to uniprot for structure search
+
+##### Map to PDB structural files
+# downloaded from https://www.uniprot.org/id-mapping/bcf1665e2612ea050140888440f39f7df822d780/overview
+df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
+# getting only first hit for each unique PDB-ID
+df = df.loc[df[['From']].drop_duplicates().index]
+
+# getting missing/unmapped prot ids
+missing = [prot_id for prot_id in unique_prots if prot_id not in df['From'].values]
+
+
+##### download pdb files
+save_dir = f'{root_dir}/structures'
+Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+
+# retrieve missing structures from AlphaFold:
+Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+
+# NOTE: some uniprotIDs map to the same structure and so using the df mapping we will rename the mapped pdb to be uniprot file names
+#%% copying as neccessary
+
+# copying to new uniprot id file names
+for i, row in df.iterrows():
+    uniprot = row['From']
+    pdb = row['To']
+    # finding pdb file
+    f_in = f'{save_dir}/{pdb}.pdb'
+    f_out = f'{save_dir}/{uniprot}.pdb'
+    if not os.path.isfile(f_in):
+        print('Missing', f_in)
+    elif not os.path.isfile(f_out):
+        shutil.copy(f_in, f_out)
+
+
+# removing old pdb files.
+for i, row in df.iterrows():
+    pdb = row['To']
+    f_in = f'{save_dir}/{pdb}.pdb'
+    if os.path.isfile(f_in):
+        os.remove(f_in)
+
+
+
+
+exit()
+
+#%%
 from src.data_processing.datasets import PDBbindDataset
 FEATURE='nomsa'
 dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
