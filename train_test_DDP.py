@@ -11,10 +11,12 @@ from src.train_test import dtrain
 #             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
 #                 ' -m DG -d PDBbind -f nomsa -e anm -lr 0.00001 -bs 32'+ \
 #                 ' -s_t 4320 -s_m 10GB -s_nn 2 -s_ng 2') # 3days == 4320 mins
+
 args = parse_train_test_args(verbose=True, distributed=True,
             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
-                ' -m EDI -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 16'+ \
-                ' -s_t 5 -s_m 10GB -s_nn 1 -s_ng 1') # 3days == 4320 mins
+                ' -m EDI -d PDBbind -f nomsa -e af2 -lr 0.0001 -bs 10'+ \
+                ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 2') # 3days == 4320 mins
+#-odir ./slurm_tests/edge_weights/%j -m EDI -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 16 -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 4
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
@@ -42,7 +44,7 @@ executor.update_parameters(
     slurm_mem=args.slurm_mem,
     # Might need this since ESM takes up a lot of memory
     # slurm_constraint='gpu16g', # using small batch size will be sufficient for now
-    # slurm_constraint='gpu32g', # using small batch size will be sufficient for now
+    slurm_constraint='gpu32g', # using small batch size will be sufficient for now
     # v100-34G can handle batch size of 15 -> v100-16G == 7?
 )
 

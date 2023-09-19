@@ -1,4 +1,16 @@
 #%%
+from src.data_processing.datasets import PDBbindDataset
+FEATURE='nomsa'
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
+        data_root=f'../data/v2020-other-PL/',
+        aln_dir=f'../data/PDBbind_aln',
+        cmap_threshold=8.0,
+        edge_opt='af2',
+        feature_opt=FEATURE,
+        overwrite=False, # overwrite old cmap.npy files
+        af_conf_dir='/cluster/home/t122995uhn/projects/colabfold/pdbbind_out/out0'
+        )
+#%%
 from src.utils.residue import Chain
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,7 +35,8 @@ for code in tqdm(df[['prot_id']].drop_duplicates().index):
     af_confs = glob(f'{af_dir}/{code}*.pdb')
 
     chains = [Chain(p) for p in af_confs]
-    tm_avg = np.mean([c.TM_score(template) for c in chains])
+    if len(chains) == 0: continue
+    tm_avg = np.max([c.TM_score(template) for c in chains])
 
     # Get the protein sequence length (you should implement this based on your data)
     sequence_length = len(template)  # Replace with your code to get sequence length
@@ -35,8 +48,8 @@ for code in tqdm(df[['prot_id']].drop_duplicates().index):
 plt.figure(figsize=(10, 6))
 plt.scatter(sequence_lengths, average_tm_scores, alpha=0.3)
 plt.xlabel('Protein Sequence Length')
-plt.ylabel('Average TM_score')
-plt.title('Average TM_score vs. Protein Sequence Length')
+plt.ylabel('Max TM_score')
+plt.title('Max TM_score vs. Protein Sequence Length')
 # plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
