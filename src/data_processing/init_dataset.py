@@ -41,6 +41,7 @@ if __name__ == "__main__":
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
+                    af_conf_dir='../colabfold/pdbbind_out/out0',
             )
         elif data == 'PDBbind':
             # create_pfm_np_files('../data/PDBbind_aln/', processes=4)
@@ -48,9 +49,10 @@ if __name__ == "__main__":
                     data_root=f'../data/v2020-other-PL/',
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
-                    edge_opt='anm',
+                    edge_opt='af2',
                     feature_opt=FEATURE,
-                    overwrite=False # overwrite old cmap.npy files
+                    overwrite=False, # overwrite old cmap.npy files
+                    af_conf_dir='../colabfold/pdbbind_out/out0'
                     )
             
     
