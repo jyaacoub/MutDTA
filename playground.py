@@ -1,11 +1,30 @@
+# #%%
+# from src.data_processing.datasets import DavisKibaDataset
+# data = 'PDBbind'
+# FEATURE = 'nomsa'
+# data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
+# # data_root_dir = '/home/jyaacoub/projects/data/'
+# DATA_ROOT = f'{data_root_dir}/'
+# dataset = DavisKibaDataset(
+#         save_root=f'../data/DavisKibaDataset/kiba/',
+#         data_root=DATA_ROOT,
+#         aln_dir=f'{DATA_ROOT}/aln/', 
+#         cmap_threshold=-0.5, 
+#         feature_opt=FEATURE,
+#         edge_opt = 'anm',
+#         af_conf_dir='../colabfold/pdbbind_out/out0',
+# )
+
+
 #%%
 from src.data_processing.downloaders import Downloader
 import pandas as pd
 import json, shutil, os
 
-root_dir = '/cluster/home/t122995uhn/projects/data/kiba_tmp'
+root_dir = '/cluster/home/t122995uhn/projects/data/kiba'
+save_dir = f'{root_dir}/structures'
 
-unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r')).keys()
+unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
 # [...]
 # send unique prots to uniprot for structure search
 
@@ -16,43 +35,79 @@ df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
 df = df.loc[df[['From']].drop_duplicates().index]
 
 # getting missing/unmapped prot ids
-missing = [prot_id for prot_id in unique_prots if prot_id not in df['From'].values]
+missing = [prot_id for prot_id in unique_prots.keys() if prot_id not in df['From'].values]
+
+# %%
+# ##### download pdb files
+# Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+
+# # retrieve missing structures from AlphaFold:
+# Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+
+# # NOTE: some uniprotIDs map to the same structure and so using the df mapping we will rename the mapped pdb to be uniprot file names
+# #%% copying as neccessary
+
+# # copying to new uniprot id file names
+# for i, row in df.iterrows():
+#     uniprot = row['From']
+#     pdb = row['To']
+#     # finding pdb file
+#     f_in = f'{save_dir}/{pdb}.pdb'
+#     f_out = f'{save_dir}/{uniprot}.pdb'
+#     if not os.path.isfile(f_in):
+#         print('Missing', f_in)
+#     elif not os.path.isfile(f_out):
+#         shutil.copy(f_in, f_out)
 
 
-##### download pdb files
-save_dir = f'{root_dir}/structures'
-Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+# # removing old pdb files.
+# for i, row in df.iterrows():
+#     pdb = row['To']
+#     f_in = f'{save_dir}/{pdb}.pdb'
+#     if os.path.isfile(f_in):
+#         os.remove(f_in)
 
-# retrieve missing structures from AlphaFold:
-Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
 
-# NOTE: some uniprotIDs map to the same structure and so using the df mapping we will rename the mapped pdb to be uniprot file names
-#%% copying as neccessary
-
-# copying to new uniprot id file names
-for i, row in df.iterrows():
-    uniprot = row['From']
-    pdb = row['To']
-    # finding pdb file
-    f_in = f'{save_dir}/{pdb}.pdb'
-    f_out = f'{save_dir}/{uniprot}.pdb'
+#%% Some downloaded pdbs dont match the provided input sequence
+from src.utils.residue import Chain
+# mismatch
+mismatch = {}
+for uniprot, seq in unique_prots.items():
+    if uniprot in missing: continue
+    f_in = f'{save_dir}/{uniprot}.pdb'
     if not os.path.isfile(f_in):
         print('Missing', f_in)
-    elif not os.path.isfile(f_out):
-        shutil.copy(f_in, f_out)
+    else:
+        c = Chain(f_in)
+        pdb_sequence = c.getSequence()
+        if len(seq) != len(pdb_sequence):
+            mismatch[uniprot] = (c, seq, mismatch_count)
+            print(f'LENGTH MISMATCH FOR {uniprot} - {f_in} (Expected: {len(seq)}, Actual: {len(pdb_sequence)})')
+        else:
+            # Calculate the number of mismatches
+            mismatch_count = sum(1 for i in range(len(seq)) if seq[i] != pdb_sequence[i])
+            
+            if mismatch_count > 0:
+                mismatch[uniprot] = (c, seq, mismatch_count)
+                print(f'MISMATCH FOR {uniprot} - {f_in} (Mismatches: {mismatch_count})')
+            
+        # try:
+        #     hv = parsePDB(f_in, subset='ca').getHierView()
+        #     # s.getSequence()
+        #     # c = Chain(f_in)
+        #     match = None
+        #     for c in hv.iterChains():
+        #         if c.getSequence() == seq:
+        #             match = c
+        #             break
+        #     # if c.getSequence() != seq:
+        #     if match is None:
+        #         print(f'MISMATCH FOR {uniprot} - {f_in}')
+        # except Exception as e:
+        #     raise Exception(f'{f_in}') from e
+        
 
 
-# removing old pdb files.
-for i, row in df.iterrows():
-    pdb = row['To']
-    f_in = f'{save_dir}/{pdb}.pdb'
-    if os.path.isfile(f_in):
-        os.remove(f_in)
-
-
-
-
-exit()
 
 #%%
 from src.data_processing.datasets import PDBbindDataset
