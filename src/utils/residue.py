@@ -317,10 +317,13 @@ class Chain:
                 
                 # only want CA and CB atoms
                 atm_type = line[12:16].strip()
+                alt_loc = line[16] # some can have multiple locations for each protein confirmation.
+                res_name = line[17:20].strip()
+                if res_name == 'UNK': continue # WARNING: unkown residues are skipped
+                
                 if atm_type not in ['CA', 'CB']: continue
                 icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
                                 # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
-
 
                 curr_res = int(line[22:26])
                 curr_chain = line[21]
@@ -328,6 +331,11 @@ class Chain:
                 # Glycine has no CB atom, so only CA is saved
                 res_key = f"{curr_res}_{icode}"            
                 chains.setdefault(curr_chain, OrderedDict())
+                
+                # Only keep first alt_loc
+                if atm_type in chains[curr_chain].get(res_key, {}) and bool(alt_loc.strip()):
+                    continue
+                
                 assert atm_type not in chains[curr_chain].get(res_key, {}), \
                         f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
 
@@ -336,7 +344,6 @@ class Chain:
                 chains[curr_chain].setdefault(res_key, OrderedDict())[atm_type] = np.array([x,y,z])
 
                 # Saving residue name
-                res_name = line[17:20].strip()
                 assert ("name" not in chains[curr_chain].get(res_key, {})) or \
                     (chains[curr_chain][res_key]["name"] == res_name), \
                                             f"Inconsistent residue name for residue {res_key} in {pdb_file}"
