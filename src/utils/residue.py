@@ -170,9 +170,10 @@ class Chain:
         """
         if self._seq is None:
             # Get sequence from chain
-            self._seq = ''
+            seq = ''
             for res_v in self.chain.values():
-                self._seq += ResInfo.pep_to_code[res_v["name"]]
+                seq += ResInfo.pep_to_code[res_v["name"]]
+            self._seq = seq
         return self._seq
         
     def getCoords(self) -> np.array:
