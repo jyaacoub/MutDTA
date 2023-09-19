@@ -89,7 +89,7 @@ class Loader():
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
-                    
+                    af_conf_dir='../colabfold/pdbbind_out/out0',
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(

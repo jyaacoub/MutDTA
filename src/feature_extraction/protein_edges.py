@@ -169,9 +169,10 @@ def get_af_edge_weights(chains:Iterable[Chain]) -> np.array:
     M = np.array([c.get_contact_map() for c in chains])
     return np.sum(M < 8.0, axis=0)/len(M)    
 
-def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str, 
+def get_target_edge_weights(pdb_fp:str, target_seq:str, 
                             n_modes:int=5, n_cpu=4, edge_opt='anm', af_confs:Iterable[str]=None,
-                            filter=False):
+                            filter=False) -> np.array:
+    """ Returns an LxL matrix of the edge weights"""
     # edge weights should be returned as a list of Z weights
     # where Z is the number of edges (|E|)
     if edge_opt is None or edge_opt == 'binary':
@@ -179,13 +180,19 @@ def get_target_edge_weights(edge_index:np.array, pdb_fp:str, target_seq:str,
     elif edge_opt == 'anm':
         # shape of |V|x|V| (V=vertices |V|=len(target_seq))
         cc = get_cross_correlation(pdb_fp, target_seq, n_modes, n_cpu=n_cpu)
-        return cc[edge_index[0], edge_index[1]]
+        return cc
     elif edge_opt == 'af2':
         chains = [Chain(p) for p in af_confs]
         # filter chains by template modeling score:
         if filter:
             template = Chain(pdb_fp)
             chains = [c for c in chains if 0.85 < c.TM_score(template) < 0.98]
-        return get_af_edge_weights(chains=chains)
+        
+        #TODO: if chains is empty then just return np.zeros matrix
+        if len(chains) == 0:
+            print(f'WARNING: no af2 pdbs for {pdb_fp}')
+            return np.ones(shape=(len(target_seq), len(target_seq)))
+        else:
+            return get_af_edge_weights(chains=chains)
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')

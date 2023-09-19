@@ -92,6 +92,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
         
+        assert self.edge_opt != 'af2' or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
         assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
         self.af_conf_dir = af_conf_dir
         
@@ -235,35 +236,34 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
-                extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
+                extra_feat, edge_idx = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
+                pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
+                
                 if self.edge_opt == 'af2':
                     af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
                 else:
                     af_confs = None
-                pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
+                pro_edge_weight = get_target_edge_weights(self.pdb_p(code), 
                                                         pro_seq, n_modes=10, n_cpu=2,
                                                         edge_opt=self.edge_opt,
                                                         af_confs=af_confs)
             except AssertionError as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
-            
-            pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
-            
             if pro_edge_weight is None:
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge),
+                                    edge_index=torch.LongTensor(edge_idx),
                                     pro_seq=pro_seq, # protein sequence for downstream esm model
                                     prot_id=prot_id)
             else:
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge),
-                                    edge_weight=torch.Tensor(pro_edge_weight),
+                                    edge_index=torch.LongTensor(edge_idx),
                                     pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id)
+                                    prot_id=prot_id,
+                                    edge_weight=torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]]))
             processed_prots[prot_id] = pro
         
         ###### Get Ligand Graphs ######
@@ -434,6 +434,10 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         # changing index name to code (to match with super class):
         df.index.name = 'code'
+        
+        ############# FILTER #############
+        # filter out rows that dont have af2 pdb files?
+        
         df.to_csv(self.processed_paths[0])
         return df
 
