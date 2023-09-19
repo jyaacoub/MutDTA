@@ -41,7 +41,7 @@ if __name__ == "__main__":
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
-                    af_conf_dir='../colabfold/pdbbind_out/out0',
+                    af_conf_dir='', #TODO:
             )
         elif data == 'PDBbind':
             # create_pfm_np_files('../data/PDBbind_aln/', processes=4)

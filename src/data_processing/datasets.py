@@ -13,7 +13,6 @@ import torch_geometric as torchg
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from data_processing.downloaders import Downloader
 
 from src.utils import config as cfg
 from src.utils.residue import Chain
@@ -22,6 +21,7 @@ from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
+from src.data_processing.downloaders import Downloader
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
@@ -107,6 +107,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 "please create subset before initialization."
         self.subset = subset
         
+        print(save_root)
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
@@ -242,19 +243,20 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
-                pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
-                
-                if self.edge_opt == 'af2':
-                    af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
-                else:
-                    af_confs = None
-                pro_edge_weight = get_target_edge_weights(self.pdb_p(code), 
-                                                        pro_seq, n_modes=10, n_cpu=2,
-                                                        edge_opt=self.edge_opt,
-                                                        af_confs=af_confs)
             except AssertionError as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
+            pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
+            
+            if self.edge_opt == 'af2':
+                af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
+            else:
+                af_confs = None
+            pro_edge_weight = get_target_edge_weights(self.pdb_p(code), 
+                                                    pro_seq, n_modes=10, n_cpu=2,
+                                                    edge_opt=self.edge_opt,
+                                                    af_confs=af_confs)
+        
             if pro_edge_weight is None:
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                     edge_index=torch.LongTensor(edge_idx),
@@ -536,7 +538,7 @@ class DavisKibaDataset(BaseDataset):
         # NOTE: some uniprotIDs map to the same structure, so we copy them to ensure each has its own file.
 
         # copying to new uniprot id file names
-        for i, row in df.iterrows():
+        for _, row in df.iterrows():
             uniprot = row['From']
             pdb = row['To']
             # finding pdb file
