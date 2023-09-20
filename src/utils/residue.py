@@ -1,4 +1,6 @@
+from matplotlib import pyplot as plt
 import numpy as np
+import os
 
 # one hot encoding
 def one_hot(x, allowable_set, cap=False):
@@ -103,7 +105,6 @@ class ResInfo():
     hydrophobic_ph7 = normalize_add_x(hydrophobic_ph7)
 
 
-
 from collections import OrderedDict
 
 class Chain:
@@ -119,16 +120,23 @@ class Chain:
         """
         # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
         self._chains = self._pdb_get_chains(pdb_file, model)
+        self.pdb_file = pdb_file
         
         # if t_chain is not specified then set it to be the largest chain
         self.t_chain = t_chain or max(self._chains, key=lambda x: len(self._chains[x]))
         
         self.reset_attributes()
         
+    def __len__(self):
+        return len(self.getSequence())
+    
+    def __repr__(self):
+        return f'<Chain {os.path.basename(self.pdb_file).split(".")[0]}:{self.t_chain}>'
+        
     def reset_attributes(self):
         self._seq = None        
         self._coords = None
-        self._hessian = None        
+        self._hessian = None
     
     @property
     def hessian(self) -> np.array:
@@ -153,6 +161,10 @@ class Chain:
         self.reset_attributes()
         self._t_chain = chain_ID        
     
+    @property
+    def sequence(self) -> str:
+        return self.getSequence()
+      
     def getSequence(self) -> str:
         """
         camelCase to mimic ProDy Chain class
@@ -162,9 +174,10 @@ class Chain:
         """
         if self._seq is None:
             # Get sequence from chain
-            self._seq = ''
+            seq = ''
             for res_v in self.chain.values():
-                self._seq += ResInfo.pep_to_code[res_v["name"]]
+                seq += ResInfo.pep_to_code[res_v["name"]]
+            self._seq = seq
         return self._seq
         
     def getCoords(self) -> np.array:
@@ -184,6 +197,43 @@ class Chain:
                     coords.append(res["CB"])
             self._coords = np.array(coords)
         return self._coords
+      
+    @staticmethod
+    def align_coords(c1:np.array,c2:np.array) -> tuple[np.array, np.array]:
+        """Aligns the given two 3D coordinate sets"""
+        # Calculate the centroid (center of mass) of each set of coordinates
+        centroid1 = np.mean(c1, axis=0)
+        centroid2 = np.mean(c2, axis=0)
+
+        # Translate both sets of coordinates to their respective centroids
+        c1_centered = c1 - centroid1
+        c2_centered = c2 - centroid2
+
+        # Calculate the covariance matrix
+        covariance_matrix = np.dot(c2_centered.T, c1_centered)
+
+        # Use singular value decomposition (SVD) to find the optimal rotation matrix
+        u, _, vt = np.linalg.svd(covariance_matrix)
+        rotation_matrix = np.dot(u, vt)
+
+        # Apply the calculated rotation matrix to c2_centered
+        c2_aligned = np.dot(c2_centered, rotation_matrix)
+        return c1_centered, c2_aligned
+    
+    def TM_score(self, template:'Chain'):
+        # getting and aligning coords
+        c1, c2 = self.align_coords(self.getCoords(), template.getCoords())
+        
+        # Calculating score:
+        L = len(c1)
+        # d0 is less than 0.5 for L < 22 
+        # and nan for L < 15 (root of a negative number)
+        d0 = 1.24 * np.power(L - 15, 1/3) - 1.8
+        d0 = max(0.5, d0) 
+
+        # compute the distance for each pair of atoms
+        di = np.sum((c1 - c2) ** 2, 1) # sum along first axis
+        return np.sum(1 / (1 + (di / d0) ** 2)) / L
 
     def get_mutated_seq(self, muts:list[str], reversed:bool=False) -> tuple[str, str]:
         """
@@ -210,29 +260,29 @@ class Chain:
             The mutated and reference sequences, respectively.
         """
         # prepare the mutations:
-        mut_dict = OrderedDict()
+        mut_dict = {}
         for mut in muts:
             if reversed:
                 mut, pos, ref = mut[0], mut[1:-1], mut[-1]
             else:
                 ref, pos, mut = mut[0], mut[1:-1], mut[-1]
-            mut_dict[pos] = (ref, mut)
+            mut_dict[pos] = [ref, mut, False] # False is to indicate if done
 
         # apply mutations
         mut_seq = list(self.getSequence())
-        mut_done = []
-        for i, res in enumerate(self._chains):
-            pos = str(res.getResnum())
+        for i, res in enumerate(self.chain):
+            pos = ''.join(res.split('_')) # split out icode from resnum
             if pos in mut_dict: # should always be the case unless mutation passed in is incorrect (see check below)
-                ref, mut = mut_dict[pos] 
-                assert ref == mut_seq[i], f"source ref '{mut_seq[i]}' doesnt match with mutation ref '{ref}'"
+                ref, mut, _ = mut_dict[pos] 
+                assert ref == mut_seq[i], f"Source ref '{mut_seq[i]}' "+\
+                    f"doesnt match with mutation {ref}->{mut} at position {pos}."
                 mut_seq[i] = mut
-                mut_done.append(pos)
+                mut_dict[pos][2] = True
                 
         # check    
-        for m in mut_dict:
-            if m not in mut_done:
-                raise Exception('Mutation sequence translation failed (due to no res at target position).')
+        for k,v in mut_dict.items():
+            if not v[2]:
+                raise Exception(f'Mutation sequence translation failed (due to no res at target position {k}).')
             
         return ''.join(mut_seq)
     
@@ -270,10 +320,12 @@ class Chain:
                 
                 # only want CA and CB atoms
                 atm_type = line[12:16].strip()
+                alt_loc = line[16] # some can have multiple locations for each protein confirmation.
+                res_name = line[17:20].strip()
+                if res_name == 'UNK': continue # WARNING: unkown residues are skipped
                 if atm_type not in ['CA', 'CB']: continue
                 icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
                                 # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
-
 
                 curr_res = int(line[22:26])
                 curr_chain = line[21]
@@ -281,6 +333,11 @@ class Chain:
                 # Glycine has no CB atom, so only CA is saved
                 res_key = f"{curr_res}_{icode}"            
                 chains.setdefault(curr_chain, OrderedDict())
+                
+                # Only keep first alt_loc
+                if atm_type in chains[curr_chain].get(res_key, {}) and bool(alt_loc.strip()):
+                    continue
+                    
                 assert atm_type not in chains[curr_chain].get(res_key, {}), \
                         f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
 
@@ -336,4 +393,42 @@ class Chain:
                 kirchhoff[i, i] = kirchhoff[i, i] + g
                 kirchhoff[j, j] = kirchhoff[j, j] + g
         return hessian
+      
+    def get_contact_map(self, display=False, title="Residue Contact Map") -> np.array:
+        """
+        Returns the residue contact map for that structure.
+            See: `get_sequence` for details on getting the residue chain dict.
+
+        Parameters
+        ----------
+        `display` : bool, optional
+            If true will display the contact map, by default False
+        `title` : str, optional
+            Title for cmap plot, by default "Residue Contact Map"
+
+        Returns
+        -------
+        Tuple[np.array]
+            residue contact map as a matrix
+
+        Raises
+        ------
+        KeyError
+            KeyError if a non-glycine residue is missing CB atom.
+        """
+        
+        # getting coords from residues
+        coords = self.getCoords() # shape == (L,3) where L is the sequence length
     
+        # Calculate the pairwise distance matrix
+        pairwise_distances = np.sqrt(np.sum((coords[:, np.newaxis] - coords) ** 2, axis=-1))
+
+        # Fill the upper triangle and the diagonal of the distance matrix
+        np.fill_diagonal(pairwise_distances, 0)
+        
+        if display:
+            plt.imshow(pairwise_distances)
+            plt.title(title)
+            plt.show()
+            
+        return pairwise_distances

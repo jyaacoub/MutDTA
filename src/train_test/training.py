@@ -3,8 +3,9 @@ import gc
 from typing import Tuple
 
 from tqdm import tqdm
-import torch
 import numpy as np
+import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from src.train_test.utils import train_val_test_split, CheckpointSaver
 from src.models.utils import BaseModel
@@ -15,8 +16,10 @@ from src.utils.loader import Loader
 
 
 def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader, 
-          device: torch.device, epochs=10, lr=0.001, 
-          saver: CheckpointSaver=None, silent=False, **kwargs) -> dict:
+          device: torch.device, saver: CheckpointSaver=None, 
+          silent=False, 
+          epochs=10, lr_0=0.1,
+          **kwargs) -> dict:
     """
     Training loop for graph models.
     Note that **kwargs is used to pass any additional arguments to the optimizer.
@@ -31,14 +34,18 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         Data loader for validation set.
     `device` : torch.device
         Device to train on.
-    `epochs` : int, optional
-        number of epochs, by default 10
-    `lr` : float, optional
-        learning rate, by default 0.001
     `saver` : CheckpointSaver, optional
         CheckpointSaver object that decides when to stop training and saves checkpoint 
         of best performant version of the model if none provided then will train for 
         all epochs, by default None
+    `epochs` : int, optional
+        number of epochs, by default 10
+    `lr_0` : float, optional
+        Starting learning rate, by default 0.1
+    `lr_e`: float, optional
+        End learning rate
+    `last_epoch` : int, optional
+        Starting point for scheduler if continuing from prev run, by default -1
         
     Returns
     -------
@@ -47,7 +54,11 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     """
     saver = saver or CheckpointSaver(model, train_all=True)
     CRITERION = torch.nn.MSELoss()
-    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr, **kwargs)
+    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
+    # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=5, 
+                                  threshold=0.001, min_lr=1e-5, factor=0.6,
+                                  verbose=True)
 
     logs = {'train_loss': [], 'val_loss': []}
     
@@ -98,6 +109,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         # Validation loop
         val_loss = test(model, val_loader, device, CRITERION)[0]
+        SCHEDULER.step(val_loss)
 
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
@@ -108,7 +120,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         # Print training and validation loss for the epoch
         if not silent:
-            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']}: Train Loss: {train_loss:.4f}, "+\
+            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']:.1f}: Train Loss: {train_loss:.4f}, "+\
                 f"Val Loss: {val_loss:.4f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
 
@@ -183,7 +195,7 @@ def train_tune(config, model:str, pro_feature:str, train_dataset:BaseDataset, va
     saver = CheckpointSaver(model, debug=True)
     for i in range(10): # 10 epochs
         logs = train(model, train_loader, val_loader, device, epochs=1, 
-              lr=config['lr'], silent=True, saver=saver)
+              lr_0=config['lr'], silent=True, saver=saver)
         val_loss = logs['val_loss'][0]
 
         # Send the current training result back to Tune
@@ -224,7 +236,7 @@ def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
                             shuffle_dataset=True, random_seed=RAND_SEED, 
                             batch_size=BATCH_SIZE)
         logs = train(model, train_loader, val_loader, device, 
-                epochs=NUM_EPOCHS, lr=LEARNING_RATE)
+                epochs=NUM_EPOCHS, lr_0=LEARNING_RATE)
 
         loss, pred, actual = test(model, test_loader, device)
         model_results[MODEL_KEY] = {'test_loss': loss, 

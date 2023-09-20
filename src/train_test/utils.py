@@ -145,7 +145,7 @@ def train_val_test_split(dataset: InMemoryDataset,
 
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-    def __init__(self, model:BaseModel, save_path=None, train_all=False, patience=5, 
+    def __init__(self, model:BaseModel, save_path=None, train_all=True, patience=5, 
                  min_delta=0.03, save_freq:int=50, debug=False, dist_rank:int=None):
         """
         Early stopping and checkpoint saving class.

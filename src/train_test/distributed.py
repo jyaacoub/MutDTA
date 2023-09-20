@@ -92,7 +92,7 @@ def dtrain(args):
     
     # ==== train ====
     cp_saver = CheckpointSaver(model=model, save_path=f'{model_save_dir}/{MODEL_KEY}.model',
-                            train_all=False,
+                            train_all=True,
                             patience=10, min_delta=0.1,
                             save_freq=10,
                             dist_rank=args.rank)
@@ -101,11 +101,11 @@ def dtrain(args):
         # load ckpnt
         model.load_state_dict(torch.load(cp_saver.save_path + '_tmp', 
                                 map_location=torch.device(f'cuda:{args.gpu}')))
-    torch.distributed.barrier()
+    torch.distributed.barrier() # Sync params across GPUs before training
     
     print("starting training:")
-    train(model, loaders['train'], loaders['val'], args.gpu, EPOCHS, 
-            LEARNING_RATE, cp_saver)
+    train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
+          device=args.gpu, saver=cp_saver, epochs=EPOCHS, lr_0=LEARNING_RATE)
     
     cp_saver.save()
     

@@ -1,5 +1,7 @@
 from collections import Counter, OrderedDict
+from glob import glob
 import json, pickle, re, os, abc
+import shutil
 import tarfile
 from typing import Iterable
 import requests
@@ -15,10 +17,11 @@ from tqdm import tqdm
 from src.utils import config as cfg
 from src.utils.residue import Chain
 from src.feature_extraction.ligand import smile_to_graph
-from src.feature_extraction.protein import create_save_cmaps, get_contact_map, target_to_graph
+from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor
+from src.data_processing.downloaders import Downloader
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
@@ -41,15 +44,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
         Parameters
         ----------
-        `save_root` : str, optional
+        `save_root` : str
             Path to processed dir, by default '../data/DavisKibaDataset/'
-        `data_root` : str, optional
+        `data_root` : str
             Path to raw data files, by default '../data/davis_kiba/davis/'
-        `aln_dir` : str, optional
+        `aln_dir` : str
             Path to sequence alignment directory with files of the name 
             '{code}_cleaned.a3m'. If set to None then no PSSM calculation is 
             done and is set to zeros, by default '../data/davis_kiba/davis/aln/'.
-        `cmap_threshold` : float, optional
+        `cmap_threshold` : float
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
@@ -91,6 +94,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
         
+        assert self.edge_opt != 'af2' or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
         assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
         self.af_conf_dir = af_conf_dir
         
@@ -234,30 +238,35 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
-                extra_feat, pro_edge = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
+                extra_feat, edge_idx = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
             except AssertionError as e:
-                raise Exception(f"error on protein creation for code {code}") from e
-            pro_edge_weight = get_target_edge_weights(pro_edge, self.pdb_p(code), 
-                                                      pro_seq, n_modes=10, n_cpu=2,
-                                                      edge_opt=self.edge_opt,
-                                                      af_conf=self.af_conf_dir)
+                raise Exception(f"error on protein graph creation for code {code}") from e
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
+            if self.edge_opt == 'af2':
+                af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
+            else:
+                af_confs = None
+            pro_edge_weight = get_target_edge_weights(self.pdb_p(code), 
+                                                    pro_seq, n_modes=10, n_cpu=2,
+                                                    edge_opt=self.edge_opt,
+                                                    af_confs=af_confs)
+        
             if pro_edge_weight is None:
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge),
+                                    edge_index=torch.LongTensor(edge_idx),
                                     pro_seq=pro_seq, # protein sequence for downstream esm model
                                     prot_id=prot_id)
             else:
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(pro_edge),
-                                    edge_weight=torch.Tensor(pro_edge_weight),
+                                    edge_index=torch.LongTensor(edge_idx),
                                     pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id)
+                                    prot_id=prot_id,
+                                    edge_weight=torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]]))
             processed_prots[prot_id] = pro
         
         ###### Get Ligand Graphs ######
@@ -428,6 +437,10 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         # changing index name to code (to match with super class):
         df.index.name = 'code'
+        
+        ############# FILTER #############
+        # filter out rows that dont have af2 pdb files?
+        
         df.to_csv(self.processed_paths[0])
         return df
 
@@ -461,8 +474,8 @@ class DavisKibaDataset(BaseDataset):
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                                feature_opt=feature_opt, *args, **kwargs)
-    # def pdb_p(self, code):
-    #     return super().pdb_p(code) #TODO: download pdb structures using protID
+    def pdb_p(self, code):
+        return os.path.join(self.data_root, f'structures/{code}.pdb')
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
@@ -497,6 +510,51 @@ class DavisKibaDataset(BaseDataset):
         return ['proteins.txt',
                 'ligands_can.txt',
                 'Y']
+    
+    def download_structures(self):
+        # proteins.txt file:
+        unique_prots = json.load(open(self.raw_file_names[0], 'r')).keys()
+        # [...]
+        # TODO: send unique prots to uniprot for structure search
+        # TODO: make flexible depending on which dataset is being used (kiba vs davis have different needs)
+        
+        ##### Map to PDB structural files
+        # downloaded from https://www.uniprot.org/id-mapping/bcf1665e2612ea050140888440f39f7df822d780/overview
+        df = pd.read_csv(f'{self.data_root}/kiba_mapping_pdb.tsv', sep='\t')
+        # getting only first hit for each unique PDB-ID
+        df = df.loc[df[['From']].drop_duplicates().index]
+
+        # getting missing/unmapped prot ids
+        missing = [prot_id for prot_id in unique_prots if prot_id not in df['From'].values]
+
+        ##### download pdb files
+        save_dir = f'{self.data_root}/structures'
+        Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+
+        # retrieve missing structures from AlphaFold:
+        Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+
+        # NOTE: some uniprotIDs map to the same structure, so we copy them to ensure each has its own file.
+
+        # copying to new uniprot id file names
+        for _, row in df.iterrows():
+            uniprot = row['From']
+            pdb = row['To']
+            # finding pdb file
+            f_in = f'{save_dir}/{pdb}.pdb'
+            f_out = f'{save_dir}/{uniprot}.pdb'
+            if not os.path.isfile(f_in):
+                print('Missing', f_in)
+            elif not os.path.isfile(f_out):
+                shutil.copy(f_in, f_out)
+
+
+        # removing old pdb files.
+        for i, row in df.iterrows():
+            pdb = row['To']
+            f_in = f'{save_dir}/{pdb}.pdb'
+            if os.path.isfile(f_in):
+                os.remove(f_in)
     
     def pre_process(self):
         """
@@ -547,7 +605,7 @@ class DavisKibaDataset(BaseDataset):
         # creating binding dataframe:
         #   code,SMILE,pkd,prot_seq
         df = pd.DataFrame({
-           'code': [codes[c] for c in prot_c],
+           'code': [codes[c] for c in prot_c], 
            'SMILE': [ligand_seq[r] for r in lig_r],
            'prot_seq': [prot_seq[c] for c in prot_c]
         })
@@ -559,12 +617,14 @@ class DavisKibaDataset(BaseDataset):
         else:
             df['pkd'] = affinity_mat[lig_r, prot_c]
             
-        # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id)
+        # adding prot_id column (in the case of davis and kiba datasets, the code is the prot_id/name)
         # Note: this means the code is not unique (unlike pdbbind)
         df['prot_id'] = df['code']
         df.set_index('code', inplace=True,
                      verify_integrity=False)
         
+        # NOTE: codes are not unique but its okay since we use idx positions when getting 
+        # binding info (see BaseDataset.__getitem__)
         df.to_csv(self.processed_paths[0])
         return df
     
@@ -572,23 +632,25 @@ class DavisKibaDataset(BaseDataset):
 class PlatinumDataset(BaseDataset):
     CSV_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_flat_file.csv'
     PBD_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_processed_pdb_files.tar.gz'
-    def __init__(self, save_root: str, data_root: str, 
+    def __init__(self, save_root: str, data_root: str=None, 
                  aln_dir: str=None, cmap_threshold: float=8.0, 
-                 feature_opt='nomsa', mutated=True, *args, **kwargs):
+                 feature_opt='nomsa', *args, **kwargs):
         """
         Dataset class for the Platinum dataset.
+        NOTE: Platinum dataset is essentially two datasets in one (one for mutations and one for wildtype)
 
         Parameters
         ----------
         `save_root` : str
             Where to save the processed data.
-        `data_root` : str
+        `data_root` : str, optional
             Where the raw data is stored from the Platinum dataset 
             (from: https://biosig.lab.uq.edu.au/platinum/).
         `aln_dir` : str, optional
             MSA alignments for each protein in the dataset, by default None
         `cmap_threshold` : float, optional
             Threshold for contact map creation, by default 8.0
+            
         `feature_opt` : str, optional
             Choose from ['nomsa', 'msa', 'shannon'], by default 'nomsa'
         """
@@ -597,20 +659,20 @@ class PlatinumDataset(BaseDataset):
             raise ValueError(f'Invalid feature_opt: {feature_opt}. '+\
                         f'Only {options} is currently supported for Platinum dataset.')
         
-        # Platinum dataset is essentially two datasets in one
-        # (one for mutations and one for wildtype) and is why we need to
-        # specify mutations_only.
-        self.mutated = mutated # only use mutated sequences and data
-        if mutated:
-            save_root = save_root + '_mut'
         
         if aln_dir is not None:
             print('WARNING: aln_dir is not used for Platinum dataset, no support for MSA alignments.')
         
         super().__init__(save_root, data_root, None, cmap_threshold, 
                          feature_opt, *args, **kwargs)
-        
-    def cmap_p(self, code):
+    
+    def pdb_p(self, code):
+        return os.path.join(self.raw_paths[1], f'{code}.pdb')
+    
+    def cmap_p(self, code, map=True): 
+        # map is important so that we map the provided code to the correct pdb ID
+        if map:
+            code = self.df.loc[code]['prot_id']
         return os.path.join(self.raw_dir, 'contact_maps', f'{code}.npy')
     
     def aln_p(self, code):
@@ -626,11 +688,10 @@ class PlatinumDataset(BaseDataset):
     
     def download(self):
         """Download the raw data for the dataset."""
+        # Download flat CSV file containing binding info, PDB IDs, ligand IDs, etc...
         if not os.path.isfile(self.raw_paths[0]):
             print('CSV file not found, downloading from website...')
             urllib.request.urlretrieve(self.CSV_LINK, self.raw_paths[0])
-        
-        df = pd.read_csv(self.raw_paths[0])
         
         # Downloading pdb files:
         os.makedirs(self.raw_paths[1], exist_ok=True)
@@ -652,6 +713,18 @@ class PlatinumDataset(BaseDataset):
         except requests.HTTPError as e:
             raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
         
+        # download remaining pdbs from PDB site
+        # missing pdbs will be those that are not wildtypes since that is the default
+        # NOTE: some structures do not match up with sequence length of native structure.
+        # to get around this these are ignored and we just use the native structure.
+        def filter(row):
+            mt = row['mut.mt_pdb']
+            return mt != 'NO' and not \
+                os.path.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
+        df_raw = pd.read_csv(self.raw_paths[0])
+        Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'],
+                                 save_dir=self.raw_paths[1])
+        
     def pre_process(self):
         """
         This method is used to create the processed data files for feature extraction.
@@ -671,60 +744,58 @@ class PlatinumDataset(BaseDataset):
         """
         df_raw = pd.read_csv(self.raw_paths[0])
         os.makedirs(os.path.join(self.raw_dir, 'contact_maps'), exist_ok=True)
-        
+        # fixing pkd values for binding affinity
+        df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
+                                                      expand=False).astype(float)
+        # adjusting units for binding data from nM to pKd:
+        df_raw['affin.k_mt'] = -np.log10(df_raw['affin.k_mt']*1e-9)
+        df_raw['affin.k_wt'] = -np.log10(df_raw['affin.k_wt']*1e-9)
         # Getting sequences and cmaps:
         prot_seq = {}
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Getting sequences and cmaps',
                            total=len(df_raw)):
             mut = row['mutation']
-            pdb = row['affin.pdb_id']
+            pdb_wt = row['mut.wt_pdb']
+            pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
-            
-            # Getting sequence from pdb file:
-            pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chain = Chain(pdb_fp, t_chain=t_chain)
+
+            # Getting sequence  from pdb file:
+            missing_wt = pdb_wt == 'NO'
+            pdb = pdb_mt if missing_wt else pdb_wt
+            chain = Chain(self.pdb_p(pdb), t_chain=t_chain)
             
             # Getting and saving contact map:
-            if not os.path.isfile(self.cmap_p(pdb)):
-                cmap = get_contact_map(chain)
-                np.save(self.cmap_p(i), cmap)
+            # no mapping during creation 
+            # this is done to prevent havign to store duplicate cmaps for the same 
+            # pdb but under different names
+            if not os.path.isfile(self.cmap_p(pdb, map=False)): 
+                cmap = chain.get_contact_map()
+                np.save(self.cmap_p(pdb, map=False), cmap)
             
-            mut_seq = chain.get_mutated_seq(chain, mut.split('/'), reversed=False)
-            ref_seq = chain.getSequence()
+            # Getting sequences:
+            try:
+                if missing_wt:
+                    mut_seq = chain.sequence
+                    ref_seq = chain.get_mutated_seq(mut.split('/'), reversed=True)
+                else:
+                    mut_seq = chain.get_mutated_seq(mut.split('/'), reversed=False)
+                    ref_seq = chain.sequence
+            except Exception as e:
+                raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e
             
-            # getting mutated sequence:
-            if self.mutated:
-                prot_seq[i] = (pdb, mut_seq)
-            else:
-                prot_seq[i] = (pdb, ref_seq)
+            # Saving sequence and additional relevant info
+            mt_pkd = row['affin.k_mt']
+            wt_pkd = row['affin.k_wt']
+            lig_id = row['affin.lig_id']
+            smiles = row['lig.canonical_smiles']
+            # using index number for ID since pdb is not unique in this dataset.
+            prot_seq[f'{i}_mt'] = (pdb, lig_id,  mt_pkd, smiles, mut_seq)
+            prot_seq[f'{i}_wt'] = (pdb, lig_id, wt_pkd, smiles, ref_seq)
                 
-        df_seq = pd.DataFrame.from_dict(prot_seq, orient='index', 
-                                        columns=['prot_id', 'prot_seq'])
-        
-        # NOTE: ligand sequences and binding data are already in the csv file
-        # 'affin.lig_id', 'lig.canonical_smiles', 'affin.k_wt', 'affin.k_mt'
-        if self.mutated:
-            # parsing out '>' and '<' from binding data for pure numbers:
-            df_binding = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
-                                                      expand=False).astype(float)
-        else:
-            df_binding = df_raw['affin.k_wt']
-        
-        # adjusting units for binding data from nM to pKd:
-        df_binding = -np.log10(df_binding*1e-9)
-        
-        # merging dataframes:
-        df = pd.DataFrame({
-            'lig_id': df_raw['affin.lig_id'],
-            'prot_id': df_seq['prot_id'],
-            
-            'pkd': df_binding,
-            
-            'prot_seq': df_seq['prot_seq'],
-            'SMILE': df_raw['lig.canonical_smiles']
-        }, index=df_raw.index)
+        df = pd.DataFrame.from_dict(prot_seq, orient='index', 
+                                        columns=['prot_id', 'lig_id', 
+                                                 'pkd', 'SMILE', 'prot_seq'])
         df.index.name = 'code'
-        
         df.to_csv(self.processed_paths[0])
         return df

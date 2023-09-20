@@ -1,154 +1,246 @@
 #%%
-from src.utils.loader import Loader
-d = Loader.load_dataset(data='PDBbind', pro_feature='nomsa', edge_opt='anm', subset='train')
+from src.data_processing.datasets import PlatinumDataset
+from src.utils.residue import Chain
 
-#%%
-from src.data_processing.datasets import PDBbindDataset
-
-FEATURE='nomsa'
-
-dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
-                    data_root=f'../data/v2020-other-PL/',
-                    aln_dir=f'../data/PDBbind_aln',
-                    cmap_threshold=8.0,
-                    feature_opt=FEATURE,
-                    edge_opt='anm',
-                    subset='train'
-                    )
-            
-
-
-#%%
-from src.feature_extraction.protein import multi_save_cmaps
+import pandas as pd
+import numpy as np
+import os.path as osp
 import os
-data_root = f'../data/v2020-other-PL/'
+data = 'PDBbind'
+FEATURE = 'nomsa'
+data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
+df_p = '../data/PlatinumDataset/raw/platinum_flat_file.csv'
+# data_root_dir = '/home/jyaacoub/projects/data/'
+DATA_ROOT = f'{data_root_dir}/'
 
-pdb_codes = os.listdir(data_root)
-# filter out readme and index folders
-pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
-pdb_p = lambda x: os.path.join(data_root, x, f'{x}_protein.pdb')
-cmap_p = lambda x: os.path.join(data_root, x, f'{x}.npy')
+df_raw = pd.read_csv(df_p)
 
-multi_save_cmaps(pdb_codes, pdb_p, cmap_p, processes=4)
+# get test sample 
+row = df_raw.iloc[778]
+mut = row['mutation']
+pdb_wt = row['mut.wt_pdb']
+pdb_mt = row['mut.mt_pdb'] 
+t_chain = row['affin.chain']
+            
+# Getting sequence from pdb file:
+chain_wt = Chain(f'../data/PlatinumDataset/raw/platinum_pdb/{pdb_wt}.pdb', 
+              t_chain=t_chain)
+mt_seq = chain_wt.get_mutated_seq(mut.split('/'), reversed=False)
+# chain_mt = Chain(f'../data/PlatinumDataset/raw/platinum_pdb/{pdb_mt}.pdb', 
+#               t_chain=t_chain)
+# mt_seq == chain_mt.getSequence()
+
 
 #%%
-from src.utils.residue import Chain
-fp = '../data/v2020-other-PL/4no9/4no9_protein.pdb'
-c = Chain(fp)
+from src.data_processing.downloaders import Downloader
+
+# download missing pdbs:
+# only missing pdbs will be those that are not wildtypes since that is the default
+def filter(row):
+    mt = row['mut.mt_pdb']
+    return mt != 'NO' and not osp.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
+
+Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'])
+
+#%%
+from src.data_processing.datasets import PlatinumDataset
+
+d = PlatinumDataset(
+    save_root=f'../data/PlatinumDataset/',
+    data_root=f'../data/PlatinumDataset/raw',
+    aln_dir=None,
+    cmap_threshold=8.0,
+    mutated=False, # downloaded PDBs are the mutated versions, ref can be achived by reversing mutation
+    feature_opt='nomsa',
+    edge_opt='binary')
+# exit()
+
+# dataset = DavisKibaDataset(
+#         save_root=f'../data/DavisKibaDataset/kiba/',
+#         data_root=DATA_ROOT,
+#         aln_dir=f'{DATA_ROOT}/aln/', 
+#         cmap_threshold=-0.5, 
+#         feature_opt=FEATURE,
+#         edge_opt = 'anm',
+#         af_conf_dir='../colabfold/pdbbind_out/out0',
+# )
 
 
 #%%
-import timeit
-from src.utils.residue import Chain
-from prody import parsePDB, calcANM, calcCrossCorr
-
-code = "1a1e"
-pdb_fp = f"/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb"
-pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); cc = calcCrossCorr(mine[:5], n_cpu=1, norm=True)
-
-#%%
-res_mine = timeit.timeit(
-    stmt="pdb = Chain(pdb_fp, t_chain='A'); mine = calcANM(pdb.hessian, n_modes=5); ccm = calcCrossCorr(mine[:5], n_cpu=1, norm=True)",
-    setup="from __main__ import code, pdb_fp, Chain, calcANM, calcCrossCorr",
-    number=10
-)
-
-res_prody = timeit.timeit(
-    stmt="pdb = parsePDB(pdb_fp, subset='calpha').getHierView(); anm, _ = calcANM(pdb['A'], selstr='calpha', n_modes=5); cc = calcCrossCorr(anm[:5], n_cpu=1, norm=True)",
-    setup="from __main__ import code, pdb_fp, parsePDB, calcANM, calcCrossCorr",
-    number=10
-)
-
-print(res_mine, res_prody)
-
-# %%
-import numpy as np
-from prody import AtomGroup
-
-ag = AtomGroup('test')
-ag.addCoordset((np.random.rand(25,3) -0.5) * 100) # random coords to mimic what it would look like
-
-
-# how to add sequence info?
-
-# %%
+from src.data_processing.downloaders import Downloader
 import pandas as pd
-code = "3eql"
-df_old = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/old_nomsa/full/XY.csv', index_col=0)
-df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa/full/XY.csv', index_col=0)
+import json, shutil, os
 
-df_old['prot_seq'].eq(df['prot_seq'])
+root_dir = '/cluster/home/t122995uhn/projects/data/kiba'
+save_dir = f'{root_dir}/structures'
 
-#%% checking to see if current seq match with MSA generated alignments
+unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
+# [...]
+# send unique prots to uniprot for structure search
+
+##### Map to PDB structural files
+# downloaded from https://www.uniprot.org/id-mapping/bcf1665e2612ea050140888440f39f7df822d780/overview
+df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
+# getting only first hit for each unique PDB-ID
+df = df.loc[df[['From']].drop_duplicates().index]
+
+# getting missing/unmapped prot ids
+missing = [prot_id for prot_id in unique_prots.keys() if prot_id not in df['From'].values]
+
+# %%
+# ##### download pdb files
+# Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+
+# # retrieve missing structures from AlphaFold:
+# Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+
+# # NOTE: some uniprotIDs map to the same structure and so using the df mapping we will rename the mapped pdb to be uniprot file names
+# #%% copying as neccessary
+
+# # copying to new uniprot id file names
+# for i, row in df.iterrows():
+#     uniprot = row['From']
+#     pdb = row['To']
+#     # finding pdb file
+#     f_in = f'{save_dir}/{pdb}.pdb'
+#     f_out = f'{save_dir}/{uniprot}.pdb'
+#     if not os.path.isfile(f_in):
+#         print('Missing', f_in)
+#     elif not os.path.isfile(f_out):
+#         shutil.copy(f_in, f_out)
+
+# # removing old pdb files.
+# for i, row in df.iterrows():
+#     pdb = row['To']
+#     f_in = f'{save_dir}/{pdb}.pdb'
+#     if os.path.isfile(f_in):
+#         os.remove(f_in)
+
+
+#%% Some downloaded pdbs dont match the provided input sequence
+from src.utils.residue import Chain
+# mismatch
+mismatch = {}
+for uniprot, seq in unique_prots.items():
+    if uniprot in missing: continue
+    f_in = f'{save_dir}/{uniprot}.pdb'
+    if not os.path.isfile(f_in):
+        print('Missing', f_in)
+    else:
+        c = Chain(f_in)
+        pdb_sequence = c.getSequence()
+        if len(seq) != len(pdb_sequence):
+            mismatch[uniprot] = (c, seq, mismatch_count)
+            print(f'LENGTH MISMATCH FOR {uniprot} - {f_in} (Expected: {len(seq)}, Actual: {len(pdb_sequence)})')
+        else:
+            # Calculate the number of mismatches
+            mismatch_count = sum(1 for i in range(len(seq)) if seq[i] != pdb_sequence[i])
+            
+            if mismatch_count > 0:
+                mismatch[uniprot] = (c, seq, mismatch_count)
+                print(f'MISMATCH FOR {uniprot} - {f_in} (Mismatches: {mismatch_count})')
+            
+        # try:
+        #     hv = parsePDB(f_in, subset='ca').getHierView()
+        #     # s.getSequence()
+        #     # c = Chain(f_in)
+        #     match = None
+        #     for c in hv.iterChains():
+        #         if c.getSequence() == seq:
+        #             match = c
+        #             break
+        #     # if c.getSequence() != seq:
+        #     if match is None:
+        #         print(f'MISMATCH FOR {uniprot} - {f_in}')
+        # except Exception as e:
+        #     raise Exception(f'{f_in}') from e
+
+#%%
 from src.data_processing.datasets import PDBbindDataset
-FEATURE='nomsa' # msa not working due to refactoring that caused change in sequences used
-dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/{FEATURE}',
-                    data_root=f'../data/v2020-other-PL/',
-                    aln_dir=f'../data/PDBbind_aln',
-                    cmap_threshold=8.0,
-                    edge_opt='anm',
-                    feature_opt=FEATURE,
-                    overwrite=True
-                    )
-
+FEATURE='nomsa'
+dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
+        data_root=f'../data/v2020-other-PL/',
+        aln_dir=f'../data/PDBbind_aln',
+        cmap_threshold=8.0,
+        edge_opt='af2',
+        feature_opt=FEATURE,
+        overwrite=False, # overwrite old cmap.npy files
+        af_conf_dir='/cluster/home/t122995uhn/projects/colabfold/pdbbind_out/out0'
+        )
 #%%
-from src.feature_extraction.process_msa import create_pfm_np_files
-
-create_pfm_np_files('../data/PDBbind_aln/', processes=4)
-
-#%%
-from src.utils.loader import Loader
-from src.utils import config
-import pickle
-
-import numpy as np
+from src.utils.residue import Chain
 import pandas as pd
-from src.data_processing.processors import Processor
-from prody import parsePDB, calcANM
+import matplotlib.pyplot as plt
+import numpy as np
+from glob import glob
+from tqdm import tqdm
 
-# delNonstdAminoacid('SEP')
+# Create empty lists to store protein sequence lengths and average TM_scores
+sequence_lengths = []
+average_tm_scores = []
 
+# Read the CSV file
+df = pd.read_csv("/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_anm/full/XY.csv", 
+                 index_col=0)
 
-td = Loader.load_dataset('PDBbind', 'nomsa', 'binary',
-                                    path="/cluster/home/t122995uhn/projects/data") 
+af_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_afConf'
 
-hv = parsePDB('../data/v2020-other-PL/5swg/5swg_protein.pdb', subset='calpha').getHierView()
-for c in hv: print(c)
+for code in tqdm(df[['prot_id']].drop_duplicates().index):
+    t_p = f'/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb'
+    template = Chain(t_p)
+
+    af_confs = glob(f'{af_dir}/{code}*.pdb')
+
+    chains = [Chain(p) for p in af_confs]
+    if len(chains) == 0: continue
+    tm_avg = np.max([c.TM_score(template) for c in chains])
+
+    # Get the protein sequence length (you should implement this based on your data)
+    sequence_length = len(template)  # Replace with your code to get sequence length
+
+    sequence_lengths.append(sequence_length)
+    average_tm_scores.append(tm_avg)
+
+#%% Create a bar graph
+plt.figure(figsize=(10, 6))
+plt.scatter(sequence_lengths, average_tm_scores, alpha=0.3)
+plt.xlabel('Protein Sequence Length')
+plt.ylabel('Max TM_score')
+plt.title('Max TM_score vs. Protein Sequence Length')
+# plt.grid(axis='y', linestyle='--', alpha=0.7)
+plt.show()
+
 
 #%%
-ch = Processor.pdb_get_chain('../data/v2020-other-PL/5swg/5swg_protein.pdb', model=1)
-seq_mine = ch.getSequence()
-seq_real = hv['A'].getSequence()
-for i, c in enumerate(seq_real):
-    if seq_real[i] != seq_mine[i]:
-        print(f'{i}: MISMATCH')
-        print(f'\t{seq_real[i-3:i+3]}')
-        print(f'\t{seq_mine[i-3:i+3]}')
-        break
+from src.utils.residue import Chain
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from glob import glob
+
+# IN: list of chains
+# OUT: edge weights and updated edge index?
+df = pd.read_csv("/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_anm/full/XY.csv", 
+                 index_col=0)
 
 
-#%%
-from prody import parsePDB, calcANM
-from src.feature_extraction.protein import calcCrossCorr
+af_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_afConf'
 
-idx=1
-pdb_fp = td.pdb_p(td[idx]['code'])
-target_seq = td[idx]['protein'].pro_seq
-n_modes=10
+for code in df[['prot_id']].drop_duplicates().index:
+    t_p = f'/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb'
+    template = Chain(t_p)
 
-pdb = parsePDB(pdb_fp, subset='calpha').getHierView()
-    
-anm = None
-for chain in pdb:
-    if chain.getSequence() == target_seq:
-        anm, _ = calcANM(chain, selstr='calpha', n_modes=n_modes)
-        break
-    
-if anm is None:
-    raise ValueError(f"No matching chain found in pdb file ({pdb_fp})")
-else:
-    # norm=True normalizes it from -1.0 to 1.0
-    cc = calcCrossCorr(anm[:n_modes], n_cpu=2, norm=True)
+    af_confs = glob(f'{af_dir}/{code}*.pdb')
+
+    chains = [Chain(p) for p in af_confs]
+    tm_avg = np.mean([c.TM_score(template) for c in chains])
+    print(tm_avg)
+
+# chains[0].getCoords()
+#%% Get adjacency matrix
+
+M = np.array([c.get_contact_map() for c in chains])
+ew = np.sum(M < 8.0, axis=0)/len(M)
 
 
 
@@ -189,18 +281,53 @@ import numpy as np
 
 # %%
 # tm score for A&B is 0.9835 (https://seq2fun.dcmb.med.umich.edu//TM-score/tmp/110056.html)
-src_model = '/cluster/home/t122995uhn/projects/data/v2020-other-PL/1a1e/1a1e_protein.pdb'
-pred_model = '/cluster/home/t122995uhn/projects/colabfold/out/1a1e.msa_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000.pdb'
+t_p = f'/cluster/home/t122995uhn/projects/data/v2020-other-PL/{code}/{code}_protein.pdb'
+af_confs = glob(f'{af_dir}/{code}*.pdb')
+src_model ='/cluster/home/t122995uhn/projects/data/v2020-other-PL/1a1e/1a1e_protein.pdb'
+pred_model = '/cluster/home/t122995uhn/projects/colabfold/out/1a1e.msa_unrelaxed_rank_002_alphafold2_ptm_model_1_seed_000.pdb'
 
 sm = parsePDB(src_model, model=1, subset="ca", chain="A")
 sm.setTitle('experimental')
 pm = parsePDB(pred_model, model=1, subset="ca", chain="A")
 pm.setTitle('alphafold')
 
+# showProtein(sm,pm)
+# legend()
+import numpy as np
+
+# Assuming you have two sets of 3D coordinates, c1 and c2, as NumPy arrays
+c1, c2 = sm.getCoords(), pm.getCoords()
+
+# Calculate the centroid (center of mass) of each set of coordinates
+centroid1 = np.mean(c1, axis=0)
+centroid2 = np.mean(c2, axis=0)
+
+# Translate both sets of coordinates to their respective centroids
+c1_centered = c1 - centroid1
+c2_centered = c2 - centroid2
+
+# Calculate the covariance matrix
+covariance_matrix = np.dot(c2_centered.T, c1_centered)
+
+# Use singular value decomposition (SVD) to find the optimal rotation matrix
+u, _, vt = np.linalg.svd(covariance_matrix)
+rotation_matrix = np.dot(u, vt)
+
+# Apply the calculated rotation matrix to c2_centered
+c2_aligned = np.dot(c2_centered, rotation_matrix)
+
+# Calculate the root mean square deviation (RMSD) to measure structural similarity
+rmsd = np.sqrt(np.mean((c1_centered - c2_aligned) ** 2))
+print(f"RMSD: {rmsd}")
+sm.setCoords(c1_centered)
+pm.setCoords(c2_aligned)
 showProtein(sm,pm)
 legend()
 
 #%% Performing alignment before TM-score
+
+from prody import confProDy
+confProDy(verbosity='debug') # stop printouts from prody
 result = matchAlign(pm, sm)
 
 showProtein(sm,pm)
@@ -221,3 +348,5 @@ def tm_score(xyz0, xyz1): #Check if TM-align use all atoms!
 # TM score for predicted model 1 with chain A of src should be 0.9681 (https://seq2fun.dcmb.med.umich.edu//TM-score/tmp/987232.html)
 tm_score(sm.getCoords(), 
          pm.getCoords())
+
+# %%

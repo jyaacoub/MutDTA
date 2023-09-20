@@ -115,9 +115,12 @@ class Downloader:
             os.makedirs(os.path.dirname(save_path(name)), 
                         exist_ok=True)
             with open(save_path(name), 'w') as f:
-                f.write(r.get(url(name)).text)
-            ID_status[name] = 'downloaded'
-            
+                resp = r.get(url(name))
+                if resp.status_code >= 400: 
+                    ID_status[name] = resp.status_code
+                else:
+                    ID_status[name] = 'downloaded'
+                    f.write(resp.text)
         return ID_status
     
     @staticmethod
@@ -128,8 +131,14 @@ class Downloader:
         """
         save_path = lambda x: f'{save_dir}/{x}.pdb'
         url = lambda x: f'https://files.rcsb.org/download/{x}.pdb'
-        
         return Downloader.download(PDBCodes, save_path=save_path, url=url)
+    
+    @staticmethod
+    def download_predicted_PDBs(UniProtID: Iterable[str], save_dir='./') -> dict:
+        """Downloads pdbs given uniprotIDs from alphafold predictions"""
+        save_path = lambda x: f'{save_dir}/{x}.pdb'
+        url = lambda x: f'https://alphafold.ebi.ac.uk/files/AF-{x}-F1-model_v4.pdb'
+        return Downloader.download(UniProtID, save_path=save_path, url=url)
     
     @staticmethod
     def download_SDFs(ligand_names: List[str], 
