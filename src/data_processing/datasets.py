@@ -44,15 +44,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
         Parameters
         ----------
-        `save_root` : str, optional
+        `save_root` : str
             Path to processed dir, by default '../data/DavisKibaDataset/'
-        `data_root` : str, optional
+        `data_root` : str
             Path to raw data files, by default '../data/davis_kiba/davis/'
-        `aln_dir` : str, optional
+        `aln_dir` : str
             Path to sequence alignment directory with files of the name 
             '{code}_cleaned.a3m'. If set to None then no PSSM calculation is 
             done and is set to zeros, by default '../data/davis_kiba/davis/aln/'.
-        `cmap_threshold` : float, optional
+        `cmap_threshold` : float
             Threshold for contact map creation, DGraphDTA use probability based 
             cmaps so we use negative to indicate this. (see `feature_extraction.protein.
             target_to_graph` for details), by default -0.5.
@@ -633,23 +633,25 @@ class DavisKibaDataset(BaseDataset):
 class PlatinumDataset(BaseDataset):
     CSV_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_flat_file.csv'
     PBD_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_processed_pdb_files.tar.gz'
-    def __init__(self, save_root: str, data_root: str, 
+    def __init__(self, save_root: str, data_root: str=None, 
                  aln_dir: str=None, cmap_threshold: float=8.0, 
-                 feature_opt='nomsa', mutated=True, *args, **kwargs):
+                 feature_opt='nomsa', *args, **kwargs):
         """
         Dataset class for the Platinum dataset.
+        NOTE: Platinum dataset is essentially two datasets in one (one for mutations and one for wildtype)
 
         Parameters
         ----------
         `save_root` : str
             Where to save the processed data.
-        `data_root` : str
+        `data_root` : str, optional
             Where the raw data is stored from the Platinum dataset 
             (from: https://biosig.lab.uq.edu.au/platinum/).
         `aln_dir` : str, optional
             MSA alignments for each protein in the dataset, by default None
         `cmap_threshold` : float, optional
             Threshold for contact map creation, by default 8.0
+            
         `feature_opt` : str, optional
             Choose from ['nomsa', 'msa', 'shannon'], by default 'nomsa'
         """
@@ -658,20 +660,20 @@ class PlatinumDataset(BaseDataset):
             raise ValueError(f'Invalid feature_opt: {feature_opt}. '+\
                         f'Only {options} is currently supported for Platinum dataset.')
         
-        # Platinum dataset is essentially two datasets in one
-        # (one for mutations and one for wildtype) and is why we need to
-        # specify mutations_only.
-        self.mutated = mutated # only use mutated sequences and data
-        if mutated:
-            save_root = save_root + '_mut'
         
         if aln_dir is not None:
             print('WARNING: aln_dir is not used for Platinum dataset, no support for MSA alignments.')
         
         super().__init__(save_root, data_root, None, cmap_threshold, 
                          feature_opt, *args, **kwargs)
-        
-    def cmap_p(self, code):
+    
+    def pdb_p(self, code):
+        return os.path.join(self.raw_paths[1], f'{code}.pdb')
+    
+    def cmap_p(self, code, map=True): 
+        # map is important so that we map the provided code to the correct pdb ID
+        if map:
+            code = self.df.loc[code]['prot_id']
         return os.path.join(self.raw_dir, 'contact_maps', f'{code}.npy')
     
     def aln_p(self, code):
@@ -687,11 +689,10 @@ class PlatinumDataset(BaseDataset):
     
     def download(self):
         """Download the raw data for the dataset."""
+        # Download flat CSV file containing binding info, PDB IDs, ligand IDs, etc...
         if not os.path.isfile(self.raw_paths[0]):
             print('CSV file not found, downloading from website...')
             urllib.request.urlretrieve(self.CSV_LINK, self.raw_paths[0])
-        
-        df = pd.read_csv(self.raw_paths[0])
         
         # Downloading pdb files:
         os.makedirs(self.raw_paths[1], exist_ok=True)
@@ -713,6 +714,18 @@ class PlatinumDataset(BaseDataset):
         except requests.HTTPError as e:
             raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
         
+        # download remaining pdbs from PDB site
+        # missing pdbs will be those that are not wildtypes since that is the default
+        # NOTE: some structures do not match up with sequence length of native structure.
+        # to get around this these are ignored and we just use the native structure.
+        def filter(row):
+            mt = row['mut.mt_pdb']
+            return mt != 'NO' and not \
+                os.path.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
+        df_raw = pd.read_csv(self.raw_paths[0])
+        Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'],
+                                 save_dir=self.raw_paths[1])
+        
     def pre_process(self):
         """
         This method is used to create the processed data files for feature extraction.
@@ -732,60 +745,58 @@ class PlatinumDataset(BaseDataset):
         """
         df_raw = pd.read_csv(self.raw_paths[0])
         os.makedirs(os.path.join(self.raw_dir, 'contact_maps'), exist_ok=True)
-        
+        # fixing pkd values for binding affinity
+        df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
+                                                      expand=False).astype(float)
+        # adjusting units for binding data from nM to pKd:
+        df_raw['affin.k_mt'] = -np.log10(df_raw['affin.k_mt']*1e-9)
+        df_raw['affin.k_wt'] = -np.log10(df_raw['affin.k_wt']*1e-9)
         # Getting sequences and cmaps:
         prot_seq = {}
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Getting sequences and cmaps',
                            total=len(df_raw)):
             mut = row['mutation']
-            pdb = row['affin.pdb_id']
+            pdb_wt = row['mut.wt_pdb']
+            pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
             
-            # Getting sequence from pdb file:
-            pdb_fp = f'{self.raw_paths[1]}/{pdb}.pdb'
-            chain = Chain(pdb_fp, t_chain=t_chain)
+            # Getting sequence  from pdb file:
+            missing_wt = pdb_wt == 'NO'
+            pdb = pdb_mt if missing_wt else pdb_wt
+            chain = Chain(self.pdb_p(pdb), t_chain=t_chain)
             
             # Getting and saving contact map:
-            if not os.path.isfile(self.cmap_p(pdb)):
+            # no mapping during creation 
+            # this is done to prevent havign to store duplicate cmaps for the same 
+            # pdb but under different names
+            if not os.path.isfile(self.cmap_p(pdb, map=False)): 
                 cmap = chain.get_contact_map()
-                np.save(self.cmap_p(i), cmap)
+                np.save(self.cmap_p(pdb, map=False), cmap)
             
-            mut_seq = chain.get_mutated_seq(chain, mut.split('/'), reversed=False)
-            ref_seq = chain.getSequence()
+            # Getting sequences:
+            try:
+                if missing_wt:
+                    mut_seq = chain.sequence
+                    ref_seq = chain.get_mutated_seq(mut.split('/'), reversed=True)
+                else:
+                    mut_seq = chain.get_mutated_seq(mut.split('/'), reversed=False)
+                    ref_seq = chain.sequence
+            except Exception as e:
+                raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e
             
-            # getting mutated sequence:
-            if self.mutated:
-                prot_seq[i] = (pdb, mut_seq)
-            else:
-                prot_seq[i] = (pdb, ref_seq)
+            # Saving sequence and additional relevant info
+            mt_pkd = row['affin.k_mt']
+            wt_pkd = row['affin.k_wt']
+            lig_id = row['affin.lig_id']
+            smiles = row['lig.canonical_smiles']
+            # using index number for ID since pdb is not unique in this dataset.
+            prot_seq[f'{i}_mt'] = (pdb, lig_id,  mt_pkd, smiles, mut_seq)
+            prot_seq[f'{i}_wt'] = (pdb, lig_id, wt_pkd, smiles, ref_seq)
                 
-        df_seq = pd.DataFrame.from_dict(prot_seq, orient='index', 
-                                        columns=['prot_id', 'prot_seq'])
-        
-        # NOTE: ligand sequences and binding data are already in the csv file
-        # 'affin.lig_id', 'lig.canonical_smiles', 'affin.k_wt', 'affin.k_mt'
-        if self.mutated:
-            # parsing out '>' and '<' from binding data for pure numbers:
-            df_binding = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
-                                                      expand=False).astype(float)
-        else:
-            df_binding = df_raw['affin.k_wt']
-        
-        # adjusting units for binding data from nM to pKd:
-        df_binding = -np.log10(df_binding*1e-9)
-        
-        # merging dataframes:
-        df = pd.DataFrame({
-            'lig_id': df_raw['affin.lig_id'],
-            'prot_id': df_seq['prot_id'],
-            
-            'pkd': df_binding,
-            
-            'prot_seq': df_seq['prot_seq'],
-            'SMILE': df_raw['lig.canonical_smiles']
-        }, index=df_raw.index)
+        df = pd.DataFrame.from_dict(prot_seq, orient='index', 
+                                        columns=['prot_id', 'lig_id', 
+                                                 'pkd', 'SMILE', 'prot_seq'])
         df.index.name = 'code'
-        
         df.to_csv(self.processed_paths[0])
         return df

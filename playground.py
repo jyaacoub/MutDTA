@@ -1,10 +1,59 @@
-# #%%
-# from src.data_processing.datasets import DavisKibaDataset
-# data = 'PDBbind'
-# FEATURE = 'nomsa'
-# data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
-# # data_root_dir = '/home/jyaacoub/projects/data/'
-# DATA_ROOT = f'{data_root_dir}/'
+#%%
+from src.data_processing.datasets import PlatinumDataset
+from src.utils.residue import Chain
+
+import pandas as pd
+import numpy as np
+import os.path as osp
+import os
+data = 'PDBbind'
+FEATURE = 'nomsa'
+data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
+df_p = '../data/PlatinumDataset/raw/platinum_flat_file.csv'
+# data_root_dir = '/home/jyaacoub/projects/data/'
+DATA_ROOT = f'{data_root_dir}/'
+
+df_raw = pd.read_csv(df_p)
+
+# get test sample 
+row = df_raw.iloc[778]
+mut = row['mutation']
+pdb_wt = row['mut.wt_pdb']
+pdb_mt = row['mut.mt_pdb'] 
+t_chain = row['affin.chain']
+            
+# Getting sequence from pdb file:
+chain_wt = Chain(f'../data/PlatinumDataset/raw/platinum_pdb/{pdb_wt}.pdb', 
+              t_chain=t_chain)
+mt_seq = chain_wt.get_mutated_seq(mut.split('/'), reversed=False)
+# chain_mt = Chain(f'../data/PlatinumDataset/raw/platinum_pdb/{pdb_mt}.pdb', 
+#               t_chain=t_chain)
+# mt_seq == chain_mt.getSequence()
+
+#%%
+from src.data_processing.downloaders import Downloader
+
+# download missing pdbs:
+# only missing pdbs will be those that are not wildtypes since that is the default
+def filter(row):
+    mt = row['mut.mt_pdb']
+    return mt != 'NO' and not osp.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
+
+Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'])
+
+#%%
+from src.data_processing.datasets import PlatinumDataset
+
+d = PlatinumDataset(
+    save_root=f'../data/PlatinumDataset/',
+    data_root=f'../data/PlatinumDataset/raw',
+    aln_dir=None,
+    cmap_threshold=8.0,
+    mutated=False, # downloaded PDBs are the mutated versions, ref can be achived by reversing mutation
+    feature_opt='nomsa',
+    edge_opt='binary')
+# exit()
+
 # dataset = DavisKibaDataset(
 #         save_root=f'../data/DavisKibaDataset/kiba/',
 #         data_root=DATA_ROOT,
@@ -59,7 +108,6 @@ missing = [prot_id for prot_id in unique_prots.keys() if prot_id not in df['From
 #     elif not os.path.isfile(f_out):
 #         shutil.copy(f_in, f_out)
 
-
 # # removing old pdb files.
 # for i, row in df.iterrows():
 #     pdb = row['To']
@@ -105,9 +153,6 @@ for uniprot, seq in unique_prots.items():
         #         print(f'MISMATCH FOR {uniprot} - {f_in}')
         # except Exception as e:
         #     raise Exception(f'{f_in}') from e
-        
-
-
 
 #%%
 from src.data_processing.datasets import PDBbindDataset

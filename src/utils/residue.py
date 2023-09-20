@@ -136,7 +136,7 @@ class Chain:
     def reset_attributes(self):
         self._seq = None        
         self._coords = None
-        self._hessian = None        
+        self._hessian = None
     
     @property
     def hessian(self) -> np.array:
@@ -160,6 +160,10 @@ class Chain:
         # reset so that they are updated on next getter calls
         self.reset_attributes()
         self._t_chain = chain_ID        
+    
+    @property
+    def sequence(self) -> str:
+        return self.getSequence()
     
     def getSequence(self) -> str:
         """
@@ -257,29 +261,29 @@ class Chain:
             The mutated and reference sequences, respectively.
         """
         # prepare the mutations:
-        mut_dict = OrderedDict()
+        mut_dict = {}
         for mut in muts:
             if reversed:
                 mut, pos, ref = mut[0], mut[1:-1], mut[-1]
             else:
                 ref, pos, mut = mut[0], mut[1:-1], mut[-1]
-            mut_dict[pos] = (ref, mut)
+            mut_dict[pos] = [ref, mut, False] # False is to indicate if done
 
         # apply mutations
         mut_seq = list(self.getSequence())
-        mut_done = []
-        for i, res in enumerate(self._chains):
-            pos = str(res.getResnum())
+        for i, res in enumerate(self.chain):
+            pos = ''.join(res.split('_')) # split out icode from resnum
             if pos in mut_dict: # should always be the case unless mutation passed in is incorrect (see check below)
-                ref, mut = mut_dict[pos] 
-                assert ref == mut_seq[i], f"source ref '{mut_seq[i]}' doesnt match with mutation ref '{ref}'"
+                ref, mut, _ = mut_dict[pos] 
+                assert ref == mut_seq[i], f"Source ref '{mut_seq[i]}' "+\
+                    f"doesnt match with mutation {ref}->{mut} at position {pos}."
                 mut_seq[i] = mut
-                mut_done.append(pos)
+                mut_dict[pos][2] = True
                 
         # check    
-        for m in mut_dict:
-            if m not in mut_done:
-                raise Exception('Mutation sequence translation failed (due to no res at target position).')
+        for k,v in mut_dict.items():
+            if not v[2]:
+                raise Exception(f'Mutation sequence translation failed (due to no res at target position {k}).')
             
         return ''.join(mut_seq)
     
