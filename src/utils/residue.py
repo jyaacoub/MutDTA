@@ -164,7 +164,7 @@ class Chain:
     @property
     def sequence(self) -> str:
         return self.getSequence()
-    
+      
     def getSequence(self) -> str:
         """
         camelCase to mimic ProDy Chain class
@@ -197,7 +197,7 @@ class Chain:
                     coords.append(res["CB"])
             self._coords = np.array(coords)
         return self._coords
-    
+      
     @staticmethod
     def align_coords(c1:np.array,c2:np.array) -> tuple[np.array, np.array]:
         """Aligns the given two 3D coordinate sets"""
@@ -234,7 +234,6 @@ class Chain:
         # compute the distance for each pair of atoms
         di = np.sum((c1 - c2) ** 2, 1) # sum along first axis
         return np.sum(1 / (1 + (di / d0) ** 2)) / L
-        
 
     def get_mutated_seq(self, muts:list[str], reversed:bool=False) -> tuple[str, str]:
         """
@@ -324,7 +323,6 @@ class Chain:
                 alt_loc = line[16] # some can have multiple locations for each protein confirmation.
                 res_name = line[17:20].strip()
                 if res_name == 'UNK': continue # WARNING: unkown residues are skipped
-                
                 if atm_type not in ['CA', 'CB']: continue
                 icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
                                 # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
@@ -339,7 +337,7 @@ class Chain:
                 # Only keep first alt_loc
                 if atm_type in chains[curr_chain].get(res_key, {}) and bool(alt_loc.strip()):
                     continue
-                
+                    
                 assert atm_type not in chains[curr_chain].get(res_key, {}), \
                         f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
 
@@ -348,6 +346,7 @@ class Chain:
                 chains[curr_chain].setdefault(res_key, OrderedDict())[atm_type] = np.array([x,y,z])
 
                 # Saving residue name
+                res_name = line[17:20].strip()
                 assert ("name" not in chains[curr_chain].get(res_key, {})) or \
                     (chains[curr_chain][res_key]["name"] == res_name), \
                                             f"Inconsistent residue name for residue {res_key} in {pdb_file}"
@@ -394,7 +393,7 @@ class Chain:
                 kirchhoff[i, i] = kirchhoff[i, i] + g
                 kirchhoff[j, j] = kirchhoff[j, j] + g
         return hessian
-    
+      
     def get_contact_map(self, display=False, title="Residue Contact Map") -> np.array:
         """
         Returns the residue contact map for that structure.
@@ -433,4 +432,3 @@ class Chain:
             plt.show()
             
         return pairwise_distances
-    

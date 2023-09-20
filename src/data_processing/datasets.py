@@ -107,7 +107,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 "please create subset before initialization."
         self.subset = subset
         
-        print(save_root)
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
@@ -760,7 +759,7 @@ class PlatinumDataset(BaseDataset):
             pdb_wt = row['mut.wt_pdb']
             pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
-            
+
             # Getting sequence  from pdb file:
             missing_wt = pdb_wt == 'NO'
             pdb = pdb_mt if missing_wt else pdb_wt

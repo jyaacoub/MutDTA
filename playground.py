@@ -30,6 +30,7 @@ mt_seq = chain_wt.get_mutated_seq(mut.split('/'), reversed=False)
 #               t_chain=t_chain)
 # mt_seq == chain_mt.getSequence()
 
+
 #%%
 from src.data_processing.downloaders import Downloader
 
