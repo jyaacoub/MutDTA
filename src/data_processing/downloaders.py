@@ -51,6 +51,7 @@ class Downloader:
     def get_SMILE(drug_names: Iterable[str],
                 url=lambda x: f'https://cactus.nci.nih.gov/chemical/structure/{quote(x)}/smiles') -> dict:
         """Gets SMILE strings from given drug names and returns dict with {drug_name: SMILE}"""
+        # wont work with some drug names and so its better to use download_sdf then parse sdf to get smile
         drug_SMILEs = {}
         for drug_name in tqdm(drug_names, 'Downloading SMILE strings'):
             if drug_name in drug_SMILEs: continue
@@ -105,21 +106,22 @@ class Downloader:
         """
         
         ID_status = {}
-        for name in tqdm(IDs, 'Downloading files'):
-            if name in ID_status: continue
+        for id in tqdm(IDs, 'Downloading files'):
+            if id in ID_status: continue
+            fp = save_path(id)
             # checking to make sure that we didnt already download file
-            if os.path.isfile(save_path(name)): 
-                ID_status[name] = 'already downloaded'
+            if os.path.isfile(fp): 
+                ID_status[id] = 'already downloaded'
                 continue
                 
-            os.makedirs(os.path.dirname(save_path(name)), 
+            os.makedirs(os.path.dirname(fp), 
                         exist_ok=True)
-            with open(save_path(name), 'w') as f:
-                resp = r.get(url(name))
+            with open(fp, 'w') as f:
+                resp = r.get(url(id))
                 if resp.status_code >= 400: 
-                    ID_status[name] = resp.status_code
+                    ID_status[id] = resp.status_code
                 else:
-                    ID_status[name] = 'downloaded'
+                    ID_status[id] = 'downloaded'
                     f.write(resp.text)
         return ID_status
     
@@ -129,14 +131,14 @@ class Downloader:
         Wrapper of `Downloader.download` for downloading PDB files.
         Fetches PDB files from https://files.rcsb.org/download/{PDBCode}.pdb.           
         """
-        save_path = lambda x: f'{save_dir}/{x}.pdb'
+        save_path = lambda x: os.path.join(save_dir, f'{x}.pdb')
         url = lambda x: f'https://files.rcsb.org/download/{x}.pdb'
         return Downloader.download(PDBCodes, save_path=save_path, url=url)
     
     @staticmethod
     def download_predicted_PDBs(UniProtID: Iterable[str], save_dir='./') -> dict:
         """Downloads pdbs given uniprotIDs from alphafold predictions"""
-        save_path = lambda x: f'{save_dir}/{x}.pdb'
+        save_path = lambda x: os.path.join(save_dir, f'{x}.pdb')
         url = lambda x: f'https://alphafold.ebi.ac.uk/files/AF-{x}-F1-model_v4.pdb'
         return Downloader.download(UniProtID, save_path=save_path, url=url)
     
@@ -148,7 +150,7 @@ class Downloader:
         Fetches SDF files from
         https://files.rcsb.org/ligands/download/{ligand_name}_ideal.sdf.
         """
-        save_path = lambda x: f'{save_dir}/{x}.sdf'
+        save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')
         url = lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'
         
         return Downloader.download(ligand_names, save_path=save_path, url=url)
