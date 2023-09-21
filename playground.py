@@ -1,151 +1,46 @@
-# #%%
-# from src.data_processing.datasets import PlatinumDataset
-# from src.utils.residue import Chain
-
-# import pandas as pd
-# import numpy as np
-# import os.path as osp
-# import os
-# data = 'PDBbind'
-# FEATURE = 'nomsa'
-# data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
-# df_p = '../data/PlatinumDataset/raw/platinum_flat_file.csv'
-# df_pro = '../data/PlatinumDataset/nomsa_binary/full/XY.csv'
-# # data_root_dir = '/home/jyaacoub/projects/data/'
-# DATA_ROOT = f'{data_root_dir}/'
-
-# df_raw = pd.read_csv(df_p)
-
-# # get test sample 
-# row = df_raw.iloc[778]
-# mut = row['mutation']
-# pdb_wt = row['mut.wt_pdb']
-# pdb_mt = row['mut.mt_pdb'] 
-# t_chain = row['affin.chain']
-
-
-# #%%
-# from src.data_processing.downloaders import Downloader
-
-# # download missing pdbs:
-# # only missing pdbs will be those that are not wildtypes since that is the default
-# def filter(row):
-#     mt = row['mut.mt_pdb']
-#     return mt != 'NO' and not osp.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
-
-# Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'])
-
 #%%
-from src.data_processing.datasets import PlatinumDataset
-print('CREATING PLATINUM DATASET...')
-d = PlatinumDataset(
-    save_root=f'../data/PlatinumDataset/',
-    data_root=f'../data/PlatinumDataset/raw',
-    aln_dir=None,
-    cmap_threshold=8.0,
-    feature_opt='nomsa',
-    edge_opt='binary')
-# exit()
-
-# dataset = DavisKibaDataset(
-#         save_root=f'../data/DavisKibaDataset/kiba/',
-#         data_root=DATA_ROOT,
-#         aln_dir=f'{DATA_ROOT}/aln/', 
-#         cmap_threshold=-0.5, 
-#         feature_opt=FEATURE,
-#         edge_opt = 'anm',
-#         af_conf_dir='../colabfold/pdbbind_out/out0',
-# )
-
-
-#%%
-from src.data_processing.downloaders import Downloader
+import json, os
 import pandas as pd
-import json, shutil, os
+from concurrent.futures import ThreadPoolExecutor
+from tqdm.contrib.concurrent import thread_map  # Use tqdm for multithreading
+from src.data_processing.downloaders import Downloader
 
-root_dir = '/cluster/home/t122995uhn/projects/data/kiba'
+root_dir = '/cluster/home/t122995uhn/projects/data/kiba_tmp'
 save_dir = f'{root_dir}/structures'
 
+# Contains protein sequences mapped to uniprotIDs
 unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
-# [...]
-# send unique prots to uniprot for structure search
-
-##### Map to PDB structural files
-# downloaded from https://www.uniprot.org/id-mapping/bcf1665e2612ea050140888440f39f7df822d780/overview
+# [...] send to https://www.uniprot.org/id-mapping to get associated pdb files
+# this returns a tsv containing all matching pdbs for each unique uniprotID
 df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
-# getting only first hit for each unique PDB-ID
-df = df.loc[df[['From']].drop_duplicates().index]
 
-# getting missing/unmapped prot ids
-missing = [prot_id for prot_id in unique_prots.keys() if prot_id not in df['From'].values]
+#%% Downloading pdbs
+def download_pdb(pdb_id):
+    try:
+        Downloader.download_PDBs([pdb_id], save_dir=save_dir, tqdm_disable=True)
+        return pdb_id  # Return the downloaded PDB ID for progress tracking
+    except Exception as e:
+        print(f"Error downloading {pdb_id}: {str(e)}")
 
-# %%
-# ##### download pdb files
-# Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
+# Get unique PDBs
+pdbs = df['To'].unique()
 
-# # retrieve missing structures from AlphaFold:
-# Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+# Number of concurrent threads (adjust as needed)
+num_threads = 4
 
-# # NOTE: some uniprotIDs map to the same structure and so using the df mapping we will rename the mapped pdb to be uniprot file names
-# #%% copying as neccessary
+# Use tqdm with ThreadPoolExecutor
+with ThreadPoolExecutor(max_workers=num_threads) as executor:
+    # Use thread_map for tqdm integration
+    downloaded_pdbs = list(thread_map(download_pdb, pdbs, desc="Downloading PDBs", total=len(pdbs)))
 
-# # copying to new uniprot id file names
-# for i, row in df.iterrows():
-#     uniprot = row['From']
-#     pdb = row['To']
-#     # finding pdb file
-#     f_in = f'{save_dir}/{pdb}.pdb'
-#     f_out = f'{save_dir}/{uniprot}.pdb'
-#     if not os.path.isfile(f_in):
-#         print('Missing', f_in)
-#     elif not os.path.isfile(f_out):
-#         shutil.copy(f_in, f_out)
+print("DONE.")
 
-# # removing old pdb files.
-# for i, row in df.iterrows():
-#     pdb = row['To']
-#     f_in = f'{save_dir}/{pdb}.pdb'
-#     if os.path.isfile(f_in):
-#         os.remove(f_in)
+exit()
 
 
-#%% Some downloaded pdbs dont match the provided input sequence
-from src.utils.residue import Chain
-# mismatch
-mismatch = {}
-for uniprot, seq in unique_prots.items():
-    if uniprot in missing: continue
-    f_in = f'{save_dir}/{uniprot}.pdb'
-    if not os.path.isfile(f_in):
-        print('Missing', f_in)
-    else:
-        c = Chain(f_in)
-        pdb_sequence = c.getSequence()
-        if len(seq) != len(pdb_sequence):
-            mismatch[uniprot] = (c, seq, mismatch_count)
-            print(f'LENGTH MISMATCH FOR {uniprot} - {f_in} (Expected: {len(seq)}, Actual: {len(pdb_sequence)})')
-        else:
-            # Calculate the number of mismatches
-            mismatch_count = sum(1 for i in range(len(seq)) if seq[i] != pdb_sequence[i])
-            
-            if mismatch_count > 0:
-                mismatch[uniprot] = (c, seq, mismatch_count)
-                print(f'MISMATCH FOR {uniprot} - {f_in} (Mismatches: {mismatch_count})')
-            
-        # try:
-        #     hv = parsePDB(f_in, subset='ca').getHierView()
-        #     # s.getSequence()
-        #     # c = Chain(f_in)
-        #     match = None
-        #     for c in hv.iterChains():
-        #         if c.getSequence() == seq:
-        #             match = c
-        #             break
-        #     # if c.getSequence() != seq:
-        #     if match is None:
-        #         print(f'MISMATCH FOR {uniprot} - {f_in}')
-        # except Exception as e:
-        #     raise Exception(f'{f_in}') from e
+
+
+
 
 #%%
 from src.data_processing.datasets import PDBbindDataset
