@@ -202,7 +202,6 @@ plt.title('Max TM_score vs. Protein Sequence Length')
 # plt.grid(axis='y', linestyle='--', alpha=0.7)
 plt.show()
 
-
 #%%
 from src.utils.residue import Chain
 import pandas as pd

@@ -701,8 +701,8 @@ class PlatinumDataset(BaseDataset):
             df_raw.index.name = 'raw_idx'
             df_raw.to_csv(self.raw_paths[0])
         else:
-            df_raw = pd.read_csv(self.raw_paths[0])        
-        
+            df_raw = pd.read_csv(self.raw_paths[0])
+            
         # Downloading pdb files:
         os.makedirs(self.raw_paths[1], exist_ok=True)
         print('Downloading pdb files from PLATINUM website...')
@@ -800,7 +800,6 @@ class PlatinumDataset(BaseDataset):
             wt_pkd = row['affin.k_wt']
             lig_id = row['affin.lig_id']
             smiles = row['smiles']
-            
             # using index number for ID since pdb is not unique in this dataset.
             prot_seq[f'{i}_mt'] = (pdb, lig_id,  mt_pkd, smiles, mut_seq)
             prot_seq[f'{i}_wt'] = (pdb, lig_id, wt_pkd, smiles, ref_seq)
