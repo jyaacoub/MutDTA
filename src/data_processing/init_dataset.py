@@ -51,7 +51,7 @@ if __name__ == "__main__":
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir='../colabfold/pdbbind_out/out0'
+                    af_conf_dir='../colabfold/pdbbind_out/out0',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     )
