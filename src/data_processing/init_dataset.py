@@ -8,7 +8,7 @@ sys.path.append(PROJECT_ROOT)
 
 
 from src.feature_extraction.process_msa import create_pfm_np_files
-from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset
+from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
 from src.train_test.utils import train_val_test_split
 
 # for multiprocess create cmaps run the following (davis and kiba already have cmaps from pscons4; but we can create cmaps from kiba using providied uniprotid)
@@ -25,12 +25,13 @@ from src.train_test.utils import train_val_test_split
 # multi_save_cmaps(pdb_codes, pdb_p, cmap_p, processes=4)
 
 if __name__ == "__main__":
-    datas = ['PDBbind']#, 'kiba']
-    FEATUREs = ['nomsa']#, 'msa', 'shannon']
+    datas = ['Platinum']#['PDBbind']#, 'kiba']
+    feat_opt = ['nomsa']#, 'msa', 'shannon']
+    edge_opt = ['binary']
     # data_root_dir = '/cluster/home/t122995uhn/projects/data/'
     data_root_dir = '/home/jyaacoub/projects/data/'
 
-    for data, FEATURE in itertools.product(datas, FEATUREs):
+    for data, FEATURE, EDGE in itertools.product(datas, feat_opt, edge_opt):
         print('\n', data, FEATURE)
         if data in ['davis', 'kiba']:
             DATA_ROOT = f'{data_root_dir}/'
@@ -49,11 +50,20 @@ if __name__ == "__main__":
                     data_root=f'../data/v2020-other-PL/',
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
-                    edge_opt='af2',
-                    feature_opt=FEATURE,
                     overwrite=False, # overwrite old cmap.npy files
                     af_conf_dir='../colabfold/pdbbind_out/out0'
+                    feature_opt=FEATURE,
+                    edge_opt=EDGE,
                     )
+        elif data == 'Platinum':
+            dataset = PlatinumDataset(
+                save_root=f'../data/PlatinumDataset/',
+                data_root=f'../data/PlatinumDataset/raw',
+                aln_dir=None,
+                cmap_threshold=8.0,
+                feature_opt=FEATURE,
+                edge_opt=EDGE
+                )
             
     
         # saving training, validation, and test sets

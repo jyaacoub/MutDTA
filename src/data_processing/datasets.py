@@ -20,7 +20,7 @@ from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
-from src.data_processing.processors import PDBbindProcessor
+from src.data_processing.processors import PDBbindProcessor, Processor
 from src.data_processing.downloaders import Downloader
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
@@ -281,6 +281,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 except ValueError:
                     errors.append(f'L-{lig_seq}')
                     continue
+                except AttributeError as e:
+                    raise Exception(f'Error on graph creation for ligand {lig_seq}.') from e
                 
                 lig = torchg.data.Data(x=torch.Tensor(mol_feat),
                                     edge_index=torch.LongTensor(mol_edge),
@@ -685,7 +687,8 @@ class PlatinumDataset(BaseDataset):
         """call by self.raw_paths to get the proper file paths"""
         # in order of download/creation:
         return ['platinum_flat_file.csv',# downloaded from website
-                'platinum_pdb']
+                'platinum_pdb',
+                'platinum_sdf']
     
     def download(self):
         """Download the raw data for the dataset."""
@@ -693,6 +696,13 @@ class PlatinumDataset(BaseDataset):
         if not os.path.isfile(self.raw_paths[0]):
             print('CSV file not found, downloading from website...')
             urllib.request.urlretrieve(self.CSV_LINK, self.raw_paths[0])
+            df_raw = pd.read_csv(self.raw_paths[0])
+            # removing broken structures
+            df_raw = df_raw[~df_raw['lig.canonical_smiles'].str.contains('broken')]
+            df_raw.index.name = 'raw_idx'
+            df_raw.to_csv(self.raw_paths[0])
+        else:
+            df_raw = pd.read_csv(self.raw_paths[0])        
         
         # Downloading pdb files:
         os.makedirs(self.raw_paths[1], exist_ok=True)
@@ -714,17 +724,18 @@ class PlatinumDataset(BaseDataset):
         except requests.HTTPError as e:
             raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
         
-        # download remaining pdbs from PDB site
-        # missing pdbs will be those that are not wildtypes since that is the default
-        # NOTE: some structures do not match up with sequence length of native structure.
-        # to get around this these are ignored and we just use the native structure.
-        def filter(row):
-            mt = row['mut.mt_pdb']
-            return mt != 'NO' and not \
-                os.path.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
-        df_raw = pd.read_csv(self.raw_paths[0])
-        Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'],
-                                 save_dir=self.raw_paths[1])
+        # Download corrected SMILEs since the ones provided in the csv file have issues 
+        # (see https://github.com/jyaacoub/MutDTA/issues/27)
+        os.makedirs(self.raw_paths[2], exist_ok=True)
+        print('Downloading SDF files for ligands.')
+        Downloader.download_SDFs(ligand_names=df_raw['affin.lig_id'].unique(),
+                                save_dir=self.raw_paths[2])
+        
+        # Fixing smiles in csv file using downloaded sdf files        
+        smiles_dict = Processor.get_SMILE(df_raw['affin.lig_id'].unique(),
+                            lambda x: os.path.join(self.raw_paths[2], f'{x}.sdf'))
+        df_raw['smiles'] = df_raw['affin.lig_id'].map(smiles_dict)
+        df_raw.to_csv(self.raw_paths[0])
         
     def pre_process(self):
         """
@@ -789,7 +800,8 @@ class PlatinumDataset(BaseDataset):
             mt_pkd = row['affin.k_mt']
             wt_pkd = row['affin.k_wt']
             lig_id = row['affin.lig_id']
-            smiles = row['lig.canonical_smiles']
+            smiles = row['smiles']
+            
             # using index number for ID since pdb is not unique in this dataset.
             prot_seq[f'{i}_mt'] = (pdb, lig_id,  mt_pkd, smiles, mut_seq)
             prot_seq[f'{i}_wt'] = (pdb, lig_id, wt_pkd, smiles, ref_seq)

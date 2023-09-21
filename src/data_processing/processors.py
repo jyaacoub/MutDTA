@@ -35,8 +35,7 @@ class Processor:
             f.write('protID,prot_seq\n')
             for k,v in prot_dict.items():
                 f.write(f'{k},{v}\n')
-
-class PDBbindProcessor(Processor):
+                
     @staticmethod
     def get_SMILE(IDs: Iterable[str],
                 dir: Callable[[str], str] = 
@@ -83,7 +82,8 @@ class PDBbindProcessor(Processor):
         RDLogger.EnableLog('rdApp.*')
             
         return drug_smi
-    
+
+class PDBbindProcessor(Processor):
     @staticmethod
     def excel_to_csv(xlsx_path='data/PDBbind/raw/P-L_refined_set_all.xlsx') -> None:
         """

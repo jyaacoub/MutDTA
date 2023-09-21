@@ -1,55 +1,48 @@
-#%%
-from src.data_processing.datasets import PlatinumDataset
-from src.utils.residue import Chain
+# #%%
+# from src.data_processing.datasets import PlatinumDataset
+# from src.utils.residue import Chain
 
-import pandas as pd
-import numpy as np
-import os.path as osp
-import os
-data = 'PDBbind'
-FEATURE = 'nomsa'
-data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
-df_p = '../data/PlatinumDataset/raw/platinum_flat_file.csv'
-# data_root_dir = '/home/jyaacoub/projects/data/'
-DATA_ROOT = f'{data_root_dir}/'
+# import pandas as pd
+# import numpy as np
+# import os.path as osp
+# import os
+# data = 'PDBbind'
+# FEATURE = 'nomsa'
+# data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
+# df_p = '../data/PlatinumDataset/raw/platinum_flat_file.csv'
+# df_pro = '../data/PlatinumDataset/nomsa_binary/full/XY.csv'
+# # data_root_dir = '/home/jyaacoub/projects/data/'
+# DATA_ROOT = f'{data_root_dir}/'
 
-df_raw = pd.read_csv(df_p)
+# df_raw = pd.read_csv(df_p)
 
-# get test sample 
-row = df_raw.iloc[778]
-mut = row['mutation']
-pdb_wt = row['mut.wt_pdb']
-pdb_mt = row['mut.mt_pdb'] 
-t_chain = row['affin.chain']
-            
-# Getting sequence from pdb file:
-chain_wt = Chain(f'../data/PlatinumDataset/raw/platinum_pdb/{pdb_wt}.pdb', 
-              t_chain=t_chain)
-mt_seq = chain_wt.get_mutated_seq(mut.split('/'), reversed=False)
-# chain_mt = Chain(f'../data/PlatinumDataset/raw/platinum_pdb/{pdb_mt}.pdb', 
-#               t_chain=t_chain)
-# mt_seq == chain_mt.getSequence()
+# # get test sample 
+# row = df_raw.iloc[778]
+# mut = row['mutation']
+# pdb_wt = row['mut.wt_pdb']
+# pdb_mt = row['mut.mt_pdb'] 
+# t_chain = row['affin.chain']
 
-#%%
-from src.data_processing.downloaders import Downloader
 
-# download missing pdbs:
-# only missing pdbs will be those that are not wildtypes since that is the default
-def filter(row):
-    mt = row['mut.mt_pdb']
-    return mt != 'NO' and not osp.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
+# #%%
+# from src.data_processing.downloaders import Downloader
 
-Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'])
+# # download missing pdbs:
+# # only missing pdbs will be those that are not wildtypes since that is the default
+# def filter(row):
+#     mt = row['mut.mt_pdb']
+#     return mt != 'NO' and not osp.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
+
+# Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'])
 
 #%%
 from src.data_processing.datasets import PlatinumDataset
-
+print('CREATING PLATINUM DATASET...')
 d = PlatinumDataset(
     save_root=f'../data/PlatinumDataset/',
     data_root=f'../data/PlatinumDataset/raw',
     aln_dir=None,
     cmap_threshold=8.0,
-    mutated=False, # downloaded PDBs are the mutated versions, ref can be achived by reversing mutation
     feature_opt='nomsa',
     edge_opt='binary')
 # exit()
