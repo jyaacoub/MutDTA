@@ -47,25 +47,23 @@ def pdb_RMSD(pdb_file: str, pred_file: str) -> Number:
         The RMSD between the two structures.
     """
     raise NotImplementedError 
-# %%
-def concordance_index(y_true, y_pred): #TODO: make this faster
-    """
-    Calculates the concordance index (CI) between two arrays of affinity values.
-    """
-    # sorting by y_true in ascending order and removing duplicates
+# %%    
+def concordance_index(y_true, y_pred) -> float:
+    """Faster implementation of cindex by utilizing vectorization and numpy"""
     sorted_indices = np.argsort(y_true)
-    y_true = y_true[sorted_indices]
-    y_pred = y_pred[sorted_indices]
+    y_true_sorted = y_true[sorted_indices]
+    y_pred_sorted = y_pred[sorted_indices]
     
-    # calculating concordance index
-    sum = 0
-    num_pairs = 0 # number of pairs of samples that can be compared
-    for i in range(len(y_true)):
-        for j in range(i): # only need to loop through j < i
-            if (y_true[i] > y_true[j]): # y[i] > y[j] is implied
-                num_pairs += 1
-                sum +=  1* (y_pred[i] > y_pred[j]) + 0.5 * (y_pred[i] == y_pred[j])
-    return sum/num_pairs if num_pairs > 0 else 0
+    # Calculate concordant and discordant pairs
+    # where i > j is all we care about
+    i, j = np.where(y_true_sorted[:,np.newaxis] > y_true_sorted)
+    pairs_gt = np.sum(y_pred_sorted[i] > y_pred_sorted[j])
+    pairs_eq = np.sum(y_pred_sorted[i] == y_pred_sorted[j])*0.5
+    
+    # Calculate the concordance index
+    c_index = (pairs_gt + pairs_eq)/len(i)
+
+    return c_index
     
     
 try:
@@ -171,3 +169,5 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
     
     return c_index, p_corr, s_corr, mse, mae, rmse
 
+
+# %%
