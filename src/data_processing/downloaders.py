@@ -118,13 +118,14 @@ class Downloader:
                 
             os.makedirs(os.path.dirname(fp), 
                         exist_ok=True)
-            with open(fp, 'w') as f:
-                resp = r.get(url(id))
-                if resp.status_code >= 400: 
-                    ID_status[id] = resp.status_code
-                else:
-                    ID_status[id] = 'downloaded'
+            
+            resp = r.get(url(id))
+            if resp.status_code >= 400: 
+                ID_status[id] = resp.status_code
+            else:
+                with open(fp, 'w') as f:
                     f.write(resp.text)
+                ID_status[id] = 'downloaded'
         return ID_status
     
     @staticmethod
