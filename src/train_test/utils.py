@@ -2,14 +2,13 @@ import signal, os, subprocess
 from typing import Tuple
 
 import submitit
+
 import numpy as np
+import pandas as pd
 
 import torch
 from torch import nn
 import torch.distributed as dist
-import numpy as np
-import pandas as pd
-import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import InMemoryDataset
@@ -234,19 +233,20 @@ class CheckpointSaver:
                 return True
             
         if curr_epoch % self.save_freq == 0:
-            self.save(f'{self.save_path}_tmp')
+            self.save(f'{self.save_path}_tmp', rm_tmp=False)
         return False
 
-    def save(self, path:str=None, silent=False):
+    def save(self, path:str=None, silent=False, rm_tmp=True):
         # only allow the main process to save models
         if self.dist_rank is None or self.dist_rank == 0:
             path = path or self.save_path
             # save model default path is model class name + best epoch
             torch.save(self.best_model_dict, path)
             if not silent: print(f'Model saved to: {path}')
+            if rm_tmp and os.path.isfile(f'{path}_tmp'): 
+                os.remove(f'{path}_tmp')
         elif not silent:
             print(f'WARNING: No saving on non-main process')
-            
         
     def __repr__(self) -> str:
         return f'save path: {self.save_path}'+ \
