@@ -132,8 +132,8 @@ def add_slurm_dist_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument('-s_ng',
         '--slurm_ngpus',
-        action='store', type=int, default=2,
-        help='Number of GPUs for DDP (default: 2)'
+        action='store', type=int, default=1,
+        help='Number of GPUs for DDP (default: 1)'
     )
     parser.add_argument('-s_nn',
         '--slurm_nnodes',

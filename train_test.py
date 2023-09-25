@@ -1,7 +1,7 @@
 # %%
 from src.utils.arg_parse import parse_train_test_args
 args = parse_train_test_args(verbose=True,
-                             jyp_args='-m DG -d davis -f nomsa -e simple -D -bs 10')
+                             jyp_args='-m DG -d PDBbind -f nomsa -e binary -bs 64')
 FORCE_TRAINING = args.train
 DEBUG = args.debug
 
@@ -47,7 +47,7 @@ torch.manual_seed(args.rand_seed)
 
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
-                            train_all=False,
+                            train_all=True,
                             patience=10, min_delta=0.1,
                             save_freq=10)
 
