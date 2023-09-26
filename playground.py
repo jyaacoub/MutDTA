@@ -14,11 +14,10 @@ df = pd.read_csv(csv)
 #%% find matching cp
 media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/' 
 checkpoints = set(os.listdir(cp))
-starti, endi = 7, 18
+starti, endi = 10, 13
 
 for i, run in enumerate(df['run'][starti:endi]):
     sp = run.split('_')
-    # for 7-18 this is all that we need to consider
     if 'DG' in run:
         m = 'DG'
     else:
@@ -39,6 +38,7 @@ for i, run in enumerate(df['run'][starti:endi]):
     print(run)
     print(new_name)
     
+    run = ''.join(run.split('overlap_')) # removing overlap
     files = glob(f'{media_dir}/*/*/{run}[_\.]*')
     for f in files:
         print('  ', f)
@@ -49,6 +49,7 @@ for i, run in enumerate(df['run'][starti:endi]):
         os.rename(f, new_f)
         
     if len(files) != 0:
+        print('')
         df.at[i+starti, 'run'] = new_name
     else:
         print('WARNING: no files for', run)
