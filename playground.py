@@ -2,58 +2,70 @@
 import os
 from os import path as osp
 from glob import glob
+
+import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 
 
 cp = '/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/ours'
 csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
 
-df = pd.read_csv(csv)
+df = pd.read_csv(csv)[:13]
+
+#%% Extract dataset types and features from the 'run' column
+df['Dataset Type'] = df['run'].str.extract(r'_(davis|kiba)', expand=False)
+df['Feature'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
+df['Overlap'] = df['run'].str.contains('overlap')
+
+# %%
+
+# Group the DataFrame by Dataset Type and Feature and calculate the mean cindex
+grouped_df = df.groupby(['Dataset Type', 'Feature', 'Overlap'])['cindex']
+
+# Create a grouped bar plot
+dataset_types = grouped_df.index
+num_features = len(grouped_df.columns)
+bar_width = 0.2
+index = np.arange(len(dataset_types))
+
+colors = ['blue', 'green', 'red']  # You can customize colors for each feature
+
+for i, feature in enumerate(grouped_df.columns):
+    plt.bar(index + i * bar_width, grouped_df[feature], bar_width, label=feature, color=colors[i])
+
+plt.xlabel('Dataset Type')
+plt.ylabel('Mean cindex')
+plt.title('Mean cindex Comparison for Davis and Kiba Dataset Types by Feature')
+plt.xticks(index + (bar_width * (num_features - 1)) / 2, dataset_types)
+plt.legend(title='Feature', loc='upper left')
+plt.tight_layout()
+plt.show()
+
+
 
 
 #%% find matching cp
-media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/' 
-checkpoints = set(os.listdir(cp))
-starti, endi = 10, 13
+csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
+df = pd.read_csv(csv)
 
-for i, run in enumerate(df['run'][starti:endi]):
-    sp = run.split('_')
-    if 'DG' in run:
-        m = 'DG'
-    else:
-        m = sp[0]
+
+media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/'
+
+run = 'DGM_davis-fixedD_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E'
+idx = df.index[df['run'] == run][0]
+new_name = ''.join(run.split('-fixed')) # removing "fixed"
+
+files = glob(f'{media_dir}/*/*/{run}[_\.]*')
+for f in files:
+    print('  ', f)
+    sp = f.split(run)
+    start, end = sp[0], sp[-1]
+    new_f = f'{start}{new_name}{end}'
+    print('->', new_f)
+    os.rename(f, new_f)
     
-    d = 'davis' if 'davis' in run else 'kiba'
-    d += '-overlap' if 'overlap' in run else ''
-    d += '-fixed' if 'fixed' in run else ''
-    edge = 'binary'
-    feat = run.split('F')[0].split('_')[-1]
-    b = run.split('B_')[0].split('_')[-1]
-    LR = run.split('LR_')[0].split('_')[-1]
-    DO = run.split('D_')[0].split('_')[-1]
-    ep = run.split('E_')[0].split('_')[-1]
-    
-    
-    new_name = f'{m}M_{d}D_{feat}F_{edge}E_{b}B_{LR}LR_{DO}D_{ep}E'
-    print(run)
-    print(new_name)
-    
-    run = ''.join(run.split('overlap_')) # removing overlap
-    files = glob(f'{media_dir}/*/*/{run}[_\.]*')
-    for f in files:
-        print('  ', f)
-        sp = f.split(run)
-        start, end = sp[0], sp[-1]
-        new_f = f'{start}{new_name}{end}'
-        print('->', new_f)
-        os.rename(f, new_f)
-        
-    if len(files) != 0:
-        print('')
-        df.at[i+starti, 'run'] = new_name
-    else:
-        print('WARNING: no files for', run)
-    print('---', len(files))
+df.at[17, 'run'] = new_name
 
 #%%
 df.to_csv(csv, index=False)
