@@ -35,7 +35,7 @@ MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 
 MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGE,
                                      BATCH_SIZE,LEARNING_RATE,DROPOUT,EPOCHS)
-MODEL_KEY = 'DDP-' + MODEL_KEY # distributed model
+# MODEL_KEY = 'DDP-' + MODEL_KEY # distributed model
 model_p = checkpoint_p(MODEL_KEY)
 model_p = model_p if os.path.isfile(model_p) else checkpoint_p_tmp(MODEL_KEY)
 assert os.path.isfile(model_p), f"MISSING MODEL CHECKPOINT {model_p}"

@@ -36,7 +36,7 @@ def dtrain(args):
     model_save_dir = 'results/model_checkpoints/ours/'
     MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,BATCH_SIZE*args.world_size,
                                      LEARNING_RATE,DROPOUT,EPOCHS)
-    MODEL_KEY = "DDP-" + MODEL_KEY
+    # MODEL_KEY = "DDP-" + MODEL_KEY
     
     print(os.getcwd())
     print(f"---------------- MODEL OPT ---------------")
