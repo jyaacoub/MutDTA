@@ -1,12 +1,64 @@
+# %% Rename old models so that they match with new format
+import os
+from os import path as osp
+from glob import glob
+import pandas as pd
+
+
+cp = '/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/ours'
+csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
+
+df = pd.read_csv(csv)
+
+
+#%% find matching cp
+media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/' 
+checkpoints = set(os.listdir(cp))
+
+for i, run in enumerate(df['run'][:7]):
+    m = 'DGI' if 'DGraphDTAImproved' in run else 'DG'
+    d = 'davis' if 'davis' in run else 'kiba'
+    d += '-overlap' if 'fixed' not in run else ''
+    edge= 'binary'
+    feat = run.split('F_')[0].split('_')[-1]
+    b = run.split('B_')[0].split('_')[-1]
+    LR = run.split('LR_')[0].split('_')[-1]
+    DO = run.split('D_')[0].split('_')[-1]
+    ep = run.split('E_')[0].split('_')[-1]
+    
+    
+    new_name = f'{m}M_{d}D_{feat}F_{edge}E_{b}B_{LR}LR_{DO}D_{ep}E'
+    print(run)
+    print(new_name)
+    
+    files = glob(f'{media_dir}/*/*/{run}[_\.]*')
+    for f in files:
+        print('  ', f)
+        sp = f.split(run)
+        start, end = sp[0], sp[-1]
+        new_f = f'{start}{new_name}{end}'
+        print('->', new_f)
+        os.rename(f, new_f)
+        
+    df.at[i, 'run'] = new_name
+    print('---', len(files))
+
+#%%
+df.to_csv(csv, index=False)
+
+
+
+
 #%%
 import json, os
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor
-from tqdm.contrib.concurrent import thread_map  # Use tqdm for multithreading
-from src.data_processing.downloaders import Downloader
+from src.utils.residue import Chain
+from tqdm import tqdm
+from prody import parsePDB
 
 root_dir = '/cluster/home/t122995uhn/projects/data/kiba_tmp'
 save_dir = f'{root_dir}/structures'
+pdb_fp = lambda x: f'{save_dir}/{x}.pdb'
 
 # Contains protein sequences mapped to uniprotIDs
 unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
@@ -14,32 +66,51 @@ unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
 # this returns a tsv containing all matching pdbs for each unique uniprotID
 df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
 
-#%% Downloading pdbs
-def download_pdb(pdb_id):
+#%%
+from thefuzz import fuzz
+# fuzzy matching:
+matches = {} # tracks matching sequences to pdb structures
+fails = []
+for i, row in tqdm(df.iterrows(), desc='Matching pdbs', total=len(df)):
+    uniprot = row['From']
+    pdb = row['To']
+    if uniprot in matches: continue # already matched
     try:
-        Downloader.download_PDBs([pdb_id], save_dir=save_dir, tqdm_disable=True)
-        return pdb_id  # Return the downloaded PDB ID for progress tracking
+        pdb_s = parsePDB(pdb_fp(pdb), subset='ca')
+        hv = pdb_s.getHierView()
+        seq = pdb_s.getSequence() # includes all chains 
     except Exception as e:
-        print(f"Error downloading {pdb_id}: {str(e)}")
+        fails.append((pdb, e))
+        # raise Exception(f'Error on {i}, ({uniprot}, {pdb}).') from e
+    
+    curr_seq = unique_prots[uniprot] 
+    
+    for c in hv:
+        chain_seq = c.getSequence()        
+        if (len(chain_seq) == len(curr_seq) and chain_seq == curr_seq) or \
+            (len(chain_seq) > len(curr_seq) and curr_seq in chain_seq):
+            # (len(chain_seq) < len(curr_seq) and chain_seq in curr_seq): # this would cause small chains to match with reference
+            sim_score = fuzz.ratio(chain_seq, curr_seq)
+            matches[uniprot] = (c, sim_score)
+            
+    # if (len(seq) == len(curr_seq) and seq == curr_seq) or \
+    #     (len(seq) > len(curr_seq) and curr_seq in seq)or \
+    #     (len(seq) < len(curr_seq) and seq in curr_seq):
+    #     matches[uniprot] = pdb
 
-# Get unique PDBs
-pdbs = df['To'].unique()
-
-# Number of concurrent threads (adjust as needed)
-num_threads = 4
-
-# Use tqdm with ThreadPoolExecutor
-with ThreadPoolExecutor(max_workers=num_threads) as executor:
-    # Use thread_map for tqdm integration
-    downloaded_pdbs = list(thread_map(download_pdb, pdbs, desc="Downloading PDBs", total=len(pdbs)))
-
-print("DONE.")
-
-exit()
+#%% Fails are due to empty pdb files
+for c, _ in fails:
+    os.remove(pdb_fp(c))
 
 
 
-
+#%% Download missing
+from src.data_processing.downloaders import Downloader
+import pickle
+with open('temp.pkl', 'rb') as f:
+    ids = pickle.load(f)
+    
+Downloader.download_PDBs(ids, save_dir=save_dir)
 
 
 #%%
