@@ -14,13 +14,21 @@ df = pd.read_csv(csv)
 #%% find matching cp
 media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/' 
 checkpoints = set(os.listdir(cp))
+starti, endi = 7, 18
 
-for i, run in enumerate(df['run'][:7]):
-    m = 'DGI' if 'DGraphDTAImproved' in run else 'DG'
+for i, run in enumerate(df['run'][starti:endi]):
+    sp = run.split('_')
+    # for 7-18 this is all that we need to consider
+    if 'DG' in run:
+        m = 'DG'
+    else:
+        m = sp[0]
+    
     d = 'davis' if 'davis' in run else 'kiba'
-    d += '-overlap' if 'fixed' not in run else ''
-    edge= 'binary'
-    feat = run.split('F_')[0].split('_')[-1]
+    d += '-overlap' if 'overlap' in run else ''
+    d += '-fixed' if 'fixed' in run else ''
+    edge = 'binary'
+    feat = run.split('F')[0].split('_')[-1]
     b = run.split('B_')[0].split('_')[-1]
     LR = run.split('LR_')[0].split('_')[-1]
     DO = run.split('D_')[0].split('_')[-1]
@@ -40,7 +48,10 @@ for i, run in enumerate(df['run'][:7]):
         print('->', new_f)
         os.rename(f, new_f)
         
-    df.at[i, 'run'] = new_name
+    if len(files) != 0:
+        df.at[i+starti, 'run'] = new_name
+    else:
+        print('WARNING: no files for', run)
     print('---', len(files))
 
 #%%
