@@ -100,7 +100,7 @@ def dtrain(args):
     
     # ==== train ====
     cp_saver = CheckpointSaver(model=model, save_path=f'{model_save_dir}/{MODEL_KEY}.model',
-                            train_all=True,
+                            train_all=False,
                             patience=10, min_delta=0.1,
                             save_freq=10,
                             dist_rank=args.rank)
