@@ -1,5 +1,8 @@
 # TODO: create a trainer class for modularity
 from functools import wraps
+from typing import Iterable
+from torch_geometric.loader import DataLoader
+
 from src.models.mut_dta import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
@@ -25,7 +28,9 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt})
     def get_model_key(model:str, data:str, pro_feature:str, edge:str, 
-                      batch_size:int, lr:float, dropout:float, n_epochs:int):
+                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False):
+        data += '-overlap' if pro_overlap else ''
+        
         if model in ['EAT']: # no edgew or features for this model type
             print('WARNING: edge weight and feature opt is not supported with the specified model.')
             return f'{model}M_{data}D_{batch_size}B_{lr}LR_{dropout}D_{n_epochs}E'
@@ -79,7 +84,7 @@ class Loader():
         return model
     
     @staticmethod
-    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge': edge_opt})
+    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt})
     def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str='../data/'):
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
@@ -104,3 +109,28 @@ class Loader():
             raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
             
         return dataset
+    
+    @staticmethod
+    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt})
+    def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str='../data/', 
+                      batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+                      protein_overlap:bool=False):
+        loaders = {}
+        
+        # different list for subset so that loader keys are the same name as input
+        if protein_overlap:
+            subsets = [d+'-overlap' for d in datasets]
+        else:
+            subsets = datasets
+            
+        for d, s in zip(datasets, subsets):
+            dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
+                                          subset=s, path=path)                
+                                            
+            bs = 1 if d == 'test' else batch_train
+            loader = DataLoader(dataset=dataset, batch_size=bs, 
+                                shuffle=False)
+            loaders[d] = loader
+            
+        return loaders
+        

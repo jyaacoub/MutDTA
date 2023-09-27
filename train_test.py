@@ -1,7 +1,7 @@
 # %%
 from src.utils.arg_parse import parse_train_test_args
 args = parse_train_test_args(verbose=True,
-                             jyp_args='-m DG -d davis -f nomsa -e simple -D -bs 10')
+                             jyp_args='-m DG -d PDBbind -f nomsa -e binary -bs 64')
 FORCE_TRAINING = args.train
 DEBUG = args.debug
 
@@ -47,7 +47,7 @@ torch.manual_seed(args.rand_seed)
 
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
-                            train_all=False,
+                            train_all=True,
                             patience=10, min_delta=0.1,
                             save_freq=10)
 
@@ -57,7 +57,8 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
                                                      args.feature_opt, args.edge_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
     MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,
-                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,NUM_EPOCHS)
+                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,NUM_EPOCHS,
+                                     pro_overlap=args.protein_overlap)
     print(f'# {MODEL_KEY} \n')
     
     # init paths for media and model checkpoints
@@ -71,14 +72,19 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
 
 
     # ==== LOAD DATA ====
-    dataset = Loader.load_dataset(DATA, FEATURE, EDGEW)
-    print(f'# Number of samples: {len(dataset)}')
-
-    train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-                        train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
-                        shuffle_dataset=True, random_seed=args.rand_seed, 
-                        batch_train=BATCH_SIZE, use_refined=False,
-                        split_by_prot=True)
+    # WARNING: Deprecating use of split to ensure all models train on same dataset splits.
+    # dataset = Loader.load_dataset(DATA, FEATURE, EDGEW, subset='full')
+    # print(f'# Number of samples: {len(dataset)}')
+    # train_loader, val_loader, test_loader = train_val_test_split(dataset, 
+    #                     train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
+    #                     shuffle_dataset=True, random_seed=args.rand_seed, 
+    #                     batch_train=BATCH_SIZE, use_refined=False,
+    #                     split_by_prot=not args.protein_overlap)
+    
+    loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGEW, path='../', 
+                                        batch_train=BATCH_SIZE,
+                                        datasets=['train', 'test', 'val'],
+                                        protein_overlap=args.protein_overlap)
 
 
     # ==== LOAD MODEL ====
@@ -89,7 +95,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     
     if DEBUG: 
         # run single batch through model
-        debug(model, train_loader, device)
+        debug(model, loaders['train'], device)
         continue # skip training
     
     
@@ -108,7 +114,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     
     if not os.path.exists(cp_saver.save_path) or FORCE_TRAINING:
         # training
-        logs = train(model, train_loader, val_loader, device, 
+        logs = train(model, loaders['train'], loaders['val'], device, 
                     epochs=NUM_EPOCHS, lr_0=LEARNING_RATE, saver=cp_saver)
         cp_saver.save()
         # load best model for testing
@@ -121,7 +127,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
             
     # ==== EVALUATE ====
     # testing
-    loss, pred, actual = test(model, test_loader, device)
+    loss, pred, actual = test(model, loaders['test'], device)
     print(f'# Test loss: {loss}')
     get_metrics(actual, pred,
                 save_results=SAVE_RESULTS,

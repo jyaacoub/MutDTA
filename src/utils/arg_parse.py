@@ -108,6 +108,9 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         action='store', type=float, default=0.1,
         help='Percentage of data for validation (default: 0.1)'
     )
+    parser.add_argument('-pro_o',
+        '--protein_overlap', action='store_true',
+        help='Disable split by protein, allowing protein overlap in train and test.')
     parser.add_argument('-nos',
         '--no_shuffle', action='store_true',
         help='Dont shuffle the data before splitting (default: True)'
@@ -132,8 +135,8 @@ def add_slurm_dist_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument('-s_ng',
         '--slurm_ngpus',
-        action='store', type=int, default=2,
-        help='Number of GPUs for DDP (default: 2)'
+        action='store', type=int, default=1,
+        help='Number of GPUs for DDP (default: 1)'
     )
     parser.add_argument('-s_nn',
         '--slurm_nnodes',

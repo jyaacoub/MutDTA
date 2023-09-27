@@ -16,12 +16,14 @@ from tqdm import tqdm
 
 from src.utils import config as cfg
 from src.utils.residue import Chain
+from src.utils.exceptions import DatasetNotFound
 from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
 from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor, Processor
 from src.data_processing.downloaders import Downloader
+
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
@@ -103,8 +105,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}') # e.g.: path/to/root/nomsa_anm
         if subset != 'full':
             data_p = os.path.join(save_root, subset)
-            assert os.path.isdir(data_p), f"{data_p} Subset does not exist,"+\
-                "please create subset before initialization."
+            if not os.path.isdir(data_p):
+                DatasetNotFound(f"{data_p} Subset does not exist, please create subset before initialization.")
         self.subset = subset
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)

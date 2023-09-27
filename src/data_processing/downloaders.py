@@ -81,7 +81,9 @@ class Downloader:
     @staticmethod
     def download(IDs: Iterable[str], 
                  save_path=lambda x:'./data/structures/ligands/{x}.sdf', 
-                 url=lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf') -> dict:
+                 url=lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf',
+                 tqdm_desc='Downloading files',
+                 tqdm_disable=False) -> dict:
         """
         Generalized download function for downloading any file type from any site.
         
@@ -106,7 +108,7 @@ class Downloader:
         """
         
         ID_status = {}
-        for id in tqdm(IDs, 'Downloading files'):
+        for id in tqdm(IDs, tqdm_desc, disable=tqdm_disable):
             if id in ID_status: continue
             fp = save_path(id)
             # checking to make sure that we didnt already download file
@@ -116,24 +118,25 @@ class Downloader:
                 
             os.makedirs(os.path.dirname(fp), 
                         exist_ok=True)
-            with open(fp, 'w') as f:
-                resp = r.get(url(id))
-                if resp.status_code >= 400: 
-                    ID_status[id] = resp.status_code
-                else:
-                    ID_status[id] = 'downloaded'
+            
+            resp = r.get(url(id))
+            if resp.status_code >= 400: 
+                ID_status[id] = resp.status_code
+            else:
+                with open(fp, 'w') as f:
                     f.write(resp.text)
+                ID_status[id] = 'downloaded'
         return ID_status
     
     @staticmethod
-    def download_PDBs(PDBCodes: Iterable[str], save_dir='./') -> dict:
+    def download_PDBs(PDBCodes: Iterable[str], save_dir='./', **kwargs) -> dict:
         """
         Wrapper of `Downloader.download` for downloading PDB files.
         Fetches PDB files from https://files.rcsb.org/download/{PDBCode}.pdb.           
         """
         save_path = lambda x: os.path.join(save_dir, f'{x}.pdb')
         url = lambda x: f'https://files.rcsb.org/download/{x}.pdb'
-        return Downloader.download(PDBCodes, save_path=save_path, url=url)
+        return Downloader.download(PDBCodes, save_path=save_path, url=url, **kwargs)
     
     @staticmethod
     def download_predicted_PDBs(UniProtID: Iterable[str], save_dir='./') -> dict:

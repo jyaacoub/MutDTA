@@ -1,151 +1,141 @@
-# #%%
-# from src.data_processing.datasets import PlatinumDataset
-# from src.utils.residue import Chain
+# %% Rename old models so that they match with new format
+import os
+from os import path as osp
+from glob import glob
 
-# import pandas as pd
-# import numpy as np
-# import os.path as osp
-# import os
-# data = 'PDBbind'
-# FEATURE = 'nomsa'
-# data_root_dir = '/cluster/home/t122995uhn/projects/data/kiba/'
-# df_p = '../data/PlatinumDataset/raw/platinum_flat_file.csv'
-# df_pro = '../data/PlatinumDataset/nomsa_binary/full/XY.csv'
-# # data_root_dir = '/home/jyaacoub/projects/data/'
-# DATA_ROOT = f'{data_root_dir}/'
-
-# df_raw = pd.read_csv(df_p)
-
-# # get test sample 
-# row = df_raw.iloc[778]
-# mut = row['mutation']
-# pdb_wt = row['mut.wt_pdb']
-# pdb_mt = row['mut.mt_pdb'] 
-# t_chain = row['affin.chain']
-
-
-# #%%
-# from src.data_processing.downloaders import Downloader
-
-# # download missing pdbs:
-# # only missing pdbs will be those that are not wildtypes since that is the default
-# def filter(row):
-#     mt = row['mut.mt_pdb']
-#     return mt != 'NO' and not osp.isfile(f'../data/PlatinumDataset/raw/platinum_pdb/{mt}.pdb')
-
-# Downloader.download_PDBs(df_raw[df_raw.apply(filter, axis=1)]['mut.mt_pdb'])
-
-#%%
-from src.data_processing.datasets import PlatinumDataset
-print('CREATING PLATINUM DATASET...')
-d = PlatinumDataset(
-    save_root=f'../data/PlatinumDataset/',
-    data_root=f'../data/PlatinumDataset/raw',
-    aln_dir=None,
-    cmap_threshold=8.0,
-    feature_opt='nomsa',
-    edge_opt='binary')
-# exit()
-
-# dataset = DavisKibaDataset(
-#         save_root=f'../data/DavisKibaDataset/kiba/',
-#         data_root=DATA_ROOT,
-#         aln_dir=f'{DATA_ROOT}/aln/', 
-#         cmap_threshold=-0.5, 
-#         feature_opt=FEATURE,
-#         edge_opt = 'anm',
-#         af_conf_dir='../colabfold/pdbbind_out/out0',
-# )
-
-
-#%%
-from src.data_processing.downloaders import Downloader
+import matplotlib.pyplot as plt
 import pandas as pd
-import json, shutil, os
+import numpy as np
 
-root_dir = '/cluster/home/t122995uhn/projects/data/kiba'
-save_dir = f'{root_dir}/structures'
 
-unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
-# [...]
-# send unique prots to uniprot for structure search
+cp = '/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/ours'
+csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
 
-##### Map to PDB structural files
-# downloaded from https://www.uniprot.org/id-mapping/bcf1665e2612ea050140888440f39f7df822d780/overview
-df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
-# getting only first hit for each unique PDB-ID
-df = df.loc[df[['From']].drop_duplicates().index]
+df = pd.read_csv(csv)[:13]
 
-# getting missing/unmapped prot ids
-missing = [prot_id for prot_id in unique_prots.keys() if prot_id not in df['From'].values]
+#%% Extract dataset types and features from the 'run' column
+df['Dataset Type'] = df['run'].str.extract(r'_(davis|kiba)', expand=False)
+df['Feature'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
+df['Overlap'] = df['run'].str.contains('overlap')
 
 # %%
-# ##### download pdb files
-# Downloader.download_PDBs(df['To'].values, save_dir=save_dir)
 
-# # retrieve missing structures from AlphaFold:
-# Downloader.download_predicted_PDBs(missing, save_dir=save_dir)
+# Group the DataFrame by Dataset Type and Feature and calculate the mean cindex
+grouped_df = df.groupby(['Dataset Type', 'Feature', 'Overlap'])['cindex']
 
-# # NOTE: some uniprotIDs map to the same structure and so using the df mapping we will rename the mapped pdb to be uniprot file names
-# #%% copying as neccessary
+# Create a grouped bar plot
+dataset_types = grouped_df.index
+num_features = len(grouped_df.columns)
+bar_width = 0.2
+index = np.arange(len(dataset_types))
 
-# # copying to new uniprot id file names
-# for i, row in df.iterrows():
-#     uniprot = row['From']
-#     pdb = row['To']
-#     # finding pdb file
-#     f_in = f'{save_dir}/{pdb}.pdb'
-#     f_out = f'{save_dir}/{uniprot}.pdb'
-#     if not os.path.isfile(f_in):
-#         print('Missing', f_in)
-#     elif not os.path.isfile(f_out):
-#         shutil.copy(f_in, f_out)
+colors = ['blue', 'green', 'red']  # You can customize colors for each feature
 
-# # removing old pdb files.
-# for i, row in df.iterrows():
-#     pdb = row['To']
-#     f_in = f'{save_dir}/{pdb}.pdb'
-#     if os.path.isfile(f_in):
-#         os.remove(f_in)
+for i, feature in enumerate(grouped_df.columns):
+    plt.bar(index + i * bar_width, grouped_df[feature], bar_width, label=feature, color=colors[i])
+
+plt.xlabel('Dataset Type')
+plt.ylabel('Mean cindex')
+plt.title('Mean cindex Comparison for Davis and Kiba Dataset Types by Feature')
+plt.xticks(index + (bar_width * (num_features - 1)) / 2, dataset_types)
+plt.legend(title='Feature', loc='upper left')
+plt.tight_layout()
+plt.show()
 
 
-#%% Some downloaded pdbs dont match the provided input sequence
+
+
+#%% find matching cp
+csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
+df = pd.read_csv(csv)
+
+
+media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/'
+
+run = 'DGM_davis-fixedD_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E'
+idx = df.index[df['run'] == run][0]
+new_name = ''.join(run.split('-fixed')) # removing "fixed"
+
+files = glob(f'{media_dir}/*/*/{run}[_\.]*')
+for f in files:
+    print('  ', f)
+    sp = f.split(run)
+    start, end = sp[0], sp[-1]
+    new_f = f'{start}{new_name}{end}'
+    print('->', new_f)
+    os.rename(f, new_f)
+    
+df.at[17, 'run'] = new_name
+
+#%%
+df.to_csv(csv, index=False)
+
+
+
+
+#%%
+import json, os
+import pandas as pd
 from src.utils.residue import Chain
-# mismatch
-mismatch = {}
-for uniprot, seq in unique_prots.items():
-    if uniprot in missing: continue
-    f_in = f'{save_dir}/{uniprot}.pdb'
-    if not os.path.isfile(f_in):
-        print('Missing', f_in)
-    else:
-        c = Chain(f_in)
-        pdb_sequence = c.getSequence()
-        if len(seq) != len(pdb_sequence):
-            mismatch[uniprot] = (c, seq, mismatch_count)
-            print(f'LENGTH MISMATCH FOR {uniprot} - {f_in} (Expected: {len(seq)}, Actual: {len(pdb_sequence)})')
-        else:
-            # Calculate the number of mismatches
-            mismatch_count = sum(1 for i in range(len(seq)) if seq[i] != pdb_sequence[i])
+from tqdm import tqdm
+from prody import parsePDB
+
+root_dir = '/cluster/home/t122995uhn/projects/data/kiba_tmp'
+save_dir = f'{root_dir}/structures'
+pdb_fp = lambda x: f'{save_dir}/{x}.pdb'
+
+# Contains protein sequences mapped to uniprotIDs
+unique_prots = json.load(open(f'{root_dir}/proteins.txt', 'r'))
+# [...] send to https://www.uniprot.org/id-mapping to get associated pdb files
+# this returns a tsv containing all matching pdbs for each unique uniprotID
+df = pd.read_csv(f'{root_dir}/kiba_mapping_pdb.tsv', sep='\t')
+
+#%%
+from thefuzz import fuzz
+# fuzzy matching:
+matches = {} # tracks matching sequences to pdb structures
+fails = []
+for i, row in tqdm(df.iterrows(), desc='Matching pdbs', total=len(df)):
+    uniprot = row['From']
+    pdb = row['To']
+    if uniprot in matches: continue # already matched
+    try:
+        pdb_s = parsePDB(pdb_fp(pdb), subset='ca')
+        hv = pdb_s.getHierView()
+        seq = pdb_s.getSequence() # includes all chains 
+    except Exception as e:
+        fails.append((pdb, e))
+        # raise Exception(f'Error on {i}, ({uniprot}, {pdb}).') from e
+    
+    curr_seq = unique_prots[uniprot] 
+    
+    for c in hv:
+        chain_seq = c.getSequence()        
+        if (len(chain_seq) == len(curr_seq) and chain_seq == curr_seq) or \
+            (len(chain_seq) > len(curr_seq) and curr_seq in chain_seq):
+            # (len(chain_seq) < len(curr_seq) and chain_seq in curr_seq): # this would cause small chains to match with reference
+            sim_score = fuzz.ratio(chain_seq, curr_seq)
+            matches[uniprot] = (c, sim_score)
             
-            if mismatch_count > 0:
-                mismatch[uniprot] = (c, seq, mismatch_count)
-                print(f'MISMATCH FOR {uniprot} - {f_in} (Mismatches: {mismatch_count})')
-            
-        # try:
-        #     hv = parsePDB(f_in, subset='ca').getHierView()
-        #     # s.getSequence()
-        #     # c = Chain(f_in)
-        #     match = None
-        #     for c in hv.iterChains():
-        #         if c.getSequence() == seq:
-        #             match = c
-        #             break
-        #     # if c.getSequence() != seq:
-        #     if match is None:
-        #         print(f'MISMATCH FOR {uniprot} - {f_in}')
-        # except Exception as e:
-        #     raise Exception(f'{f_in}') from e
+    # if (len(seq) == len(curr_seq) and seq == curr_seq) or \
+    #     (len(seq) > len(curr_seq) and curr_seq in seq)or \
+    #     (len(seq) < len(curr_seq) and seq in curr_seq):
+    #     matches[uniprot] = pdb
+
+#%% Fails are due to empty pdb files
+for c, _ in fails:
+    os.remove(pdb_fp(c))
+
+
+
+#%% Download missing
+from src.data_processing.downloaders import Downloader
+import pickle
+with open('temp.pkl', 'rb') as f:
+    ids = pickle.load(f)
+    
+Downloader.download_PDBs(ids, save_dir=save_dir)
+
 
 #%%
 from src.data_processing.datasets import PDBbindDataset
