@@ -35,7 +35,7 @@ def dtrain(args):
     MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
     model_save_dir = 'results/model_checkpoints/ours/'
     MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,BATCH_SIZE*args.world_size,
-                                     LEARNING_RATE,DROPOUT,EPOCHS 
+                                     LEARNING_RATE,DROPOUT,EPOCHS,
                                      pro_overlap=args.protein_overlap)
     # MODEL_KEY = "DDP-" + MODEL_KEY
     

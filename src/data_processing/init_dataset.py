@@ -16,19 +16,20 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
     for data, FEATURE, EDGE in itertools.product(data_opt, feat_opt, edge_opt):
         print('\n', data, FEATURE)
         if data in ['davis', 'kiba']:
-            DATA_ROOT = f'{data_root_dir}/'
+            DATA_ROOT = f'{data_root_dir}/{data}/'
             create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) # position frequency matrix creation -> important for msa feature
             dataset = DavisKibaDataset(
-                    save_root=f'../data/DavisKibaDataset/{data}_{FEATURE}/',
+                    save_root=f'../data/DavisKibaDataset/davis/',
                     data_root=DATA_ROOT,
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
-                    af_conf_dir='', #TODO: create af_configs for davis
+                    af_conf_dir=None, #TODO: create af_configs for daviskiba
             )
         elif data == 'PDBbind':
             # create_pfm_np_files('../data/PDBbind_aln/', processes=4)
-            dataset = PDBbindDataset(save_root=f'../data/PDBbindDataset/',
+            dataset = PDBbindDataset(
+                    save_root=f'../data/PDBbindDataset/',
                     data_root=f'../data/v2020-other-PL/',
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
@@ -67,4 +68,6 @@ if __name__ == "__main__":
                     feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
                     edge_opt=['binary'],
                     pro_overlap=True, 
-                    data_root_dir='/home/jyaacoub/projects/data/') #'/cluster/home/t122995uhn/projects/data/'
+                    #/home/jyaacoub/projects/data/
+                    #'/cluster/home/t122995uhn/projects/data/'
+                    data_root_dir='/cluster/home/t122995uhn/projects/data/')
