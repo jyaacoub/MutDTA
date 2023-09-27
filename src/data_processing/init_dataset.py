@@ -19,7 +19,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
             DATA_ROOT = f'{data_root_dir}/{data}/'
             create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) # position frequency matrix creation -> important for msa feature
             dataset = DavisKibaDataset(
-                    save_root=f'../data/DavisKibaDataset/davis/',
+                    save_root=f'../data/DavisKibaDataset/{data}/',
                     data_root=DATA_ROOT,
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 

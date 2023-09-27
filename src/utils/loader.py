@@ -98,7 +98,7 @@ class Loader():
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
-                    save_root=f'{path}/DavisKibaDataset/{data}_{pro_feature}/',
+                    save_root=f'{path}/DavisKibaDataset/{data}/',
                     data_root=f'{path}/{data}/',
                     aln_dir  =f'{path}/{data}/aln/',
                     cmap_threshold=-0.5, 
