@@ -35,7 +35,8 @@ def dtrain(args):
     MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
     model_save_dir = 'results/model_checkpoints/ours/'
     MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,BATCH_SIZE*args.world_size,
-                                     LEARNING_RATE,DROPOUT,EPOCHS)
+                                     LEARNING_RATE,DROPOUT,EPOCHS 
+                                     pro_overlap=args.protein_overlap)
     # MODEL_KEY = "DDP-" + MODEL_KEY
     
     print(os.getcwd())
@@ -65,18 +66,25 @@ def dtrain(args):
     
     # ==== Load up training dataset ====
     loaders = {}
-    for d in ['train', 'test', 'val']:
-        dataset = Loader.load_dataset(DATA, FEATURE, EDGEW, subset=d)
+    datasets = ['train', 'test', 'val']
+    # different list for subset so that loader keys are the same name as input
+    if args.protein_overlap:
+        subsets = [d+'-overlap' for d in datasets]
+    else:
+        subsets = datasets
+        
+    for d, s in zip(datasets, subsets):
+        dataset = Loader.load_dataset(DATA, FEATURE, EDGEW, subset=s)
         sampler = DistributedSampler(dataset, shuffle=True, 
                                     num_replicas=args.world_size,
-                                    rank=args.rank, seed=0)
+                                    rank=args.rank, seed=args.rand_seed)
         bs = 1 if d == 'test' else BATCH_SIZE
         loader = DataLoader(dataset=dataset, 
-                                sampler = sampler,
+                                sampler=sampler,
                                 batch_size=bs, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
-                                num_workers = args.slurm_cpus_per_task, # number of subproc used for data loading
-                                pin_memory = True,
-                                drop_last = True
+                                num_workers=args.slurm_cpus_per_task, # number of subproc used for data loading
+                                pin_memory=True,
+                                drop_last=True
                                 )
         loaders[d] = loader
     print(f"Data loaded")

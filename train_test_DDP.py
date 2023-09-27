@@ -14,7 +14,7 @@ from src.train_test import dtrain
 
 args = parse_train_test_args(verbose=True, distributed=True,
             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
-                ' -m EDI -d PDBbind -f nomsa -e af2 -lr 0.0001 -bs 10'+ \
+                ' -m DG -d PDBbind -f nomsa -e af2 -lr 0.0001 -bs 32'+ \
                 ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 2') # 3days == 4320 mins
 #-odir ./slurm_tests/edge_weights/%j -m EDI -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 16 -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 4
 # %% PARSE ARGS

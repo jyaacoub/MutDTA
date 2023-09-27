@@ -108,6 +108,9 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         action='store', type=float, default=0.1,
         help='Percentage of data for validation (default: 0.1)'
     )
+    parser.add_argument('-pro_o',
+        '--protein_overlap', action='store_true',
+        help='Disable split by protein, allowing protein overlap in train and test.')
     parser.add_argument('-nos',
         '--no_shuffle', action='store_true',
         help='Dont shuffle the data before splitting (default: True)'

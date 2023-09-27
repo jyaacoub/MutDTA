@@ -25,7 +25,9 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt})
     def get_model_key(model:str, data:str, pro_feature:str, edge:str, 
-                      batch_size:int, lr:float, dropout:float, n_epochs:int):
+                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False):
+        data += '-overlap' if pro_overlap else ''
+        
         if model in ['EAT']: # no edgew or features for this model type
             print('WARNING: edge weight and feature opt is not supported with the specified model.')
             return f'{model}M_{data}D_{batch_size}B_{lr}LR_{dropout}D_{n_epochs}E'
