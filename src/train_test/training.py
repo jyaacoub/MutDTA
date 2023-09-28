@@ -60,7 +60,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
     # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
-    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=5, 
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=50, 
                                   threshold=1e-4, min_lr=5e-5, factor=0.8,
                                   verbose=True)
 
