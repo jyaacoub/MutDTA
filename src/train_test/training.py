@@ -6,12 +6,16 @@ from tqdm import tqdm
 import numpy as np
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch_geometric.loader import DataLoader
 
-from src.train_test.utils import train_val_test_split, CheckpointSaver
+from src.data_analysis.metrics import concordance_index
+from src.data_processing.datasets import BaseDataset
+
 from src.models.utils import BaseModel
 from src.models.prior_work import DGraphDTA
-from src.data_processing.datasets import BaseDataset
-from torch_geometric.loader import DataLoader
+
+from src.train_test.utils import train_val_test_split, CheckpointSaver
+
 from src.utils.loader import Loader
 
 
@@ -108,7 +112,8 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
             train_loss /= len(train_loader)
         
         # Validation loop
-        val_loss = test(model, val_loader, device, CRITERION)[0]
+        val_loss, val_pred, val_actual = test(model, val_loader, device, CRITERION)
+        cindex = concordance_index(val_actual, val_pred)
         SCHEDULER.step(val_loss)
 
         logs['train_loss'].append(train_loss)
@@ -120,8 +125,8 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         # Print training and validation loss for the epoch
         if not silent:
-            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']:.1f}: Train Loss: {train_loss:.4f}, "+\
-                f"Val Loss: {val_loss:.4f}, "+\
+            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']:.1f}s: Train Loss: {train_loss:.4f}, "+\
+                f"Val Loss: {val_loss:.4f}, cindex: {cindex:.3f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
 
     logs['best_epoch'] = saver.best_epoch

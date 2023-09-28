@@ -11,7 +11,9 @@ import numpy as np
 cp = '/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/ours'
 csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
 
-df = pd.read_csv(csv)[:13]
+df = pd.read_csv(csv)[:14]
+
+df = df[~df['run'].str.contains('DGIM')]
 
 #%% Extract dataset types and features from the 'run' column
 df['Dataset Type'] = df['run'].str.extract(r'_(davis|kiba)', expand=False)
@@ -43,32 +45,6 @@ plt.tight_layout()
 plt.show()
 
 
-
-
-#%% find matching cp
-csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
-df = pd.read_csv(csv)
-
-
-media_dir = '/cluster/home/t122995uhn/projects/MutDTA/results/'
-
-run = 'DGM_davis-fixedD_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E'
-idx = df.index[df['run'] == run][0]
-new_name = ''.join(run.split('-fixed')) # removing "fixed"
-
-files = glob(f'{media_dir}/*/*/{run}[_\.]*')
-for f in files:
-    print('  ', f)
-    sp = f.split(run)
-    start, end = sp[0], sp[-1]
-    new_f = f'{start}{new_name}{end}'
-    print('->', new_f)
-    os.rename(f, new_f)
-    
-df.at[17, 'run'] = new_name
-
-#%%
-df.to_csv(csv, index=False)
 
 
 
