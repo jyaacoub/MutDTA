@@ -101,7 +101,7 @@ def dtrain(args):
     # ==== train ====
     cp_saver = CheckpointSaver(model=model, save_path=f'{model_save_dir}/{MODEL_KEY}.model',
                             train_all=False,
-                            patience=10, min_delta=0.1,
+                            patience=20, min_delta=0.1,
                             save_freq=10,
                             dist_rank=args.rank)
     if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
@@ -114,6 +114,7 @@ def dtrain(args):
     print("starting training:")
     train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
           device=args.gpu, saver=cp_saver, epochs=EPOCHS, lr_0=LEARNING_RATE)
+    torch.distributed.barrier() # Sync params across GPUs
     
     cp_saver.save()
     
