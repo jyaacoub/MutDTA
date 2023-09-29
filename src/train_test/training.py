@@ -5,13 +5,18 @@ from typing import Tuple
 from tqdm import tqdm
 import numpy as np
 import torch
+from torch.distributed import all_reduce, ReduceOp
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch_geometric.loader import DataLoader
 
-from src.train_test.utils import train_val_test_split, CheckpointSaver
+from src.data_analysis.metrics import concordance_index
+from src.data_processing.datasets import BaseDataset
+
 from src.models.utils import BaseModel
 from src.models.prior_work import DGraphDTA
-from src.data_processing.datasets import BaseDataset
-from torch_geometric.loader import DataLoader
+
+from src.train_test.utils import train_val_test_split, CheckpointSaver
+
 from src.utils.loader import Loader
 
 
@@ -56,8 +61,8 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
     # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
-    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=5, 
-                                  threshold=0.001, min_lr=1e-5, factor=0.6,
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=50, 
+                                  threshold=1e-4, min_lr=5e-5, factor=0.8,
                                   verbose=True)
 
     logs = {'train_loss': [], 'val_loss': []}
@@ -72,6 +77,9 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         print(f"Epoch {0}/{epochs}: Val Loss: {val_loss:.4f} ")
     # we dont save it to logs since this will not be useful information
     #   - either very high or the same as prev model (redundant)
+    
+    is_distributed = saver.dist_rank is not None
+    es_flag = torch.zeros(1).to(device)
     
     for epoch in range(1, epochs+1):
         # Training loop
@@ -108,20 +116,27 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
             train_loss /= len(train_loader)
         
         # Validation loop
-        val_loss = test(model, val_loader, device, CRITERION)[0]
+        val_loss, val_pred, val_actual = test(model, val_loader, device, CRITERION)
+        cindex = concordance_index(val_actual, val_pred)
         SCHEDULER.step(val_loss)
 
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
         
-        if saver.early_stop(val_loss, epoch) and not silent:
-            print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
-            break
+        if not is_distributed or saver.dist_rank == 0: # must satisfy (distributed --implies> main process) to early stop 
+            if saver.early_stop(val_loss, epoch) and not silent:
+                print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
+                es_flag += 1 # send signal to other processes to terminate
+            
+        if is_distributed:
+            all_reduce(es_flag, ReduceOp.SUM)
+            if es_flag == 1:
+                break
         
         # Print training and validation loss for the epoch
         if not silent:
-            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']:.1f}: Train Loss: {train_loss:.4f}, "+\
-                f"Val Loss: {val_loss:.4f}, "+\
+            print(f"Epoch {epoch}/{epochs} {progress_bar.format_dict['elapsed']:.1f}s: Train Loss: {train_loss:.4f}, "+\
+                f"Val Loss: {val_loss:.4f}, cindex: {cindex:.3f}, "+\
                 f"Best Val Loss: {saver.min_val_loss:.4f} @ Epoch {saver.best_epoch}")
 
     logs['best_epoch'] = saver.best_epoch

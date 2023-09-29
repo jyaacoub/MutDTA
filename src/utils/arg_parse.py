@@ -199,6 +199,9 @@ def parse_train_test_args(verbose=True, distributed=False,
         global_bs = args.batch_size
         if distributed:
             global_bs *= args.slurm_nnodes * args.slurm_ngpus
+        print(f"---------------- DATA OPT ----------------")
+        print(f"             data_opt: {args.data_opt}")
+        print(f"      protein_overlap: {args.protein_overlap}\n")
         print(f"---------------- MODEL OPT ---------------")
         print(f"   Selected model_opt: {args.model_opt}")
         print(f"    Selected data_opt: {args.data_opt}")

@@ -47,7 +47,7 @@ torch.manual_seed(args.rand_seed)
 
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
-                            train_all=True,
+                            train_all=False, # forces full training
                             patience=10, min_delta=0.1,
                             save_freq=10)
 
@@ -81,7 +81,7 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     #                     batch_train=BATCH_SIZE, use_refined=False,
     #                     split_by_prot=not args.protein_overlap)
     
-    loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGEW, path='../', 
+    loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGEW, path='../data/', 
                                         batch_train=BATCH_SIZE,
                                         datasets=['train', 'test', 'val'],
                                         protein_overlap=args.protein_overlap)
