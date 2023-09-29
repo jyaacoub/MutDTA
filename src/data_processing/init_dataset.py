@@ -14,7 +14,7 @@ from src.train_test.utils import train_val_test_split
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str], 
                     pro_overlap:bool, data_root_dir:str) -> None:
     for data, FEATURE, EDGE in itertools.product(data_opt, feat_opt, edge_opt):
-        print('\n', data, FEATURE)
+        print('\n', data, FEATURE, EDGE)
         if data in ['davis', 'kiba']:
             DATA_ROOT = f'{data_root_dir}/{data}/'
             create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) # position frequency matrix creation -> important for msa feature
@@ -34,7 +34,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir='../colabfold/pdbbind_out/out0',
+                    af_conf_dir=(None if EDGE != 'af2' else '../colabfold/pdbbind_out/out0'),
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     )
@@ -64,10 +64,10 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         del dataset # free up memory
 
 if __name__ == "__main__":
-    create_datasets(data_opt=['PDBbind'], # 'PDBbind' 'kiba' davis
+    create_datasets(data_opt=['PDBbind', 'kiba', 'davis'], # 'PDBbind' 'kiba' davis
                     feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
-                    edge_opt=['binary'],
-                    pro_overlap=True, 
+                    edge_opt=['binary', 'simple', 'anm'],
+                    pro_overlap=False,
                     #/home/jyaacoub/projects/data/
                     #'/cluster/home/t122995uhn/projects/data/'
                     data_root_dir='/cluster/home/t122995uhn/projects/data/')

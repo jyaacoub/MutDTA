@@ -240,7 +240,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
-                extra_feat, edge_idx = target_to_graph(pro_seq, np.load(self.cmap_p(code)),
+                pro_cmap = np.load(self.cmap_p(code))
+                extra_feat, edge_idx = target_to_graph(pro_seq, pro_cmap,
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
@@ -253,9 +254,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
             else:
                 af_confs = None
-            pro_edge_weight = get_target_edge_weights(self.pdb_p(code), 
-                                                    pro_seq, n_modes=10, n_cpu=2,
+            
+            pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
                                                     edge_opt=self.edge_opt,
+                                                    cmap=pro_cmap,
+                                                    n_modes=10, n_cpu=2,
                                                     af_confs=af_confs)
         
             if pro_edge_weight is None:

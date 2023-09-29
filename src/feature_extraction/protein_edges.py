@@ -167,10 +167,12 @@ def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
 
 def get_af_edge_weights(chains:Iterable[Chain]) -> np.array:
     M = np.array([c.get_contact_map() for c in chains])
-    return np.sum(M < 8.0, axis=0)/len(M)    
+    return np.sum(M < 8.0, axis=0)/len(M)
 
-def get_target_edge_weights(pdb_fp:str, target_seq:str, 
-                            n_modes:int=5, n_cpu=4, edge_opt='anm', af_confs:Iterable[str]=None,
+def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
+                            n_modes:int=5, n_cpu=4,
+                            cmap:str or np.array=None,
+                            af_confs:Iterable[str]=None,
                             filter=False) -> np.array:
     """ Returns an LxL matrix of the edge weights"""
     # edge weights should be returned as a list of Z weights
@@ -181,6 +183,12 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str,
         # shape of |V|x|V| (V=vertices |V|=len(target_seq))
         cc = get_cross_correlation(pdb_fp, target_seq, n_modes, n_cpu=n_cpu)
         return cc
+    elif edge_opt == 'simple':
+        assert cmap is not None, "Simple edge selected, but no contact map passed in."
+        if type(cmap) == str: cmap = np.load(cmap)
+        # normalize cmap from 0.0 to 1.0 range using min-max normalization
+        cmap_min, cmap_max = cmap.min(), cmap.max()
+        return (cmap-cmap_min)/(cmap_max-cmap_min)
     elif edge_opt == 'af2':
         chains = [Chain(p) for p in af_confs]
         # filter chains by template modeling score:
