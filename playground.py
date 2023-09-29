@@ -1,3 +1,72 @@
+# %% move and alter aln files for davis and kiba
+
+
+import os
+from tqdm import tqdm
+from glob import glob
+
+# Input and output directory paths
+data = 'kiba'
+in_dir = f'../data/{data}/aln/'
+out_dir = f'/cluster/projects/kumargroup/jean/colabfold/{data}_a3m'
+
+# Create the output directory if it doesn't exist
+os.makedirs(out_dir, exist_ok=True)
+subdir = ['part1', 'part2', 'part3']
+for sub in subdir:
+    os.makedirs(os.path.join(out_dir, sub), exist_ok=True)
+
+# Get a list of files in the input directory
+input_files = glob(f'{in_dir}/*.aln')
+
+# Iterate through each input file
+for f_idx, input_fp in tqdm(enumerate(input_files), f'{data} prep and split'):
+    input_fn = os.path.basename(input_fp)
+    
+    # Skip directories if any
+    if os.path.isdir(input_fp):
+        continue
+    
+    # Read the input file
+    with open(input_fp, 'r') as file:
+        lines = file.readlines()
+
+    # Initialize an empty result list
+    result = []
+
+    # Iterate through the lines and insert '> i' between them
+    for i, line in enumerate(lines, 1):
+        result.append(f'> {i}\n{line}')  # Add '> i' followed by the line
+
+
+    sub_i = (f_idx % 3)
+    
+    # Construct the full path of the output file
+    output_file_path = os.path.join(out_dir, subdir[sub_i], input_fn.split('.aln')[0] + '.a3m') # replacing output
+
+    # Join the result list into a single string
+    output_text = '\n'.join(result)
+
+    # Write the result to the output file
+    with open(output_file_path, 'w') as file:
+        file.write(output_text)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # %% Rename old models so that they match with new format
 import os
 from os import path as osp
@@ -27,149 +96,13 @@ df['overlap'] = df['run'].str.contains('overlap')
 
 df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 
-###########################################
-#%% Figure 1 - Protein overlap cindex difference (nomsa)
 
-def fig1_pro_overlap(df, sel_col='cindex'):
-    grouped_df = df[(df['feat'] == 'nomsa') 
-                    & (df['batch_size'] == '64') 
-                    & (df['edge'] == 'binary')
-                    & (~df['ddp'])              
-                    & (~df['improved'])].groupby(['data'])
-    
-    # each group is a dataset with 2 bars (overlap and no overlap)
-    for group_name, group_data in grouped_df:
-        print(f"\nGroup Name: {group_name}")
-        print(group_data[['cindex', 'mse', 'overlap']])
-
-    # these groups are spaced by the data type, physically grouping bars of the same dataset together.
-    # Initialize lists to store cindex values for each dataset type
-    t_overlap = []
-    f_overlap = []
-    dataset_types = []
-
-    for dataset, group in grouped_df:
-        print('')
-        print(group[['cindex', 'mse', 'overlap', 'data']])
-        # overlap
-        t_overlap_vals = group[group['overlap']][sel_col].values
-        if len(t_overlap_vals) == 0:
-            t_overlap.append(0)
-        elif len(t_overlap_vals) == 1:
-            t_overlap.append(t_overlap_vals[0])
-        else:
-            raise IndexError('Too many overlap values, filter is too broad.')
-        
-        # no overlap
-        f_overlap_vals = group[~group['overlap']][sel_col].values
-        print(f_overlap_vals)
-        if len(f_overlap_vals) == 0:
-            f_overlap.append(0)
-        elif len(f_overlap_vals) == 1:
-            f_overlap.append(f_overlap_vals[0])
-        else:
-            raise IndexError('Too many overlap values, filter is too broad.')
-        dataset_types.append(dataset)
-
-    # Create an array of x positions for the bars
-    x = np.arange(len(dataset_types))
-
-    # Set the width of the bars
-    width = 0.35
-
-    # Create a bar plot with two bars for each dataset type
-    fig, ax = plt.subplots()
-    bar2 = ax.bar(x - width/2, t_overlap, width, label='With Overlap')
-    bar1 = ax.bar(x + width/2, f_overlap, width, label='No Overlap')
-
-    # Set the x-axis labels
-    ax.set_xticks(x)
-    ax.set_xticklabels(dataset_types)
-
-    # Set the y-axis label
-    ax.set_ylabel('cindex')
-    ax.set_ylim([0.5, 1]) # 0.5 is the worst cindex value
-
-    # Set the title and legend
-    ax.set_title('Protein Overlap cindex Difference (nomsa)')
-    ax.legend()
-
-    # Show the plot
-    plt.show()
+#%% Fig 4 - DDP vs non DDP
+from src.data_analysis.figures import fig1_pro_overlap, fig2_pro_feat, fig3_edge_feat
 
 fig1_pro_overlap(df)
-
-#%% Figure 2 - Feature type cindex difference
-def fig2_pro_feat(df):
-    # comparing nomsa, msa, shannon, and esm
-    # group by data type
-    
-    # this will capture multiple models per dataset (different LR, batch size, etc)
-    #   Taking the max cindex value for each dataset will give us the best model for each dataset
-    grouped_df = df[(df['edge'] == 'binary')
-                    & (~df['overlap'])].groupby(['data'])
-    
-    # each group is a dataset with 4 bars (nomsa, msa, shannon, esm)
-    for group_name, group_data in grouped_df:
-        print(f"\nGroup Name: {group_name}")
-        print(group_data[['cindex', 'mse', 'feat']])
-
-    # these groups are spaced by the data type, physically grouping bars of the same dataset together.
-    # Initialize lists to store cindex values for each dataset type
-    nomsa = []
-    msa = []
-    shannon = []
-    esm = []
-    dataset_types = []
-    
-    for dataset, group in grouped_df:
-        print('')
-        print(group[['cindex', 'mse', 'overlap', 'data']])
-        
-        nomsa_v = group[group['feat'] == 'nomsa']['cindex'].max() # NOTE: take min for mse
-        msa_v = group[group['feat'] == 'msa']['cindex'].max()
-        shannon_v = group[group['feat'] == 'shannon']['cindex'].max()
-        ESM_v = group[group['feat'] == 'ESM']['cindex'].max()
-        
-        # appending if not nan else 0
-        nomsa.append(nomsa_v if not np.isnan(nomsa_v) else 0)
-        msa.append(msa_v if not np.isnan(msa_v) else 0)
-        shannon.append(shannon_v if not np.isnan(shannon_v) else 0)
-        esm.append(ESM_v if not np.isnan(ESM_v) else 0)
-        dataset_types.append(dataset)
-        
-    # Create an array of x positions for the bars
-    x = np.arange(len(dataset_types))
-    
-    # Set the width of the bars
-    width = 0.2
-    
-    # Create a bar plot with 4 bars for each dataset type
-    fig, ax = plt.subplots()
-    bar1 = ax.bar(x - width, nomsa, width, label='nomsa')
-    bar2 = ax.bar(x, msa, width, label='msa')
-    bar3 = ax.bar(x + width, shannon, width, label='shannon')
-    bar4 = ax.bar(x + width*2, esm, width, label='esm')
-    
-    # Set the x-axis labels
-    ax.set_xticks(x)
-    ax.set_xticklabels(dataset_types)
-    
-    # Set the y-axis label
-    ax.set_ylabel('cindex')
-    ax.set_ylim([0.5, 1])
-    
-    # Set the title and legend
-    ax.set_title('Feature Type cindex Difference')
-    ax.legend()
-    
-    # Show the plot
-    plt.show()
-
 fig2_pro_feat(df)
-
-#%% Figure 3 - Edge type cindex difference
-
+fig3_edge_feat(df)
 
 #%%
 exit()
