@@ -5,6 +5,7 @@ from typing import Tuple
 from tqdm import tqdm
 import numpy as np
 import torch
+from torch.distributed import all_reduce, ReduceOp
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.loader import DataLoader
 
@@ -77,6 +78,9 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     # we dont save it to logs since this will not be useful information
     #   - either very high or the same as prev model (redundant)
     
+    is_distributed = saver.dist_rank is not None
+    es_flag = torch.zeros(1).to(device)
+    
     for epoch in range(1, epochs+1):
         # Training loop
         model.train()
@@ -119,9 +123,14 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         logs['train_loss'].append(train_loss)
         logs['val_loss'].append(val_loss)
         
-        if saver.dist_rank is None or saver.dist_rank == 0: # must satisfy (distributed --implies> main process) to early stop 
+        if not is_distributed or saver.dist_rank == 0: # must satisfy (distributed --implies> main process) to early stop 
             if saver.early_stop(val_loss, epoch) and not silent:
                 print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
+                es_flag += 1 # send signal to other processes to terminate
+            
+        if is_distributed:
+            all_reduce(es_flag, ReduceOp.SUM)
+            if es_flag == 1:
                 break
         
         # Print training and validation loss for the epoch

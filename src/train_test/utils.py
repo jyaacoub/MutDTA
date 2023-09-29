@@ -1,10 +1,12 @@
 import signal, os, subprocess
 from typing import Tuple
+from copy import deepcopy
 
 import submitit
 
 import numpy as np
 import pandas as pd
+
 
 import torch
 from torch import nn
@@ -219,9 +221,9 @@ class CheckpointSaver:
             self.min_val_loss = validation_loss
             self._counter = 0
             if isinstance(self._model, nn.DataParallel):
-                self.best_model_dict = self._model.module.state_dict()
+                self.best_model_dict = deepcopy(self._model.module.state_dict())
             else:
-                self.best_model_dict = self._model.state_dict()
+                self.best_model_dict = deepcopy(self._model.state_dict())
             self.best_epoch = curr_epoch
         
         # early stopping if validation loss doesnt improve for `patience` epochs
