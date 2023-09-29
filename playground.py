@@ -7,41 +7,93 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
+csv = 'model_stats.csv'
 
-cp = '/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/ours'
-csv = '/cluster/home/t122995uhn/projects/MutDTA/results/model_media/model_stats.csv'
+#%%
+df = pd.read_csv(csv)
 
-df = pd.read_csv(csv)[:14]
+# create data, feat, and overlap columns for easier filtering.
+df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
+df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
+df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2)E_', expand=False)
+df['ddp'] = df['run'].str.contains('DDP-')
+df['improved'] = df['run'].str.contains('IM_') # trail of model name will include I if "improved"
+df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False)
 
-df = df[~df['run'].str.contains('DGIM')]
+df.loc[df['run'].str.contains('EDIM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
+df.loc[df['run'].str.contains('EDAIM'), 'feat'] += '-ESM'
 
-#%% Extract dataset types and features from the 'run' column
-df['Dataset Type'] = df['run'].str.extract(r'_(davis|kiba)', expand=False)
-df['Feature'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
-df['Overlap'] = df['run'].str.contains('overlap')
+df['overlap'] = df['run'].str.contains('overlap')
 
-# %%
+df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 
-# Group the DataFrame by Dataset Type and Feature and calculate the mean cindex
-grouped_df = df.groupby(['Dataset Type', 'Feature', 'Overlap'])['cindex']
+###########################################
+#%% Figure 1 - Protein overlap cindex difference (nomsa)
+grouped_df = df[(df['feat'] == 'nomsa') 
+                & (df['batch_size'] == '64') 
+                & (df['edge'] == 'binary')
+                & (~df['ddp'])              
+                & (~df['improved'])].groupby(['data'])
 
-# Create a grouped bar plot
-dataset_types = grouped_df.index
-num_features = len(grouped_df.columns)
-bar_width = 0.2
-index = np.arange(len(dataset_types))
 
-colors = ['blue', 'green', 'red']  # You can customize colors for each feature
+# each group is a single bar in the figure
+for group_name, group_data in grouped_df:
+    print(f"\nGroup Name: {group_name}")
+    print(group_data[['cindex', 'mse', 'overlap']])
 
-for i, feature in enumerate(grouped_df.columns):
-    plt.bar(index + i * bar_width, grouped_df[feature], bar_width, label=feature, color=colors[i])
+#%% these groups are spaced by the data type, physically grouping bars of the same dataset together.
+# Initialize lists to store cindex values for each dataset type
+t_overlap = []
+f_overlap = []
+dataset_types = []
+sel_col = 'cindex'
 
-plt.xlabel('Dataset Type')
-plt.ylabel('Mean cindex')
-plt.title('Mean cindex Comparison for Davis and Kiba Dataset Types by Feature')
-plt.xticks(index + (bar_width * (num_features - 1)) / 2, dataset_types)
-plt.legend(title='Feature', loc='upper left')
-plt.tight_layout()
+for dataset, group in grouped_df:
+    print('')
+    print(group[['cindex', 'mse', 'overlap', 'data']])
+    # overlap
+    t_overlap_vals = group[group['overlap']][sel_col].values
+    if len(t_overlap_vals) == 0:
+        t_overlap.append(0)
+    elif len(t_overlap_vals) == 1:
+        t_overlap.append(t_overlap_vals[0])
+    else:
+        raise IndexError('Too many overlap values, filter is too broad.')
+    
+    # no overlap
+    f_overlap_vals = group[~group['overlap']][sel_col].values
+    print(f_overlap_vals)
+    if len(f_overlap_vals) == 0:
+        f_overlap.append(0)
+    elif len(f_overlap_vals) == 1:
+        f_overlap.append(f_overlap_vals[0])
+    else:
+        raise IndexError('Too many overlap values, filter is too broad.')
+    dataset_types.append(dataset)
+
+# Create an array of x positions for the bars
+x = np.arange(len(dataset_types))
+
+# Set the width of the bars
+width = 0.35
+
+# Create a bar plot with two bars for each dataset type
+fig, ax = plt.subplots()
+bar2 = ax.bar(x - width/2, t_overlap, width, label='With Overlap')
+bar1 = ax.bar(x + width/2, f_overlap, width, label='No Overlap')
+
+# Set the x-axis labels
+ax.set_xticks(x)
+ax.set_xticklabels(dataset_types)
+
+# Set the y-axis label
+ax.set_ylabel('cindex')
+
+# Set the title and legend
+ax.set_title('Protein Overlap cindex Difference (nomsa)')
+ax.legend()
+
+# Show the plot
 plt.show()
 
 
@@ -49,6 +101,8 @@ plt.show()
 
 
 
+
+exit()
 #%%
 import json, os
 import pandas as pd
