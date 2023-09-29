@@ -121,7 +121,6 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         
         if saver.dist_rank is None or saver.dist_rank == 0: # must satisfy (distributed --implies> main process) to early stop 
             if saver.early_stop(val_loss, epoch) and not silent:
-                torch.distributed.barrier() # Sync params across GPUs
                 print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
                 break
         

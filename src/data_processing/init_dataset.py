@@ -64,7 +64,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         del dataset # free up memory
 
 if __name__ == "__main__":
-    create_datasets(data_opt=['Platinum'], # 'PDBbind' 'kiba' davis
+    create_datasets(data_opt=['PDBbind'], # 'PDBbind' 'kiba' davis
                     feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
                     edge_opt=['binary'],
                     pro_overlap=True, 
