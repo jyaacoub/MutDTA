@@ -147,7 +147,7 @@ def train_val_test_split(dataset: InMemoryDataset,
 class CheckpointSaver:
     # adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
     def __init__(self, model:BaseModel, save_path=None, train_all=True, patience=5, 
-                 min_delta=0.03, save_freq:int=50, debug=False, dist_rank:int=None):
+                 min_delta=0.03, debug=False, dist_rank:int=None):
         """
         Early stopping and checkpoint saving class.
 
@@ -165,17 +165,13 @@ class CheckpointSaver:
         `min_delta` : float, optional
             The minimum change in val loss to be considered a significant degradation, 
             by default 0.03
-        `save_freq` : int, optional
-            Number of epochs between saving checkpoints. Set to None to stop this behaviour, 
-            by default 50.
         `dist_rank` : int, optional
             Whether or not this is for a distributed run, if it is this number will indicate 
             the rank of this particular process, by default None.
         """
         self.train_all = train_all 
         self.patience = patience
-        self.min_delta = min_delta 
-        self.save_freq = save_freq
+        self.min_delta = min_delta
         self.debug = debug
         self.dist_rank = dist_rank
         
@@ -225,6 +221,8 @@ class CheckpointSaver:
             else:
                 self.best_model_dict = deepcopy(self._model.state_dict())
             self.best_epoch = curr_epoch
+            # saves new best state dict
+            self.save(f'{self.save_path}_tmp', rm_tmp=False) 
         
         # early stopping if validation loss doesnt improve for `patience` epochs
         elif (not self.train_all) and \
@@ -233,9 +231,6 @@ class CheckpointSaver:
             if self._counter >= self.patience:
                 self.stop_epoch = curr_epoch
                 return True
-            
-        if curr_epoch % self.save_freq == 0:
-            self.save(f'{self.save_path}_tmp', rm_tmp=False)
         return False
 
     def save(self, path:str=None, silent=False, rm_tmp=True):
