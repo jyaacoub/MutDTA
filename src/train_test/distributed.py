@@ -11,6 +11,8 @@ from src.data_analysis.metrics import get_metrics
 from src.train_test.training import train, test
 from src.train_test.utils import CheckpointSaver, init_node, init_dist_gpu, print_device_info
 
+from src.utils.config import MODEL_STATS_CSV,MEDIA_SAVE_DIR, MODEL_SAVE_DIR
+
 # distributed training fn
 def dtrain(args):
     # ==== initialize the node ====
@@ -31,9 +33,7 @@ def dtrain(args):
     LEARNING_RATE = args.learning_rate
     EPOCHS = args.num_epochs
     
-    media_save_p = f'results/model_media/{DATA}/'
-    MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
-    model_save_dir = 'results/model_checkpoints/ours/'
+    media_save_p = f'{MEDIA_SAVE_DIR}/{DATA}/'
     MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,BATCH_SIZE*args.world_size,
                                      LEARNING_RATE,DROPOUT,EPOCHS,
                                      pro_overlap=args.protein_overlap)
@@ -99,7 +99,7 @@ def dtrain(args):
     
     
     # ==== train ====
-    cp_saver = CheckpointSaver(model=model, save_path=f'{model_save_dir}/{MODEL_KEY}.model',
+    cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
                             patience=20, min_delta=0.1,
                             dist_rank=args.rank)

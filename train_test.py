@@ -1,5 +1,6 @@
 # %%
 from src.utils.arg_parse import parse_train_test_args
+
 args = parse_train_test_args(verbose=True,
                              jyp_args='-m DG -d PDBbind -f nomsa -e binary -bs 64')
 FORCE_TRAINING = args.train
@@ -18,9 +19,6 @@ SHUFFLE_DATA = not args.no_shuffle
 
 SAVE_RESULTS = True
 SHOW_PLOTS = False
-MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
-media_save_dir = 'results/model_media/'
-model_save_dir = 'results/model_checkpoints/ours/'
 
 #%%
 import os, random, itertools, json
@@ -32,8 +30,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 from src.utils import config # sets up env vars
+from src.utils.config import MODEL_STATS_CSV, MEDIA_SAVE_DIR, MODEL_SAVE_DIR
+
 from src.train_test.training import train, test
-from src.train_test.utils import  CheckpointSaver, print_device_info, debug, train_val_test_split
+from src.train_test.utils import  CheckpointSaver, print_device_info, debug
 from src.data_analysis import get_metrics
 from src.utils.loader import Loader
 
@@ -61,9 +61,9 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     print(f'# {MODEL_KEY} \n')
     
     # init paths for media and model checkpoints
-    media_save_p = f'{media_save_dir}/{DATA}/'
+    media_save_p = f'{MEDIA_SAVE_DIR}/{DATA}/'
     logs_out_p = f'{media_save_p}/train_log/{MODEL_KEY}.json'
-    model_save_p = f'{model_save_dir}/{MODEL_KEY}.model'
+    model_save_p = f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model'
     
     # create paths if they dont exist already:
     os.makedirs(media_save_p, exist_ok=True)
