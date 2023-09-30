@@ -493,7 +493,7 @@ class DavisKibaDataset(BaseDataset):
         if self.aln_dir is None:
             # dont use aln if none provided (will set to zeros)
             return None
-        return os.path.join(self.aln_dir, f'{code}.a3m')
+        return os.path.join(self.aln_dir, f'{code}.aln')
     
     @property
     def raw_file_names(self):

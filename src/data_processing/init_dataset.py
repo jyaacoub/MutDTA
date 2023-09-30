@@ -24,7 +24,8 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
-                    af_conf_dir=None, #TODO: create af_configs for daviskiba
+                    af_conf_dir=(None if EDGE != 'af2' else f'../colabfold/{data}_af2_out/out0'),
+                    edge_opt=EDGE
             )
         elif data == 'PDBbind':
             # create_pfm_np_files('../data/PDBbind_aln/', processes=4)
@@ -34,7 +35,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     aln_dir=f'../data/PDBbind_aln',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir=(None if EDGE != 'af2' else '../colabfold/pdbbind_out/out0'),
+                    af_conf_dir=(None if EDGE != 'af2' else '../colabfold/pdbbind_af2_out/out0'),
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     )
@@ -66,7 +67,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
 if __name__ == "__main__":
     create_datasets(data_opt=['PDBbind', 'kiba', 'davis'], # 'PDBbind' 'kiba' davis
                     feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
-                    edge_opt=['binary', 'simple', 'anm'],
+                    edge_opt=['binary', 'simple'], # for anm and af2 we need structures! (see colabfold-highQ)
                     pro_overlap=False,
                     #/home/jyaacoub/projects/data/
                     #'/cluster/home/t122995uhn/projects/data/'
