@@ -6,10 +6,11 @@ from src.utils import config # sets up env vars
 from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
-
+#EDIM_PDBbindD_nomsaF_binaryE_20B_0.0001LR_0.4D_2000E
+#DGM_kibaD_shannonF_binaryE_64B_0.0001LR_0.4D_2000E
 args = parse_train_test_args(verbose=True, distributed=True,
             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
-                ' -m DG -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 32 -do 0.4'+ \
+                ' -m EDI -d kiba -f nomsa -e binary -lr 0.0001 -bs 32 -do 0.4'+ \
                 ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 2') # 3days == 4320 mins
 
 # args = parse_train_test_args(verbose=True, distributed=True,
