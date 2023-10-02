@@ -1,9 +1,4 @@
-#%% Checking max length of each sequence
-import pandas as pd
-csv = '/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_binary/full/XY.csv'
-df = pd.read_csv(csv, index_col=0)
-csvk = '/cluster/home/t122995uhn/projects/data/DavisKibaDataset/kiba/nomsa_binary/full/XY.csv'
-dfk = pd.read_csv(csvk, index_col=0)
+
 
 
 # %% Rename old models so that they match with new format
@@ -17,8 +12,11 @@ import numpy as np
 
 csv = 'results/model_media/model_stats.csv'
 
+df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_binary/full/XY.csv', index_col=0)
+
 #%%
 df = pd.read_csv(csv)
+df = pd.concat([df, pd.read_csv('results/model_media/old_model_stats.csv')])
 
 # create data, feat, and overlap columns for easier filtering.
 df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
@@ -39,7 +37,29 @@ df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 #%% Fig 4 - DDP vs non DDP
 from src.data_analysis.figures import fig1_pro_overlap, fig2_pro_feat, fig3_edge_feat
 
-fig1_pro_overlap(df)
+fig1_pro_overlap(df, verbose=True)
 fig2_pro_feat(df)
 fig3_edge_feat(df)
 
+
+# %%
+grouped_df = df[(df['feat'] == 'nomsa') 
+                & (df['batch_size'] == '64') 
+                & (df['edge'] == 'binary')
+                & (~df['ddp'])              
+                & (~df['improved'])].groupby(['data'])
+
+# each group is a dataset with 2 bars (overlap and no overlap)
+for group_name, group_data in grouped_df:
+    print(f"\nGroup Name: {group_name}")
+    print(group_data[['cindex', 'mse', 'overlap']])
+
+# these groups are spaced by the data type, physically grouping bars of the same dataset together.
+# Initialize lists to store cindex values for each dataset type
+t_overlap = []
+f_overlap = []
+dataset_types = []
+# %%
+for dataset, group in grouped_df: break
+
+# %%
