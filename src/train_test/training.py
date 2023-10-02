@@ -126,6 +126,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
         if not is_distributed or saver.dist_rank == 0: # must satisfy (distributed --implies> main process) to early stop 
             if saver.early_stop(val_loss, epoch) and not silent:
                 print(f'Early stopping at epoch {epoch}, best epoch was {saver.best_epoch}')
+                if not is_distributed: break
                 es_flag += 1 # send signal to other processes to terminate
             
         if is_distributed:

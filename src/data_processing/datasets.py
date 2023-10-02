@@ -268,7 +268,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
-            except AssertionError as e:
+            except Exception as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
@@ -431,10 +431,11 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         #NOTE: assuming MSAs are already created, since this would take a long time to do.
         # create_aln_files(df_seq, self.aln_p)
         if self.aln_dir is not None:
-            PDBbindProcessor.fasta_to_aln_dir(self.aln_dir, 
-                                              os.path.join(os.path.dirname(self.aln_dir), 
-                                                           'PDBbind_aln'),
-                                              silent=False)
+            # WARNING: use feature_extraction.process_msa method instead
+            # PDBbindProcessor.fasta_to_aln_dir(self.aln_dir, 
+            #                                   os.path.join(os.path.dirname(self.aln_dir), 
+            #                                                'PDBbind_aln'),
+            #                                   silent=False)
             
             valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
             # filters out those that do not have aln file
