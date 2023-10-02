@@ -36,7 +36,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  edge_opt='binary', 
                  af_conf_dir=None,
                  subset=None, 
-                 overwrite=False, *args, **kwargs):
+                 overwrite=False, 
+                 max_seq_len=2150,
+                 *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
         graph models. Subclasses only need to define the `pre_process` method
@@ -69,7 +71,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             that is under a different name. For distributed training this is useful since 
             you can save subsets and load only those samples for DDP leaving the DDP 
             implementation untouched, by default 'full'.
-            
+        `max_seq_len` : int, optional
+            The max protein sequence length that your system is able to handle, 2149 is 
+            the max sequence length from PDBbind, davis and kiba have sequence lengths 
+            of 2500+ which wont run on a 32GB gpu with a batch size of 32. This is also 
+            applied retroactively to existing datasets (see load fn), default is 2150. 
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
@@ -77,6 +83,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
         self.overwrite = overwrite
+        assert max_seq_len >= 100, 'max_seq_len cant be smaller than 100.'
+        self.max_seq_len = max_seq_len
         
         # checking feature and edge options
         assert feature_opt in self.FEATURE_OPTIONS, \
@@ -157,9 +165,22 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def get_protein_counts(self) -> Counter:
         # returns dict of protein counts
         return Counter(self.df['prot_id'])
-        
-    def load(self):
+    
+    @staticmethod
+    def filter_pro_len(df, max_seq_len) -> pd.DataFrame:
+        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
+        pro_filtered = len(df) - len(df_new)
+        if pro_filtered > 0:
+            print(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
+        return df_new
+    
+    def load(self): 
+        # 2149 is the max seq length in pdbbind (kiba and davis have seq lengths that are larger)
         self.df = pd.read_csv(self.processed_paths[0], index_col=0)
+        
+        # Filter out proteins that exceed the maximum sequence length
+        self.df = self.filter_pro_len(self.df, self.max_seq_len)
+        
         self._indices = self.df.index
         self._data_pro = torch.load(self.processed_paths[1])
         self._data_mol = torch.load(self.processed_paths[2])
@@ -226,6 +247,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         else:
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
+        self.df = self.filter_pro_len(self.df, self.max_seq_len)
         print(f'Number of codes: {len(self.df)}')
         
         ###### Get Protein Graphs ######
