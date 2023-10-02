@@ -22,7 +22,66 @@ from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
 
 
-class Processor:    
+class Processor:
+    def fasta_to_aln_file(in_fp, out_fp):
+        """
+        Removes lines from the input Fasta file that start with '>' and saves the result in the output file.
+        """
+        # Read the input file
+        with open(in_fp, 'r') as file:
+            lines = file.readlines()
+
+        # Initialize an empty result list
+        result = []
+
+        # Iterate through the lines and exclude lines starting with '>'
+        for line in lines:
+            if not line.startswith('>'):
+                result.append(line)
+
+        # Join the result list into a single string
+        output_text = ''.join(result)
+
+        # Write the result to the output file
+        with open(out_fp, 'w') as file:
+            file.write(output_text)
+            
+    def fasta_to_aln_dir(in_dir:str, out_dir:str=None, silent=True):
+        """
+        Removes lines starting with '>' from all files in the input directory and saves
+        the modified content in corresponding output files in the output directory.
+
+        Args:
+            in_dir (str): Input dir for a3m fasta files
+            out_dir (str, optional): Output dir, if none then will save in the same dir as input. 
+                Defaults to None.
+            silent (bool, optional): to silent tqdm output. Defaults to True.
+        """
+        if out_dir is not None:
+            os.makedirs(out_dir, exist_ok=True)
+        else:
+            out_dir = in_dir    
+            
+        # Get a list of files in the input directory
+        input_files = os.listdir(in_dir)
+
+        # Iterate through each input file
+        for in_fn in tqdm(input_files, "Converting fastas to aln files",
+                          disable=silent):
+            # Construct the full path of the input file
+            in_fp = os.path.join(in_dir, in_fn)
+
+            # Skip directories if any
+            if os.path.isdir(in_fp): continue
+
+            # Construct the full path of the output file
+            start, _ = os.path.splitext(in_fn)
+            out_fp = os.path.join(out_dir, f"{start}.aln")
+                
+            if os.path.isfile(out_fp): continue
+            
+            Processor.fasta_to_aln_file(in_fp, out_fp)
+    
     @staticmethod
     def save_prot_seq(prot_dict: dict, save_path="data/prot_seq.csv", overwrite=False) -> None:
         """
