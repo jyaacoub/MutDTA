@@ -89,7 +89,7 @@ class Loader():
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
                     data_root=f'{path}/v2020-other-PL/',
-                    aln_dir=f'{path}/PDBbind_aln', 
+                    aln_dir=f'{path}/PDBbind_a3m', 
                     cmap_threshold=8.0,
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,

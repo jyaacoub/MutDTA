@@ -26,9 +26,7 @@ def hhfilter(bin_path: str, f_in: str,
     return subprocess.run(cmd, capture_output=True,
                           shell=True, check=True)
 
-def clean_msa(f_in: str, f_out:str):
-    assert '.a3m' in f_in, 'Input file must be in a3m format'
-    
+def clean_msa(f_in: str, f_out:str):    
     # getting sequences from file
     with open(f_in, 'r') as f:
         lines = f.readlines()
@@ -63,8 +61,9 @@ def process_msa(hhfilter_bin:str, f_in:str, f_out:str):
     # overwrites filtered msa with cleaned msa
     clean_msa(f_in=f_out, f_out=f_out)
     check_aln_lines(f_out)
-
-def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
+    
+def process_msa_dir(hhfilter_bin:str, in_dir:str, out_dir:str=None,
+                    postfix:str='.msa.a3m'):
     """
     Processes msas after hhblits has been run:
     1. Filters the MSA using hhfilter.
@@ -80,28 +79,39 @@ def process_msa_dir(hhfilter_bin:str, dir_p:str, postfix:str='.msa.a3m'):
     `postfix` : str, optional
         postfix pattern for msa files, by default '.msa.a3m'
     """
-    msas = [f for f in os.listdir(dir_p) if f.endswith(postfix)]
+    if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
+    else:
+        out_dir = in_dir
+    msas = [f for f in os.listdir(in_dir) if f.endswith(postfix)]
     
     for msa in tqdm(msas, 'Filtering and cleaning MSAs'):
-        f_in = f'{dir_p}/{msa}'
-        f_out = f'{dir_p}/{msa[:-len(postfix)]}_cleaned.a3m'
+        f_in = f'{in_dir}/{msa}'
+        f_out = f'{out_dir}/{msa[:-len(postfix)]}.aln'
+        if not os.path.isfile(f_out):
+            process_msa(hhfilter_bin, f_in, f_out)
+    
+def process_msa_file(args):
+    hhfilter_bin, f_in, f_out = args
+    if not os.path.isfile(f_out):
         process_msa(hhfilter_bin, f_in, f_out)
-    
-def multi_process_msa_dir(hhfilter_bin:str, dir_p:str, 
-                          postfix:str='.msa.a3m', processes:int=4):
-    # create list of arguments for multiprocessing
-    #   -> tuple of (hhfilter_bin, f_in, f_out)
-    msas = [(hhfilter_bin, f'{dir_p}/{f}', 
-             f'{dir_p}/{f[:-len(postfix)]}_cleaned.a3m') \
-                 for f in os.listdir(dir_p) if f.endswith(postfix)]
-    
-    
-    with Pool(processes=processes) as pool:
-        starargs = lambda args: process_msa(*args)
-        # using tqdm to show progress bar
-        list(tqdm(pool.imap(starargs, msas), 
-                  total=len(msas), 
-                  desc='Filtering and cleaning MSAs'))
+
+def multiprocess_msa_dir(hhfilter_bin: str, in_dir: str, out_dir:str=None, 
+                         postfix: str = '.msa.a3m'):
+    if out_dir is not None:
+        os.makedirs(out_dir, exist_ok=True)
+    else:
+        out_dir = in_dir
+    msas = [f for f in os.listdir(in_dir) if f.endswith(postfix)]
+
+    # Create a Pool for multiprocessing
+    with Pool() as pool:
+        args_list = [(hhfilter_bin, os.path.join(in_dir, msa), 
+                      os.path.join(out_dir, 
+                                   msa[:-len(postfix)]) + '.aln') for msa in msas]
+        with tqdm(total=len(args_list), desc='Processing MSAs') as pbar:
+            for _ in pool.imap_unordered(process_msa_file, args_list):
+                pbar.update(1)
     
 def create_pfm_np_files(aln_dir, processes=4):
     """

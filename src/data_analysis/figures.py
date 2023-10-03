@@ -27,23 +27,16 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False):
         if verbose: print('')
         if verbose: print(group[['cindex', 'mse', 'overlap', 'data']])
         # overlap
-        t_overlap_vals = group[group['overlap']][sel_col].values
-        if len(t_overlap_vals) == 0:
-            t_overlap.append(0)
-        elif len(t_overlap_vals) == 1:
-            t_overlap.append(t_overlap_vals[0])
-        else:
-            raise IndexError('Too many overlap values, filter is too broad.')
+        t_overlap_val = group[group['overlap']][sel_col].max()
+        if np.isnan(t_overlap_val):
+            t_overlap_val = 0
+        t_overlap.append(t_overlap_val)
         
         # no overlap
-        f_overlap_vals = group[~group['overlap']][sel_col].values
-        if verbose: print(f_overlap_vals)
-        if len(f_overlap_vals) == 0:
-            f_overlap.append(0)
-        elif len(f_overlap_vals) == 1:
-            f_overlap.append(f_overlap_vals[0])
-        else:
-            raise IndexError('Too many overlap values, filter is too broad.')
+        f_overlap_val = group[~group['overlap']][sel_col].max()
+        if np.isnan(f_overlap_val):
+            f_overlap_val = 0
+        f_overlap.append(f_overlap_val)
         dataset_types.append(dataset)
 
     # Create an array of x positions for the bars

@@ -32,7 +32,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
             dataset = PDBbindDataset(
                     save_root=f'../data/PDBbindDataset/',
                     data_root=f'../data/v2020-other-PL/',
-                    aln_dir=f'../data/PDBbind_aln',
+                    aln_dir=f'../data/PDBbind_a3m',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
                     af_conf_dir=(None if EDGE != 'af2' else '../colabfold/pdbbind_af2_out/out0'),
@@ -65,9 +65,9 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         del dataset # free up memory
 
 if __name__ == "__main__":
-    create_datasets(data_opt=['PDBbind', 'kiba', 'davis'], # 'PDBbind' 'kiba' davis
-                    feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
-                    edge_opt=['binary', 'simple'], # for anm and af2 we need structures! (see colabfold-highQ)
+    create_datasets(data_opt=['PDBbind'], # 'PDBbind' 'kiba' davis
+                    feat_opt=['msa', 'shannon'],    # nomsa 'msa' 'shannon']
+                    edge_opt=['binary'], # for anm and af2 we need structures! (see colabfold-highQ)
                     pro_overlap=False,
                     #/home/jyaacoub/projects/data/
                     #'/cluster/home/t122995uhn/projects/data/'

@@ -37,7 +37,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  af_conf_dir=None,
                  subset=None, 
                  overwrite=False, 
-                 max_seq_len=2150,
+                 max_seq_len=None,
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -83,6 +83,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
         self.overwrite = overwrite
+        max_seq_len = 100000 or max_seq_len
         assert max_seq_len >= 100, 'max_seq_len cant be smaller than 100.'
         self.max_seq_len = max_seq_len
         
@@ -267,7 +268,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                             threshold=self.cmap_threshold,
                                                             aln_file=self.aln_p(code),
                                                             shannon=self.shannon)
-            except AssertionError as e:
+            except Exception as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
@@ -364,7 +365,10 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         if self.aln_dir is None:
             # dont use aln if none provided (will set to zeros)
             return None
-        return os.path.join(self.aln_dir, f'{code}_cleaned.a3m')
+        # aln_dir has a3m files.
+        return os.path.join(os.path.join(os.path.dirname(self.aln_dir), 
+                                                           'PDBbind_aln'), 
+                            f'{code}.aln') #TODO: fix this so '.msa' is not neccessary
         
     # for data augmentation override the transform method
     @property
@@ -427,6 +431,12 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         #NOTE: assuming MSAs are already created, since this would take a long time to do.
         # create_aln_files(df_seq, self.aln_p)
         if self.aln_dir is not None:
+            # WARNING: use feature_extraction.process_msa method instead
+            # PDBbindProcessor.fasta_to_aln_dir(self.aln_dir, 
+            #                                   os.path.join(os.path.dirname(self.aln_dir), 
+            #                                                'PDBbind_aln'),
+            #                                   silent=False)
+            
             valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
             # filters out those that do not have aln file
             print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')

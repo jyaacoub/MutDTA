@@ -101,7 +101,7 @@ def dtrain(args):
     # ==== train ====
     cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
-                            patience=20, min_delta=0.1,
+                            patience=30, min_delta=0.2,
                             dist_rank=args.rank)
     if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
         print('# Model already trained, loading checkpoint')
