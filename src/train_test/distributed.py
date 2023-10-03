@@ -111,7 +111,7 @@ def dtrain(args):
     torch.distributed.barrier() # Sync params across GPUs before training
     
     print("starting training:")
-    train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
+    logs = train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
           device=args.gpu, saver=cp_saver, epochs=EPOCHS, lr_0=LEARNING_RATE)
     torch.distributed.barrier() # Sync params across GPUs
     
@@ -128,4 +128,5 @@ def dtrain(args):
                     model_key=MODEL_KEY,
                     csv_file=MODEL_STATS_CSV,
                     show=False,
+                    logs=logs
                     )

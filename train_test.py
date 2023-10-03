@@ -134,24 +134,9 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
                 model_key=MODEL_KEY,
                 csv_file=MODEL_STATS_CSV,
                 show=SHOW_PLOTS,
+                logs=logs
                 )
     plt.clf()
-
-    # display train val plot
-    if logs is not None: 
-        ax = plt.figure().gca()
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        index = np.arange(1, len(logs['train_loss'])+1)
-        plt.plot(index, logs['train_loss'], label='train')
-        plt.plot(index, logs['val_loss'], label='val')
-        plt.legend()
-        plt.title(f'{MODEL_KEY} Loss')
-        plt.xlabel('Epoch')
-        # plt.xticks(range(0,NUM_EPOCHS+1, 2))
-        plt.xlim(0, NUM_EPOCHS)
-        plt.ylabel('Loss')
-        if SAVE_RESULTS: plt.savefig(f'{media_save_p}/{MODEL_KEY}_loss.png')
-        if SHOW_PLOTS: plt.show()
     plt.clf()
     
 
