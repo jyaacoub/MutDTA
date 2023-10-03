@@ -10,8 +10,8 @@ from src.train_test import dtrain
 #DGM_kibaD_shannonF_binaryE_64B_0.0001LR_0.4D_2000E
 args = parse_train_test_args(verbose=True, distributed=True,
             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
-                ' -m EDI -d kiba -f nomsa -e binary -lr 0.0001 -bs 32 -do 0.4'+ \
-                ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 2') # 3days == 4320 mins
+                ' -m EDI -d kiba -f nomsa -e binary -lr 0.0001 -bs 10 -do 0.4'+ \
+                ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 4') # 3days == 4320 mins
 
 # args = parse_train_test_args(verbose=True, distributed=True,
 #             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
@@ -39,13 +39,13 @@ executor.update_parameters(
     slurm_gpus_per_node=f'v100:{args.slurm_ngpus}',
     tasks_per_node=args.slurm_ngpus,
     
-    slurm_job_name=f'DDP-{args.model_opt[0]}_{args.data_opt[0]}_{args.slurm_ngpus*args.slurm_nnodes}',
-    slurm_partition="gpu",
-    slurm_account='kumargroup_gpu',
+    slurm_job_name=f'DDP-{args.model_opt[0]}_{args.data_opt[0]}_{args.slurm_ngpus*args.slurm_nnodes}v100',
+    # slurm_partition="gpu",
+    # slurm_account='kumargroup_gpu',
     slurm_mem=args.slurm_mem,
     # Might need this since ESM takes up a lot of memory
     # slurm_constraint='gpu16g', # using small batch size will be sufficient for now
-    slurm_constraint='gpu32g', # using small batch size will be sufficient for now
+    # slurm_constraint='gpu32g', # using small batch size will be sufficient for now
     # v100-34G can handle batch size of 15 -> v100-16G == 7?
 )
 
