@@ -26,14 +26,17 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False):
     for dataset, group in grouped_df:
         if verbose: print('')
         if verbose: print(group[['cindex', 'mse', 'overlap', 'data']])
+        
         # overlap
-        t_overlap_val = group[group['overlap']][sel_col].max()
+        col = group[group['overlap']][sel_col]
+        t_overlap_val = col.max() if sel_col == 'cindex' else col.min()
         if np.isnan(t_overlap_val):
             t_overlap_val = 0
         t_overlap.append(t_overlap_val)
         
         # no overlap
-        f_overlap_val = group[~group['overlap']][sel_col].max()
+        col = group[~group['overlap']][sel_col]
+        f_overlap_val = col.max() if sel_col == 'cindex' else col.min()
         if np.isnan(f_overlap_val):
             f_overlap_val = 0
         f_overlap.append(f_overlap_val)
@@ -55,11 +58,12 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False):
     ax.set_xticklabels(dataset_types)
 
     # Set the y-axis label
-    ax.set_ylabel('cindex')
-    ax.set_ylim([0.5, 1]) # 0.5 is the worst cindex value
+    ax.set_ylabel(sel_col)
+    if sel_col == 'cindex':
+        ax.set_ylim([0.5, 1]) # 0.5 is the worst cindex value
 
     # Set the title and legend
-    ax.set_title('Protein Overlap cindex Difference (nomsa)')
+    ax.set_title(f'Protein Overlap {sel_col} Difference (nomsa)')
     ax.legend()
 
     # Show the plot
@@ -67,7 +71,7 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False):
 
 # Figure 2 - Feature type cindex difference
 # Features -> nomsa, msa, shannon, and esm
-def fig2_pro_feat(df, verbose=False):
+def fig2_pro_feat(df, verbose=False, sel_col='cindex'):
     # comparing nomsa, msa, shannon, and esm
     # group by data type
     
@@ -93,10 +97,16 @@ def fig2_pro_feat(df, verbose=False):
         if verbose: print('')
         if verbose: print(group[['cindex', 'mse', 'overlap', 'data']])
         
-        nomsa_v = group[group['feat'] == 'nomsa']['cindex'].max() # NOTE: take min for mse
-        msa_v = group[group['feat'] == 'msa']['cindex'].max()
-        shannon_v = group[group['feat'] == 'shannon']['cindex'].max()
-        ESM_v = group[group['feat'] == 'ESM']['cindex'].max()
+        if sel_col == 'cindex':
+            nomsa_v = group[group['feat'] == 'nomsa'][sel_col].max()
+            msa_v = group[group['feat'] == 'msa'][sel_col].max()
+            shannon_v = group[group['feat'] == 'shannon'][sel_col].max()
+            ESM_v = group[group['feat'] == 'ESM'][sel_col].max()
+        else:
+            nomsa_v = group[group['feat'] == 'nomsa'][sel_col].min()
+            msa_v = group[group['feat'] == 'msa'][sel_col].min()
+            shannon_v = group[group['feat'] == 'shannon'][sel_col].min()
+            ESM_v = group[group['feat'] == 'ESM'][sel_col].min()
         
         # appending if not nan else 0
         nomsa.append(nomsa_v if not np.isnan(nomsa_v) else 0)
@@ -123,11 +133,12 @@ def fig2_pro_feat(df, verbose=False):
     ax.set_xticklabels(dataset_types)
     
     # Set the y-axis label
-    ax.set_ylabel('cindex')
-    ax.set_ylim([0.5, 1])
+    ax.set_ylabel(sel_col)
+    if sel_col == 'cindex':
+        ax.set_ylim([0.5, 1]) # 0.5 is the worst cindex value
     
     # Set the title and legend
-    ax.set_title('Feature Type cindex Difference')
+    ax.set_title(f'Feature Type {sel_col} Difference')
     ax.legend()
     
     # Show the plot
@@ -135,7 +146,7 @@ def fig2_pro_feat(df, verbose=False):
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
-def fig3_edge_feat(df, verbose=False):
+def fig3_edge_feat(df, verbose=False, sel_col='cindex'):
     # comparing nomsa, msa, shannon, and esm
     # group by data type
     
@@ -161,10 +172,16 @@ def fig3_edge_feat(df, verbose=False):
         if verbose: print('')
         if verbose: print(group[['cindex', 'mse', 'overlap', 'data']])
         
-        binary_v = group[group['edge'] == 'binary']['cindex'].max() # NOTE: take min for mse
-        simple_v = group[group['edge'] == 'simple']['cindex'].max()
-        anm_v = group[group['edge'] == 'anm']['cindex'].max()
-        af2_v = group[group['edge'] == 'af2']['cindex'].max()
+        if sel_col == 'cindex':
+            binary_v = group[group['edge'] == 'binary'][sel_col].max()
+            simple_v = group[group['edge'] == 'simple'][sel_col].max()
+            anm_v = group[group['edge'] == 'anm'][sel_col].max()
+            af2_v = group[group['edge'] == 'af2'][sel_col].max()
+        else:
+            binary_v = group[group['edge'] == 'binary'][sel_col].min()
+            simple_v = group[group['edge'] == 'simple'][sel_col].min()
+            anm_v = group[group['edge'] == 'anm'][sel_col].min()
+            af2_v = group[group['edge'] == 'af2'][sel_col].min()
         
         # appending if not nan else 0
         binary.append( binary_v if not np.isnan(binary_v) else 0)
@@ -191,11 +208,12 @@ def fig3_edge_feat(df, verbose=False):
     ax.set_xticklabels(dataset_types)
     
     # Set the y-axis label
-    ax.set_ylabel('cindex')
-    ax.set_ylim([0.5, 1])
+    ax.set_ylabel(sel_col)
+    if sel_col == 'cindex':
+        ax.set_ylim([0.5, 1]) # 0.5 is the worst cindex value
     
     # Set the title and legend
-    ax.set_title('Edge Type cindex Difference')
+    ax.set_title(f'Edge Type {sel_col} Difference')
     ax.legend()
     
     # Show the plot

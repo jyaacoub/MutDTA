@@ -16,7 +16,7 @@ df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_bi
 
 #%%
 df = pd.read_csv(csv)
-df = pd.concat([df, pd.read_csv('results/model_media/old_model_stats.csv')])
+df = pd.concat([df, pd.read_csv('results/model_media/old_model_stats.csv')]) # concat with old model results since we get the max value anyways...
 
 # create data, feat, and overlap columns for easier filtering.
 df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
@@ -36,11 +36,15 @@ df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 
 #%% Fig 4 - DDP vs non DDP
 from src.data_analysis.figures import fig1_pro_overlap, fig2_pro_feat, fig3_edge_feat
+df_new = df[df['data'] == 'PDBbind']
+fig1_pro_overlap(df_new, verbose=False, sel_col='mse')
+fig2_pro_feat(df_new, sel_col='mse')
+fig3_edge_feat(df_new, sel_col='mse')
 
-fig1_pro_overlap(df, verbose=True)
-fig2_pro_feat(df)
-fig3_edge_feat(df)
-
+df_new = df[~(df['data'] == 'PDBbind')]
+fig1_pro_overlap(df_new, verbose=False, sel_col='mse')
+fig2_pro_feat(df_new, sel_col='mse')
+fig3_edge_feat(df_new, sel_col='mse')
 
 # %%
 grouped_df = df[(df['feat'] == 'nomsa') 
