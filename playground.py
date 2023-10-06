@@ -1,4 +1,95 @@
+#%% redo the following af confs:
+import pandas as pd
+df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_binary/full/XY.csv', index_col=0)
 
+df['seq_len'] = df['prot_seq'].str.len()
+df_s = df.sort_values(by='seq_len', ascending=False)
+uni_prot_s = df_s[['prot_id']].drop_duplicates(keep='first')
+uni_prot = df[['prot_id']].drop_duplicates(keep='first')
+
+#%%
+df_uni = df.loc[uni_prot.index].sort_values(by='prot_id', ascending=False)
+df_uni_s = df.loc[uni_prot_s.index].sort_values(by='prot_id', ascending=False)
+
+print(sum(df_uni.index != df_uni_s.index))
+
+#%%
+# identify mismatches
+df_uni[['prot_id', 'seq_len']]
+
+#%%
+df_uni_s[['prot_id', 'seq_len']]
+
+
+#%%
+count = 0
+fa_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_fasta'
+aln_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_aln'
+a3m_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_a3m'
+for idx, (i, i_s) in enumerate(zip(df_uni.index, df_uni_s.index)):
+    row_i = df_uni.loc[i]
+    row_is = df_uni_s.loc[i_s]
+    if (i != i_s):        
+        if ((row_i['seq_len'] != row_is['seq_len']) or (row_i['prot_seq'] != row_is['prot_seq'])):
+            # Write the sequence to the FASTA file
+            with open(os.path.join(output_dir, f'{i_s}.fa'), 'w') as fasta_file:
+                fasta_file.write(f'>{i_s}\n')
+                fasta_file.write(sequence + '\n')
+            count += 1
+        else: # just rename old a3m and aln files
+            
+            os.rename()
+        
+print(count)
+
+#%%
+import pandas as pd
+import os
+from glob import glob
+
+data = 'davis'
+fp = f'/cluster/home/t122995uhn/projects/data/DavisKibaDataset/{data}/nomsa_binary/full/XY.csv'
+done_dir = f'/cluster/home/t122995uhn/projects/colabfold/{data}_af2_out/highQ/*.done.txt'
+
+df = pd.read_csv(fp)
+
+#%%
+# replace '(' with '_' in prot_id col
+df['pid_fix'] = df['prot_id'].str.replace(r'[()]', '_', regex=True)
+unique_pids = df['pid_fix'].unique()
+print(f'{len(unique_pids)} unique proteins')
+
+def getID(fn):
+    return os.path.splitext(os.path.basename(fn))[0].split('.done')[0]
+
+done_IDs =  {getID(filename) for filename in glob(done_dir)}
+
+#%%
+remaining = [id for id in unique_pids if id not in done_IDs]
+
+print(len(remaining), 'protiens remaining')
+
+done_rows = df.iloc[df[~df['pid_fix'].isin(remaining)][['pid_fix']].drop_duplicates().index]
+remaining_rows = df.iloc[df[df['pid_fix'].isin(remaining)][['pid_fix']].drop_duplicates().index]
+remaining_rows['len'] = remaining_rows['prot_seq'].str.len()
+
+max_prot_len_done = done_rows['prot_seq'].str.len().max()
+max_prot_len = remaining_rows['len'].max()
+print(f'{max_prot_len} is the max protein length for remaining structures.\n{max_prot_len_done} for done structures')
+remaining_rows[['pid_fix', 'len']]
+
+#%% get pids of those above 2149
+files_to_remove = remaining_rows[remaining_rows['len'] > 2149]['prot_id']
+
+for i in range(1,4):
+    print('\nPART', i)
+    p3p = f'/cluster/home/t122995uhn/projects/colabfold/{data}_a3m/part{i}'
+
+    for f in files_to_remove:
+        try:
+            os.remove(os.path.join(p3p, f'{f}.a3m'))
+        except FileNotFoundError:
+            print(f'{f} doesnt exist')
 
 
 # %% Rename old models so that they match with new format

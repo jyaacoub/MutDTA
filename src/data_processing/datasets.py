@@ -253,8 +253,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         ###### Get Protein Graphs ######
         processed_prots = {}
+        # sorting by sequence length before droppping so that we keep the longest protein sequence instead of just the first.
+        self.df['seq_len'] = self.df['prot_seq'].str.len()
+        self.df = self.df.sort_values(by='seq_len', ascending=False)
         
-        unique_pro = self.df[['prot_id']].drop_duplicates()
+        unique_pro = self.df[['prot_id']].drop_duplicates(keep='first')
         unique_df = self.df.loc[unique_pro.index]
         for code, (prot_id, pro_seq) in tqdm(
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
