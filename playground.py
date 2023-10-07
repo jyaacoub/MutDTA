@@ -64,7 +64,6 @@ def getID(fn):
 
 done_IDs =  {getID(filename) for filename in glob(done_dir)}
 
-#%%
 remaining = [id for id in unique_pids if id not in done_IDs]
 
 print(len(remaining), 'protiens remaining')
@@ -79,7 +78,7 @@ print(f'{max_prot_len} is the max protein length for remaining structures.\n{max
 remaining_rows[['pid_fix', 'len']]
 
 #%% get pids of those above 2149
-files_to_remove = remaining_rows[remaining_rows['len'] > 2149]['prot_id']
+files_to_remove = remaining_rows[remaining_rows['len'] > 2000]['prot_id']
 
 for i in range(1,4):
     print('\nPART', i)
@@ -88,8 +87,10 @@ for i in range(1,4):
     for f in files_to_remove:
         try:
             os.remove(os.path.join(p3p, f'{f}.a3m'))
+            print(f'{f} REMOVED')
         except FileNotFoundError:
-            print(f'{f} doesnt exist')
+            pass
+            # print(f'{f} doesnt exist')
 
 
 # %% Rename old models so that they match with new format
@@ -100,6 +101,8 @@ from glob import glob
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+
+from src.data_analysis.figures import fig1_pro_overlap, fig2_pro_feat, fig3_edge_feat
 
 csv = 'results/model_media/model_stats.csv'
 
@@ -124,12 +127,17 @@ df['overlap'] = df['run'].str.contains('overlap')
 
 df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 
+#%%
+fig2_pro_feat(df, sel_col='cindex', show=False)
+plt.savefig('fig2_pro_feat_jitter.png', dpi=300)
+plt.show()
 
 #%% Fig 4 - DDP vs non DDP
-from src.data_analysis.figures import fig1_pro_overlap, fig2_pro_feat, fig3_edge_feat
 df_new = df[df['data'] == 'PDBbind']
-fig1_pro_overlap(df_new, verbose=False, sel_col='mse')
-fig2_pro_feat(df_new, sel_col='mse')
+fig1_pro_overlap(df_new, verbose=False, sel_col='mse', show=True)
+
+fig2_pro_feat(df_new, sel_col='mse', show=False)
+
 fig3_edge_feat(df_new, sel_col='mse')
 
 df_new = df[~(df['data'] == 'PDBbind')]
