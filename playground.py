@@ -1,46 +1,38 @@
-#%% redo the following af confs:
-import pandas as pd
-df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_binary/full/XY.csv', index_col=0)
-
-df['seq_len'] = df['prot_seq'].str.len()
-df_s = df.sort_values(by='seq_len', ascending=False)
-uni_prot_s = df_s[['prot_id']].drop_duplicates(keep='first')
-uni_prot = df[['prot_id']].drop_duplicates(keep='first')
-
 #%%
-df_uni = df.loc[uni_prot.index].sort_values(by='prot_id', ascending=False)
-df_uni_s = df.loc[uni_prot_s.index].sort_values(by='prot_id', ascending=False)
+from src.data_processing.datasets import DavisKibaDataset
 
-print(sum(df_uni.index != df_uni_s.index))
+data='kiba'
+FEATURE = 'nomsa'
+EDGE = 'anm'
+DATA_ROOT = f'/cluster/home/t122995uhn/projects/data/{data}/'
 
-#%%
-# identify mismatches
-df_uni[['prot_id', 'seq_len']]
+dataset = DavisKibaDataset(
+        save_root=f'../data/DavisKibaDataset/{data}/',
+        data_root=DATA_ROOT,
+        aln_dir=f'{DATA_ROOT}/aln/', 
+        cmap_threshold=-0.5, 
+        feature_opt=FEATURE,
+        af_conf_dir=f'../colabfold/{data}_af2_out/',
+        edge_opt=EDGE
+)
 
-#%%
-df_uni_s[['prot_id', 'seq_len']]
 
 
-#%%
-count = 0
-fa_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_fasta'
-aln_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_aln'
-a3m_dir = '/cluster/home/t122995uhn/projects/data/PDBbind_a3m'
-for idx, (i, i_s) in enumerate(zip(df_uni.index, df_uni_s.index)):
-    row_i = df_uni.loc[i]
-    row_is = df_uni_s.loc[i_s]
-    if (i != i_s):        
-        if ((row_i['seq_len'] != row_is['seq_len']) or (row_i['prot_seq'] != row_is['prot_seq'])):
-            # Write the sequence to the FASTA file
-            with open(os.path.join(output_dir, f'{i_s}.fa'), 'w') as fasta_file:
-                fasta_file.write(f'>{i_s}\n')
-                fasta_file.write(sequence + '\n')
-            count += 1
-        else: # just rename old a3m and aln files
-            
-            os.rename()
-        
-print(count)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #%%
 import pandas as pd
@@ -105,8 +97,6 @@ import numpy as np
 from src.data_analysis.figures import fig1_pro_overlap, fig2_pro_feat, fig3_edge_feat
 
 csv = 'results/model_media/model_stats.csv'
-
-df = pd.read_csv('/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_binary/full/XY.csv', index_col=0)
 
 #%%
 df = pd.read_csv(csv)
