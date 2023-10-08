@@ -201,6 +201,8 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             print(f'WARNING: no af2 pdbs for {pdb_fp}')
             return np.ones(shape=(len(target_seq), len(target_seq)))
         else:
-            return get_af_edge_weights(chains=chains)
+            ew = get_af_edge_weights(chains=chains)
+            assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
+            return ew
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')

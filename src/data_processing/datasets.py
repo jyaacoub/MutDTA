@@ -34,10 +34,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
                  edge_opt='binary', 
-                 af_conf_dir=None,
-                 subset=None, 
+                 af_conf_dir:str=None,
+                 subset:str=None, 
                  overwrite=False, 
-                 max_seq_len=None,
+                 max_seq_len:int=None,
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -65,7 +65,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         `edge_opt` : str, optional
             Choose from ['simple', 'binary', 'anm', 'af2']
         `af_conf_dir`: str, optional
-            Directory containing output confirmations from af run, default is None.
+            Path to parent dir of output dirs for af configs, by default None. Output dirs 
+            must be names 'out?' where ? is the seed number given to localcolabfold. This 
+            argument is the parent directory for these 'out?' dirs.
         `subset` : str, optional
             If you want to name this dataset or load an existing version of this dataset 
             that is under a different name. For distributed training this is useful since 
@@ -120,18 +122,25 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
+        
+    def af_conf_files(self, code) -> list[str]:
+        # removing () from string since file names cannot include them and localcolabfold replaces them with _
+        code = re.sub(r'[()]', '_', code)
+        # localcolabfold has 'unrelaxed' as the first part after the code/ID.
+        # output must be in out directory
+        return glob(f'{self.af_conf_dir}/out?/{code}_unrelaxed_rank_*.pdb')            
     
     @abc.abstractmethod
-    def pdb_p(self, code):
+    def pdb_p(self, code) -> str:
         """path to pdbfile for a particular protein"""
         raise NotImplementedError
     
     @abc.abstractmethod
-    def cmap_p(self, code):
+    def cmap_p(self, code) -> str:
         raise NotImplementedError
     
     @abc.abstractmethod
-    def aln_p(self, code):
+    def aln_p(self, code) -> str:
         # path to cleaned input alignment file
         raise NotImplementedError
     
@@ -257,8 +266,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.df['seq_len'] = self.df['prot_seq'].str.len()
         self.df = self.df.sort_values(by='seq_len', ascending=False)
         
+        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+        self.df.reset_index(drop=False, inplace=True)
         unique_pro = self.df[['prot_id']].drop_duplicates(keep='first')
-        unique_df = self.df.loc[unique_pro.index]
+        # reverting index to code-based index
+        self.df.set_index('code', inplace=True)
+        unique_df = self.df.iloc[unique_pro.index]
+        print(len(unique_df))
         for code, (prot_id, pro_seq) in tqdm(
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
@@ -277,14 +291,14 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
             if self.edge_opt == 'af2':
-                af_confs = glob(f'{self.af_conf_dir}/{code}*.pdb')
+                af_confs = self.af_conf_files(code)
             else:
                 af_confs = None
             
             pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
                                                     edge_opt=self.edge_opt,
                                                     cmap=pro_cmap,
-                                                    n_modes=10, n_cpu=2,
+                                                    n_modes=5, n_cpu=4,
                                                     af_confs=af_confs)
         
             if pro_edge_weight is None:
@@ -444,6 +458,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             # filters out those that do not have aln file
             print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
             pdb_codes = valid_codes
+            
+        #TODO: filter out pdbs that dont have confirmations if edge type af2
+        
         
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
             
@@ -516,8 +533,14 @@ class DavisKibaDataset(BaseDataset):
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                                feature_opt=feature_opt, *args, **kwargs)
-    def pdb_p(self, code):
-        return os.path.join(self.data_root, f'structures/{code}.pdb')
+    def pdb_p(self, code, safe=True):
+        code = re.sub(r'[()]', '_', code)
+        # davis and kiba dont have their own structures so this must be made using 
+        # af or some other method beforehand.
+        file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
+        # should only be one file
+        assert not safe or len(file) == 1, f'Incorrect pdb pathing, {len(file)}# of structures for {code}.'
+        return file[0] if len(file) >= 1 else None
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
@@ -632,14 +655,26 @@ class DavisKibaDataset(BaseDataset):
             no_aln = [c for c in codes if (not check_aln_lines(self.aln_p(c)))]
                     
             # filters out those that do not have aln file
-            print(f'Number of codes with invalid aln files: {len(no_aln)} out of {len(codes)}')
-            
+            print(f'Number of codes with invalid aln files: {len(no_aln)} / {len(codes)}')
+                    
         # Checking that contact maps are present for each code:
         #       (Created by psconsc4)
         no_cmap = [c for c in codes if not os.path.isfile(self.cmap_p(c))]
         print(f'Number of codes without cmap files: {len(no_cmap)} out of {len(codes)}')
         
-        invalid_codes = set(no_aln + no_cmap)
+        # Checking that structure and af_confs files are present if edgeW is anm or af2
+        no_confs = []
+        if self.edge_opt in ['anm', 'af2']:
+           no_confs = [c for c in codes if (
+               (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                (len(self.af_conf_files(c)) < 2))]    # not enough af confirmations.
+           
+           # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
+           no_confs.append('TESK1')
+           
+           print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
+           
+        invalid_codes = set(no_aln + no_cmap + no_confs)
         # filtering out invalid codes:
         lig_r = [r for i,r in enumerate(lig_r) if codes[prot_c[i]] not in invalid_codes]
         prot_c = [c for c in prot_c if codes[c] not in invalid_codes]
