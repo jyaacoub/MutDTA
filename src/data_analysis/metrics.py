@@ -5,6 +5,7 @@ This file contains functions for evaluating docking and affinity prediction mode
 import os
 from typing import Tuple
 from numbers import Number
+from matplotlib.ticker import MaxNLocator
 import pandas as pd
 import numpy as np
 
@@ -76,7 +77,8 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
                 model_key='trained_davis_test',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
                 show=True,
-                title_prefix='') -> Tuple[Number]:
+                title_prefix='', 
+                logs=None) -> Tuple[Number]:
     """
     Display and save metrics
 
@@ -165,7 +167,24 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
         # replacing existing record if run_num already exists
         stats = pd.read_csv(csv_file, index_col=0)
         stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
-        stats.to_csv(csv_file)
+        stats.to_csv(csv_file)    
+    plt.clf()
+    
+    # display train val plot
+    if logs is not None: 
+        ax = plt.figure().gca()
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        index = np.arange(1, len(logs['train_loss'])+1)
+        plt.plot(index, logs['train_loss'], label='train')
+        plt.plot(index, logs['val_loss'], label='val')
+        plt.legend()
+        plt.title(f'{model_key} Loss')
+        plt.xlabel('Epoch')
+        # plt.xticks(range(0,NUM_EPOCHS+1, 2))
+        # plt.xlim(0, NUM_EPOCHS)
+        plt.ylabel('Loss')
+        if save_results: plt.savefig(f'{save_path}/{model_key}_loss.png')
+        if show: plt.show()
     
     return c_index, p_corr, s_corr, mse, mae, rmse
 

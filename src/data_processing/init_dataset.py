@@ -14,27 +14,30 @@ from src.train_test.utils import train_val_test_split
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str], 
                     pro_overlap:bool, data_root_dir:str) -> None:
     for data, FEATURE, EDGE in itertools.product(data_opt, feat_opt, edge_opt):
-        print('\n', data, FEATURE)
+        print('\n', data, FEATURE, EDGE)
         if data in ['davis', 'kiba']:
             DATA_ROOT = f'{data_root_dir}/{data}/'
-            create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) # position frequency matrix creation -> important for msa feature
+            if FEATURE == 'msa':
+                # position frequency matrix creation -> important for msa feature
+                create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) 
             dataset = DavisKibaDataset(
                     save_root=f'../data/DavisKibaDataset/{data}/',
                     data_root=DATA_ROOT,
                     aln_dir=f'{DATA_ROOT}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
-                    af_conf_dir=None, #TODO: create af_configs for daviskiba
+                    af_conf_dir=f'../colabfold/{data}_af2_out/',
+                    edge_opt=EDGE
             )
         elif data == 'PDBbind':
             # create_pfm_np_files('../data/PDBbind_aln/', processes=4)
             dataset = PDBbindDataset(
                     save_root=f'../data/PDBbindDataset/',
                     data_root=f'../data/v2020-other-PL/',
-                    aln_dir=f'../data/PDBbind_aln',
+                    aln_dir=f'../data/PDBbind_a3m',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir='../colabfold/pdbbind_out/out0',
+                    af_conf_dir=(None if EDGE != 'af2' else '../colabfold/pdbbind_af2_out/'),
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     )
@@ -64,10 +67,10 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         del dataset # free up memory
 
 if __name__ == "__main__":
-    create_datasets(data_opt=['PDBbind'], # 'PDBbind' 'kiba' davis
+    create_datasets(data_opt=['kiba', 'davis'], # 'PDBbind' 'kiba' davis
                     feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
-                    edge_opt=['binary'],
-                    pro_overlap=True, 
+                    edge_opt=['af2', 'anm'], # for anm and af2 we need structures! (see colabfold-highQ)
+                    pro_overlap=False,
                     #/home/jyaacoub/projects/data/
                     #'/cluster/home/t122995uhn/projects/data/'
                     data_root_dir='/cluster/home/t122995uhn/projects/data/')

@@ -1,6 +1,4 @@
 #%%
-
-#%%
 from src.utils import config
 import torch
 import os
@@ -10,8 +8,6 @@ from src.data_analysis.metrics import get_metrics
 from src.train_test.training import test
 from src.utils.loader import Loader
 from src.utils.arg_parse import parse_train_test_args
-from src.train_test.utils import train_val_test_split
-from src.utils.exceptions import DatasetNotFound
 args = parse_train_test_args(verbose=True,
                              jyp_args=' -m EDI -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 20 -do 0.4 -ne 2000')
 #%%
@@ -58,8 +54,13 @@ mdl_dict = torch.load(model_p, map_location=device)
 if 'DDP' in MODEL_KEY:
     # due to https://discuss.pytorch.org/t/check-if-model-is-wrapped-in-nn-dataparallel/67957
     mdl_dict = {(k[7:] if 'module.' == k[:7] else k):v for k,v in mdl_dict.items()}
-
-model.load_state_dict(mdl_dict)
+try:
+    model.load_state_dict(mdl_dict)
+except RuntimeError as e:
+    print("ERR:", e)
+    mdl_dict = {(k[7:] if 'module.' == k[:7] else k):v for k,v in mdl_dict.items()}
+    model.load_state_dict(mdl_dict)
+    
 model.to(device)
 
 #%%
@@ -73,3 +74,10 @@ get_metrics(actual, pred,
             show=False,
             )
 # %%
+# renaming checkpoint to remove _tmp specification
+model_p = checkpoint_p(MODEL_KEY)
+model_p_tmp = checkpoint_p_tmp(MODEL_KEY)
+
+if (not os.path.isfile(model_p) and  # ensuring no overwrite
+    os.path.isfile(model_p_tmp)):
+    os.rename(model_p_tmp, model_p)
