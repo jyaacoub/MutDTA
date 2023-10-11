@@ -20,7 +20,6 @@ from src.utils.exceptions import DatasetNotFound
 from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
-from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor, Processor
 from src.data_processing.downloaders import Downloader
 
@@ -652,7 +651,7 @@ class DavisKibaDataset(BaseDataset):
         # checking alignment files present for each code:
         no_aln = []
         if self.aln_dir is not None:
-            no_aln = [c for c in codes if (not check_aln_lines(self.aln_p(c)))]
+            no_aln = [c for c in codes if (not Processor.check_aln_lines(self.aln_p(c)))]
                     
             # filters out those that do not have aln file
             print(f'Number of codes with invalid aln files: {len(no_aln)} / {len(codes)}')
