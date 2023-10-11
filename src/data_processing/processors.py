@@ -23,6 +23,50 @@ from rdkit.Chem.PandasTools import LoadSDF
 
 
 class Processor:
+    @staticmethod
+    def check_aln_lines(fp:str, limit=None):
+        if not os.path.isfile(fp): return False
+        
+        with open(fp, 'r') as f:
+            lines = f.readlines()
+            seq_len = len(lines[0])
+            limit = len(lines) if limit is None else limit
+            
+            for i,l in enumerate(lines[:limit]):
+                if l[0] == '>' or len(l) != seq_len:
+                    return False
+        return True
+    
+    @staticmethod
+    def csv_to_fasta_dir(csv_p:str or pd.DataFrame, out_dir:str):
+        """
+        Given a list of sequences from a csv file under 'prot_seq' column,
+        and 'code' column for protein names, this will create fastas for each 
+        unique protein with the code as the file name and fasta header.
+        Args:
+            csv_p (strorpd.DataFrame): csv path or pandas dataframe.
+            out_dir (str): output directory for fasta files
+        """
+        if isinstance(csv_p, str):
+            df = pd.read_csv(csv_p)
+        elif isinstance(csv_p, pd.DataFrame):
+            df = csv_p
+        else:
+            raise ValueError("csv_p should be a file path or a pandas DataFrame.")
+
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+
+        for _, row in df.iterrows():
+            code = str(row['code'])
+            sequence = str(row['prot_seq'])
+            fasta_content = f">{code}\n{sequence}"
+
+            fasta_filename = os.path.join(out_dir, f"{code}.fasta")
+            with open(fasta_filename, "w") as fasta_file:
+                fasta_file.write(fasta_content)
+    
+    @staticmethod
     def fasta_to_aln_file(in_fp, out_fp):
         """
         Removes lines from the input Fasta file that start with '>' and saves the result in the output file.
@@ -46,6 +90,7 @@ class Processor:
         with open(out_fp, 'w') as file:
             file.write(output_text)
             
+    @staticmethod
     def fasta_to_aln_dir(in_dir:str, out_dir:str=None, silent=True):
         """
         Removes lines starting with '>' from all files in the input directory and saves

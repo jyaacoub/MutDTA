@@ -1,6 +1,8 @@
 from typing import Tuple
 import numpy as np
 import os
+from tqdm import tqdm
+from multiprocessing import Pool
 
 from src.utils.residue import ResInfo, one_hot
 
@@ -32,6 +34,20 @@ def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.ar
     np.save(save_p, pfm)
     
     return pfm, len(lines)
+    
+def create_pfm_np_files(aln_dir, processes=4):
+    """
+    Creates a .npy file for each MSA in the given directory.
+    """
+    files = [f for f in os.listdir(aln_dir) if f.endswith('.a3m') or f.endswith('.aln')]
+    # adding directory path to file names
+    files = [f'{aln_dir}/{f}' for f in files]
+    
+    with Pool(processes=processes) as pool:
+        # using tqdm to show progress bar
+        list(tqdm(pool.imap(get_pfm, files), 
+                  total=len(files), 
+                  desc='Creating PFM files'))
 
 # target aln file save in data/dataset/aln
 def target_to_feature(target_seq):    
@@ -55,3 +71,13 @@ def residue_features(residue):
             ResInfo.pl[residue], ResInfo.hydrophobic_ph2[residue], 
             ResInfo.hydrophobic_ph7[residue]]
     return np.array(feats)
+
+
+if __name__ == '__main__':
+    # dir_p = '/home/jyaacoub/projects/data/msa/outputs'
+    # hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
+    # postfix = '.msa.a3m'
+    # process_msa_dir(hhfilter_bin, dir_p, postfix)
+    dir_p = '/cluster/home/t122995uhn/projects/data'
+    
+    create_pfm_np_files(dir_p)

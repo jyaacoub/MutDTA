@@ -14,8 +14,21 @@ from multiprocessing import Pool
 from src.feature_extraction.protein import get_pfm
 
 
-def hhblits(bin_path, f_in, f_out):
-    pass
+def hhblits(f_in:str, f_out:str, n_cpus=6, 
+            bin_path ='/cluster/tools/software/centos7/hhsuite/3.3.0/bin/hhblits',
+            dataset='/cluster/projects/kumargroup/mslobody/Protein_Communities/01_MSA/databases/UniRef30_2020_06'
+            ) -> subprocess.CompletedProcess:
+    # hhblits works on a single sequence at once
+    # can pass FASTA file
+    
+    cmd = f"hhblits" + \
+            f" -i {f_in}" + \
+            f" -oa3m {f_out}" + \
+            f" -d {dataset}" + \
+            f" -cpu {n_cpus}" + \
+            f" -n 2"
+
+    return subprocess.run(cmd, capture_output=True, check=True, shell=True)
 
 def hhfilter(bin_path: str, f_in: str,
              f_out: str=None) -> subprocess.CompletedProcess:
@@ -113,28 +126,5 @@ def multiprocess_msa_dir(hhfilter_bin: str, in_dir: str, out_dir:str=None,
             for _ in pool.imap_unordered(process_msa_file, args_list):
                 pbar.update(1)
     
-def create_pfm_np_files(aln_dir, processes=4):
-    """
-    Creates a .npy file for each MSA in the given directory.
-    """
-    files = [f for f in os.listdir(aln_dir) if f.endswith('.a3m') or f.endswith('.aln')]
-    # adding directory path to file names
-    files = [f'{aln_dir}/{f}' for f in files]
-    
-    with Pool(processes=processes) as pool:
-        # using tqdm to show progress bar
-        list(tqdm(pool.imap(get_pfm, files), 
-                  total=len(files), 
-                  desc='Creating PFM files'))
-    
-    
-#%%
-if __name__ == '__main__':
-    # dir_p = '/home/jyaacoub/projects/data/msa/outputs'
-    # hhfilter_bin = '/home/jyaacoub/miniconda3/bin/hhfilter'
-    # postfix = '.msa.a3m'
-    # process_msa_dir(hhfilter_bin, dir_p, postfix)
-    dir_p = '/cluster/home/t122995uhn/projects/data'
-    
-    create_pfm_np_files(dir_p)
+
 # %%
