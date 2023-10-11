@@ -1,3 +1,4 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -82,30 +83,28 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
     esm = []
     dataset_types = []
 
-    for dataset_name, dataset_data in filtered_df.groupby('data'):
-        if verbose:
-            print(f"\nGroup Name: {dataset_name}")
-        if verbose:
-            print(dataset_data[['cindex', 'mse', 'feat']])
+    for dataset, group in filtered_df.groupby('data'):
+        if verbose: print(f"\nGroup Name: {dataset}")
+        if verbose: print(group[['cindex', 'mse', 'feat']])
         
         # Extract max or min values based on sel_col
         if sel_col == 'cindex':
-            nomsa_v = dataset_data[dataset_data['feat'] == 'nomsa']['cindex'].max()
-            msa_v = dataset_data[dataset_data['feat'] == 'msa']['cindex'].max()
-            shannon_v = dataset_data[dataset_data['feat'] == 'shannon']['cindex'].max()
-            ESM_v = dataset_data[dataset_data['feat'] == 'ESM']['cindex'].max()
+            nomsa_v = group[group['feat'] == 'nomsa'][sel_col].max()
+            msa_v = group[group['feat'] == 'msa'][sel_col].max()
+            shannon_v = group[group['feat'] == 'shannon'][sel_col].max()
+            ESM_v = group[group['feat'] == 'ESM'][sel_col].max()
         else:
-            nomsa_v = dataset_data[dataset_data['feat'] == 'nomsa']['cindex'].min()
-            msa_v = dataset_data[dataset_data['feat'] == 'msa']['cindex'].min()
-            shannon_v = dataset_data[dataset_data['feat'] == 'shannon']['cindex'].min()
-            ESM_v = dataset_data[dataset_data['feat'] == 'ESM']['cindex'].min()
+            nomsa_v = group[group['feat'] == 'nomsa'][sel_col].min()
+            msa_v = group[group['feat'] == 'msa'][sel_col].min()
+            shannon_v = group[group['feat'] == 'shannon'][sel_col].min()
+            ESM_v = group[group['feat'] == 'ESM'][sel_col].min()
         
         # Append values or 0 if NaN
         nomsa.append(nomsa_v if not np.isnan(nomsa_v) else 0)
         msa.append(msa_v if not np.isnan(msa_v) else 0)
         shannon.append(shannon_v if not np.isnan(shannon_v) else 0)
         esm.append(ESM_v if not np.isnan(ESM_v) else 0)
-        dataset_types.append(dataset_name)
+        dataset_types.append(dataset)
 
     # Create a DataFrame for plotting
     plot_data = pd.DataFrame({
@@ -143,10 +142,12 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
     annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
                         line_height=0.005, verbose=False)
     annotator.apply_and_annotate()
-
     # Show the plot
     if show:
         plt.show()
+        
+    # reset stylesheet back to defaults
+    mpl.rcParams.update(mpl.rcParamsDefault)
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
@@ -156,14 +157,8 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', show=True):
     
     # this will capture multiple models per dataset (different LR, batch size, etc)
     #   Taking the max cindex value for each dataset will give us the best model for each dataset
-    grouped_df = df[(df['feat'] == 'nomsa')
-                    & (~df['overlap'])].groupby(['data'])
+    filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap'])]
     
-    # each group is a dataset with 4 bars (nomsa, msa, shannon, esm)
-    for group_name, group_data in grouped_df:
-        if verbose: print(f"\nGroup Name: {group_name}")
-        if verbose: print(group_data[['cindex', 'mse', 'edge']])
-
     # these groups are spaced by the data type, physically grouping bars of the same dataset together.
     # Initialize lists to store cindex values for each dataset type
     binary = []
@@ -172,7 +167,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', show=True):
     af2 = []
     dataset_types = []
     
-    for dataset, group in grouped_df:
+    for dataset, group in filtered_df.groupby('data'):
         if verbose: print('')
         if verbose: print(group[['cindex', 'mse', 'overlap', 'data']])
         
@@ -192,7 +187,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', show=True):
         simple.append( simple_v if not np.isnan(simple_v) else 0)
         anm.append(anm_v if not np.isnan(anm_v) else 0)
         af2.append(af2_v if not np.isnan(af2_v) else 0)
-        dataset_types.append(dataset[0])
+        dataset_types.append(dataset)
         
     # Create an array of x positions for the bars
     x = np.arange(len(dataset_types))
@@ -245,6 +240,6 @@ if __name__ == '__main__':
 
     df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 
-    fig1_pro_overlap(df)
-    fig2_pro_feat(df)
-    fig3_edge_feat(df)
+    fig1_pro_overlap(df, show=True)
+    fig2_pro_feat(df, show=True)
+    fig3_edge_feat(df, show=True)
