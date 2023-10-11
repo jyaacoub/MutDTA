@@ -41,10 +41,11 @@ class Processor:
     def csv_to_fasta_dir(csv_p:str or pd.DataFrame, out_dir:str):
         """
         Given a list of sequences from a csv file under 'prot_seq' column,
-        and 'code' column for protein names, this will create fastas for each 
+        and 'prot_id' column for protein names, this will create fastas for each 
         unique protein with the code as the file name and fasta header.
         Args:
-            csv_p (strorpd.DataFrame): csv path or pandas dataframe.
+            csv_p (strorpd.DataFrame): csv path or pandas dataframe with 
+            'prot_id' and 'prot_seq' columns.
             out_dir (str): output directory for fasta files
         """
         if isinstance(csv_p, str):
@@ -54,17 +55,31 @@ class Processor:
         else:
             raise ValueError("csv_p should be a file path or a pandas DataFrame.")
 
-        if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
-
-        for _, row in df.iterrows():
-            code = str(row['code'])
-            sequence = str(row['prot_seq'])
-            fasta_content = f">{code}\n{sequence}"
-
-            fasta_filename = os.path.join(out_dir, f"{code}.fasta")
-            with open(fasta_filename, "w") as fasta_file:
-                fasta_file.write(fasta_content)
+        os.makedirs(out_dir, exist_ok=True)
+        
+        # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
+        df['seq_len'] = df['prot_seq'].str.len()
+        df = df.sort_values(by='seq_len', ascending=False)
+        
+        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+        df.reset_index(drop=False, inplace=True)
+        unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+        
+        # reverting index to code-based index
+        df.set_index('code', inplace=True)
+        
+        # getting the unique proteins
+        unique_df = df.iloc[unique_pro.index]
+        
+        # finally creating Fastas
+        for _, (prot_id, pro_seq) in tqdm(
+                        unique_df[['prot_id', 'prot_seq']].iterrows(), 
+                        desc='Creating fastas',
+                        total=len(unique_df)):
+            
+            fasta_fp = os.path.join(out_dir, f"{prot_id}.fasta")
+            with open(fasta_fp, "w") as f:
+                f.write(f">{prot_id}\n{pro_seq}")
     
     @staticmethod
     def fasta_to_aln_file(in_fp, out_fp):
