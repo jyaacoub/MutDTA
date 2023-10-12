@@ -840,12 +840,12 @@ class PlatinumDataset(BaseDataset):
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Getting sequences and cmaps',
                            total=len(df_raw)):
-            mut = row['mutation']
+            muts = row['mutation'].split('/') # split to account for multiple point mutations
             pdb_wt = row['mut.wt_pdb']
             pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
 
-            # Getting sequence  from pdb file:
+            # Getting sequence from pdb file:
             missing_wt = pdb_wt == 'NO'
             pdb = pdb_mt if missing_wt else pdb_wt
             chain = Chain(self.pdb_p(pdb), t_chain=t_chain)
@@ -862,9 +862,9 @@ class PlatinumDataset(BaseDataset):
             try:
                 if missing_wt:
                     mut_seq = chain.sequence
-                    ref_seq = chain.get_mutated_seq(mut.split('/'), reversed=True)
+                    ref_seq = chain.get_mutated_seq(muts, reversed=True)
                 else:
-                    mut_seq = chain.get_mutated_seq(mut.split('/'), reversed=False)
+                    mut_seq = chain.get_mutated_seq(muts, reversed=False)
                     ref_seq = chain.sequence
             except Exception as e:
                 raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e
@@ -875,8 +875,8 @@ class PlatinumDataset(BaseDataset):
             lig_id = row['affin.lig_id']
             smiles = row['smiles']
             # using index number for ID since pdb is not unique in this dataset.
-            prot_seq[f'{i}_mt'] = (pdb, lig_id,  mt_pkd, smiles, mut_seq)
-            prot_seq[f'{i}_wt'] = (pdb, lig_id, wt_pkd, smiles, ref_seq)
+            prot_seq[f'{i}_mt'] = (f'{pdb}_{"-".join(muts)}', lig_id,  mt_pkd, smiles, mut_seq)
+            prot_seq[f'{i}_wt'] = (f'{pdb}_wt', lig_id, wt_pkd, smiles, ref_seq)
                 
         df = pd.DataFrame.from_dict(prot_seq, orient='index', 
                                         columns=['prot_id', 'lig_id', 
