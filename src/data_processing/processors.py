@@ -38,7 +38,7 @@ class Processor:
         return True
     
     @staticmethod
-    def csv_to_fasta_dir(csv_p:str or pd.DataFrame, out_dir:str):
+    def csv_to_fasta_dir(csv_or_df:str or pd.DataFrame, out_dir:str):
         """
         Given a list of sequences from a csv file under 'prot_seq' column,
         and 'prot_id' column for protein names, this will create fastas for each 
@@ -48,10 +48,10 @@ class Processor:
             'prot_id' and 'prot_seq' columns.
             out_dir (str): output directory for fasta files
         """
-        if isinstance(csv_p, str):
-            df = pd.read_csv(csv_p)
-        elif isinstance(csv_p, pd.DataFrame):
-            df = csv_p
+        if isinstance(csv_or_df, str):
+            df = pd.read_csv(csv_or_df)
+        elif isinstance(csv_or_df, pd.DataFrame):
+            df = csv_or_df
         else:
             raise ValueError("csv_p should be a file path or a pandas DataFrame.")
 

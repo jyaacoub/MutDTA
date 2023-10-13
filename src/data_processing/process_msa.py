@@ -140,6 +140,51 @@ class MSARunner(Processor):
 
 # %%
 if __name__ == '__main__':
+    from src.data_processing.process_msa import MSARunner
+    from tqdm import tqdm
     import pandas as pd
+    import os
     csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
     df = pd.read_csv(csv, index_col=0)
+    #################### Get unique proteins:
+    # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
+    df['seq_len'] = df['prot_seq'].str.len()
+    df = df.sort_values(by='seq_len', ascending=False)
+
+    # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+    df.reset_index(drop=False, inplace=True)
+    unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+
+    # reverting index to code-based index
+    df.set_index('code', inplace=True)
+    unique_df = df.iloc[unique_pro.index]
+    
+    ########################## Get job partition
+    num_arrays = 100
+    array_idx = 0#${SLURM_ARRAY_TASK_ID}
+    partition_size = len(unique_df) / num_arrays
+    start, end = int(array_idx*partition_size), int((array_idx+1)*partition_size)
+    
+    unique_df = unique_df[start:end]
+    
+    raw_dir = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/raw'
+
+    #################################### create fastas
+    fa_dir = os.path.join(raw_dir, 'platinum_fa')
+    os.makedirs(fa_dir, exist_ok=True)
+    MSARunner.csv_to_fasta_dir(csv_or_df=unique_df, out_dir=fa_dir)
+
+    ##################################### Run hhblits
+    aln_dir = os.path.join(raw_dir, 'platinum_aln')
+    os.makedirs(aln_dir, exist_ok=True)
+
+    # finally running
+    for _, (prot_id, pro_seq) in tqdm(
+                    unique_df[['prot_id', 'prot_seq']].iterrows(), 
+                    desc='Running hhblits',
+                    total=len(unique_df)):
+        in_fp = os.path.join(fa_dir, f"{prot_id}.fasta")
+        out_fp = os.path.join(aln_dir, f"{prot_id}.a3m")
+        
+        if not os.path.isfile(out_fp):
+            MSARunner.hhblits(in_fp, out_fp)
