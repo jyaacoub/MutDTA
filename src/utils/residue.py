@@ -108,7 +108,7 @@ class ResInfo():
 from collections import OrderedDict
 
 class Chain:
-    def __init__(self, pdb_file:str, model:int=1, t_chain=None):
+    def __init__(self, pdb_file:str, model:int=1, t_chain:str=None):
         """
         This class was created to mimic the AtomGroup class from ProDy but optimized for fast parsing 
         only parses what is required for ANM simulations.
@@ -116,7 +116,7 @@ class Chain:
         Args:
             pdb_file (str): file path to pdb file to parse
             model (int, optional): model to parse from file. Defaults to 1.
-            t_chain (_type_, optional): target chain to focus on. Defaults to None.
+            t_chain (str, optional): target chain to focus on. Defaults to None.
         """
         # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
         self._chains = self._pdb_get_chains(pdb_file, model)
@@ -148,7 +148,15 @@ class Chain:
     def chain(self) -> OrderedDict:
         # {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
         # -> {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}
-        return self._chains[self.t_chain]
+        if self.t_chain.isdigit():
+            # if t_chain is a number then we assume they are trying to index the chain
+            # index starts at 1 so we do -1 to ensure this
+            idx = int(self.t_chain)-1
+            if idx < 0: raise IndexError('Chain index must start at 1')
+            k = list(self._chains.keys())[idx]
+            return self._chains[k]
+        else:
+            return self._chains[self.t_chain]
     
     @property
     def t_chain(self) -> str:

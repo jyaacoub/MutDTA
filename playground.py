@@ -1,5 +1,22 @@
 #%%
+from src.data_processing.datasets import PlatinumDataset
+
+dataset = PlatinumDataset(
+                save_root=f'../data/PlatinumDataset/',
+                data_root=f'../data/PlatinumDataset/raw',
+                aln_dir=None,
+                cmap_threshold=8.0,
+                feature_opt='nomsa',
+                edge_opt='binary',
+                )
+# exit()
+
+#%%
 import pandas as pd
+csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
+pd.read_csv(csv, index_col=0)
+
+#%%
 import os
 from glob import glob
 
@@ -22,7 +39,7 @@ done_IDs =  {getID(filename) for filename in glob(done_dir)}
 
 remaining = [id for id in unique_pids if id not in done_IDs]
 
-print(len(remaining), 'protiens remaining')
+print(len(remaining), 'proteins remaining')
 
 done_rows = df.iloc[df[~df['pid_fix'].isin(remaining)][['pid_fix']].drop_duplicates().index]
 remaining_rows = df.iloc[df[df['pid_fix'].isin(remaining)][['pid_fix']].drop_duplicates().index]

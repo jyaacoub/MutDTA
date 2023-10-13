@@ -147,7 +147,7 @@ class Downloader:
     
     @staticmethod
     def download_SDFs(ligand_names: List[str], 
-                      save_dir='./data/structures/ligands/') -> dict:
+                      save_dir='./data/structures/ligands/', **kwargs) -> dict:
         """
         Wrapper of `Downloader.download` for downloading SDF files. 
         Fetches SDF files from
@@ -156,7 +156,8 @@ class Downloader:
         save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')
         url = lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'
         
-        return Downloader.download(ligand_names, save_path=save_path, url=url)
+        return Downloader.download(ligand_names, save_path=save_path, url=url, 
+                                   tqdm_desc='Downloading ligand sdfs', **kwargs)
     
 
 if __name__ == '__main__':
