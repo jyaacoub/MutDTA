@@ -12,10 +12,9 @@ from typing import Iterable, Tuple
 from tqdm import tqdm
 from multiprocessing import Pool
 from src.feature_extraction.protein import get_pfm
+from src.data_processing.processors import Processor
 
-
-
-class MSARunner:
+class MSARunner(Processor):
     hhsuite_bin_dir = '/cluster/tools/software/centos7/hhsuite/3.3.0/bin'
     bin_hhblits = f'{hhsuite_bin_dir}/hhblits'
     bin_hhfilter = f'{hhsuite_bin_dir}/hhfilter'
@@ -78,7 +77,7 @@ class MSARunner:
         return True
 
     @staticmethod
-    def process_msa( f_in:str, f_out:str, hhfilter_bin:str=None):
+    def process_msa(f_in:str, f_out:str, hhfilter_bin:str=None):
         MSARunner.hhfilter(f_in, f_out, bin_path=hhfilter_bin)
         # overwrites filtered msa with cleaned msa
         MSARunner.clean_msa(f_in=f_out, f_out=f_out)
@@ -140,3 +139,7 @@ class MSARunner:
     
 
 # %%
+if __name__ == '__main__':
+    import pandas as pd
+    csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
+    df = pd.read_csv(csv, index_col=0)
