@@ -176,10 +176,10 @@ def get_af_edge_weights(chains:Iterable[Chain], anm_cc=False, n_modes=5, n_cpu=4
         M = np.array([get_cross_correlation(c, n_modes=n_modes, 
                                             n_cpu=n_cpu) for c in chains])
     else:
-        M = np.array([c.get_contact_map() for c in chains])
+        M = np.array([c.get_contact_map() for c in chains]) < 8.0
     
     # simple averaging of cmaps/crosscorr.
-    return np.sum(M < 8.0, axis=0)/len(M)
+    return np.sum(M, axis=0) / len(M)
 
 def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
                             n_modes:int=5, n_cpu=4,
