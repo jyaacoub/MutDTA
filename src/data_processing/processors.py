@@ -23,6 +23,65 @@ from rdkit.Chem.PandasTools import LoadSDF
 
 
 class Processor:
+    @staticmethod
+    def check_aln_lines(fp:str, limit=None):
+        if not os.path.isfile(fp): return False
+        
+        with open(fp, 'r') as f:
+            lines = f.readlines()
+            seq_len = len(lines[0])
+            limit = len(lines) if limit is None else limit
+            
+            for i,l in enumerate(lines[:limit]):
+                if l[0] == '>' or len(l) != seq_len:
+                    return False
+        return True
+    
+    @staticmethod
+    def csv_to_fasta_dir(csv_or_df:str or pd.DataFrame, out_dir:str):
+        """
+        Given a list of sequences from a csv file under 'prot_seq' column,
+        and 'prot_id' column for protein names, this will create fastas for each 
+        unique protein with the code as the file name and fasta header.
+        Args:
+            csv_p (strorpd.DataFrame): csv path or pandas dataframe with 
+            'prot_id' and 'prot_seq' columns.
+            out_dir (str): output directory for fasta files
+        """
+        if isinstance(csv_or_df, str):
+            df = pd.read_csv(csv_or_df)
+        elif isinstance(csv_or_df, pd.DataFrame):
+            df = csv_or_df
+        else:
+            raise ValueError("csv_p should be a file path or a pandas DataFrame.")
+
+        os.makedirs(out_dir, exist_ok=True)
+        
+        # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
+        df['seq_len'] = df['prot_seq'].str.len()
+        df = df.sort_values(by='seq_len', ascending=False)
+        
+        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+        df.reset_index(drop=False, inplace=True)
+        unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+        
+        # reverting index to code-based index
+        df.set_index('code', inplace=True)
+        
+        # getting the unique proteins
+        unique_df = df.iloc[unique_pro.index]
+        
+        # finally creating Fastas
+        for _, (prot_id, pro_seq) in tqdm(
+                        unique_df[['prot_id', 'prot_seq']].iterrows(), 
+                        desc='Creating fastas',
+                        total=len(unique_df)):
+            
+            fasta_fp = os.path.join(out_dir, f"{prot_id}.fasta")
+            with open(fasta_fp, "w") as f:
+                f.write(f">{prot_id}\n{pro_seq}")
+    
+    @staticmethod
     def fasta_to_aln_file(in_fp, out_fp):
         """
         Removes lines from the input Fasta file that start with '>' and saves the result in the output file.
@@ -46,6 +105,7 @@ class Processor:
         with open(out_fp, 'w') as file:
             file.write(output_text)
             
+    @staticmethod
     def fasta_to_aln_dir(in_dir:str, out_dir:str=None, silent=True):
         """
         Removes lines starting with '>' from all files in the input directory and saves

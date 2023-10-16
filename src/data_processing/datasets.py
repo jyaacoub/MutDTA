@@ -20,7 +20,6 @@ from src.utils.exceptions import DatasetNotFound
 from src.feature_extraction.ligand import smile_to_graph
 from src.feature_extraction.protein import create_save_cmaps, target_to_graph
 from src.feature_extraction.protein_edges import get_target_edge_weights
-from src.feature_extraction.process_msa import check_aln_lines
 from src.data_processing.processors import PDBbindProcessor, Processor
 from src.data_processing.downloaders import Downloader
 
@@ -38,6 +37,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  subset:str=None, 
                  overwrite=False, 
                  max_seq_len:int=None,
+                 only_download=False,
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -78,6 +78,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             the max sequence length from PDBbind, davis and kiba have sequence lengths 
             of 2500+ which wont run on a 32GB gpu with a batch size of 32. This is also 
             applied retroactively to existing datasets (see load fn), default is 2150. 
+        `only_dowwnload` : bool, optional
+            If you only want to download the raw files and not prepare the dataset set 
+            this to true, by default False. 
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
@@ -119,6 +122,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             if not os.path.isdir(data_p):
                 DatasetNotFound(f"{data_p} Subset does not exist, please create subset before initialization.")
         self.subset = subset
+        
+        self.only_download = only_download
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
@@ -252,6 +257,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         - We create graphs using the pdb/sdf file from the first instance of that prot_id/smile in the csv
           all future instances will just reference back to that in `self.__getitem__`
         """
+        if self.only_download:
+            return
+        
         if not os.path.isfile(self.processed_paths[0]):
             self.df = self.pre_process()
         else:
@@ -652,7 +660,7 @@ class DavisKibaDataset(BaseDataset):
         # checking alignment files present for each code:
         no_aln = []
         if self.aln_dir is not None:
-            no_aln = [c for c in codes if (not check_aln_lines(self.aln_p(c)))]
+            no_aln = [c for c in codes if (not Processor.check_aln_lines(self.aln_p(c)))]
                     
             # filters out those that do not have aln file
             print(f'Number of codes with invalid aln files: {len(no_aln)} / {len(codes)}')
@@ -744,6 +752,7 @@ class PlatinumDataset(BaseDataset):
                          feature_opt, *args, **kwargs)
     
     def pdb_p(self, code):
+        code = code.split('_')[0] # removing additional information for mutations.
         return os.path.join(self.raw_paths[1], f'{code}.pdb')
     
     def cmap_p(self, code, map=True): 
@@ -798,6 +807,24 @@ class PlatinumDataset(BaseDataset):
         except requests.HTTPError as e:
             raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
         
+        # validate that all files are there and download any missing pdbs:
+        for i, row in tqdm(df_raw.iterrows(), 
+                           desc='Checking pdb files and downloading missing',
+                           total=len(df_raw)):
+            pdb_wt = row['mut.wt_pdb']
+            pdb_mt = row['mut.mt_pdb']
+            
+            # Check if PDBs available
+            missing_wt = pdb_wt == 'NO'
+            missing_mt = pdb_mt == 'NO'
+            assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
+            
+            # Download if file doesnt exist:
+            if not missing_wt and (not os.path.isfile(self.pdb_p(pdb_wt))):
+                Downloader.download_PDBs([pdb_wt], save_dir=self.raw_paths[1], tqdm_disable=True)
+            if not missing_mt and (not os.path.isfile(self.pdb_p(pdb_mt))):
+                Downloader.download_PDBs([pdb_mt], save_dir=self.raw_paths[1], tqdm_disable=True)
+            
         # Download corrected SMILEs since the ones provided in the csv file have issues 
         # (see https://github.com/jyaacoub/MutDTA/issues/27)
         os.makedirs(self.raw_paths[2], exist_ok=True)
@@ -841,43 +868,57 @@ class PlatinumDataset(BaseDataset):
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Getting sequences and cmaps',
                            total=len(df_raw)):
-            mut = row['mutation']
+            muts = row['mutation'].split('/') # split to account for multiple point mutations
             pdb_wt = row['mut.wt_pdb']
             pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
-
-            # Getting sequence  from pdb file:
+            # Check if PDBs available
             missing_wt = pdb_wt == 'NO'
-            pdb = pdb_mt if missing_wt else pdb_wt
-            chain = Chain(self.pdb_p(pdb), t_chain=t_chain)
+            missing_mt = pdb_mt == 'NO'
+            assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
+            pdb_wt = pdb_mt if missing_wt else pdb_wt
+            pdb_mt = pdb_wt if missing_mt else pdb_mt
             
-            # Getting and saving contact map:
-            # no mapping during creation 
-            # this is done to prevent havign to store duplicate cmaps for the same 
-            # pdb but under different names
-            if not os.path.isfile(self.cmap_p(pdb, map=False)): 
-                cmap = chain.get_contact_map()
-                np.save(self.cmap_p(pdb, map=False), cmap)
-            
-            # Getting sequences:
             try:
+                chain_wt = Chain(self.pdb_p(pdb_wt), t_chain=t_chain)
+                chain_mt = Chain(self.pdb_p(pdb_mt), t_chain=t_chain)
+                
+                # Getting sequences:
                 if missing_wt:
-                    mut_seq = chain.sequence
-                    ref_seq = chain.get_mutated_seq(mut.split('/'), reversed=True)
+                    mut_seq = chain_wt.sequence
+                    ref_seq = chain_wt.get_mutated_seq(muts, reversed=True)
                 else:
-                    mut_seq = chain.get_mutated_seq(mut.split('/'), reversed=False)
-                    ref_seq = chain.sequence
+                    mut_seq = chain_wt.get_mutated_seq(muts, reversed=False)
+                    ref_seq = chain_wt.sequence
+                
+                # creating protein unique IDs for computational speed up by avoiding redundant compute
+                wt_id = f'{pdb_wt}_wt'
+                mt_id = f'{pdb_mt}_{"-".join(muts)}'
+                if pdb_mt != pdb_wt and mut_seq != chain_mt.sequence:
+                    # print(f'Mutated doesnt match with chain for {i}:{self.pdb_p(pdb_wt)} and {self.pdb_p(pdb_mt)}')
+                    # using just the wildtype protein structure to avoid mismatches with graph network
+                    mt_id = f'{pdb_wt}_{"-".join(muts)}'
+                    chain_mt = chain_wt
+                
+                # Getting and saving cmaps under the unique prot_ID
+                if not os.path.isfile(self.cmap_p(wt_id, map=False)):
+                    np.save(self.cmap_p(wt_id, map=False), chain_wt.get_contact_map())
+                
+                if not os.path.isfile(self.cmap_p(mt_id, map=False)):
+                    np.save(self.cmap_p(mt_id, map=False), chain_mt.get_contact_map())
+                
             except Exception as e:
                 raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e
-            
+                
             # Saving sequence and additional relevant info
             mt_pkd = row['affin.k_mt']
             wt_pkd = row['affin.k_wt']
             lig_id = row['affin.lig_id']
             smiles = row['smiles']
-            # using index number for ID since pdb is not unique in this dataset.
-            prot_seq[f'{i}_mt'] = (pdb, lig_id,  mt_pkd, smiles, mut_seq)
-            prot_seq[f'{i}_wt'] = (pdb, lig_id, wt_pkd, smiles, ref_seq)
+            
+            # Using index number for ID since pdb is not unique in this dataset.
+            prot_seq[f'{i}_mt'] = (mt_id, lig_id,  mt_pkd, smiles, mut_seq)
+            prot_seq[f'{i}_wt'] = (wt_id, lig_id, wt_pkd, smiles, ref_seq)
                 
         df = pd.DataFrame.from_dict(prot_seq, orient='index', 
                                         columns=['prot_id', 'lig_id', 
