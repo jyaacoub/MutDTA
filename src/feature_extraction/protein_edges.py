@@ -1,5 +1,7 @@
 from typing import Iterable, Tuple
 import numpy as np
+from prody import calcANM
+
 from src.utils.residue import Chain
 
 
@@ -150,13 +152,16 @@ def _crossCorrelations(queue, n_atoms, array, variances, indices):
 
 ####################################
 
-def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
+def get_cross_correlation(pdb:str or Chain, target_seq:str=None, n_modes=10, n_cpu=1):
     """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
-    from prody import calcANM
-
-    chain = Chain(pdb_fp)
-    #WARNING: assuming the target_chain is always the max len chain!
-    assert chain.getSequence() == target_seq, f'Target seq is not chain seq {pdb_fp}'
+    if isinstance(pdb, str):
+        chain = Chain(pdb)
+    elif isinstance(pdb, Chain):
+        chain = pdb
+    else:
+        raise TypeError(f'pdb arg is not str or Chain {pdb}')
+        
+    assert target_seq is None or chain.getSequence() == target_seq, f'Target seq is not chain seq {pdb}'
     anm = calcANM(chain.hessian, selstr='calpha', n_modes=n_modes)
 
     
@@ -165,8 +170,15 @@ def get_cross_correlation(pdb_fp:str, target_seq:str, n_modes=10, n_cpu=1):
     # min-max normalization into [0,1] range
     return (cc-cc_min)/(cc_max-cc_min)
 
-def get_af_edge_weights(chains:Iterable[Chain]) -> np.array:
-    M = np.array([c.get_contact_map() for c in chains])
+def get_af_edge_weights(chains:Iterable[Chain], anm_cc=False, n_modes=5, n_cpu=4) -> np.array:
+    if anm_cc:
+        # run anm on each chain then average the cmaps
+        M = np.array([get_cross_correlation(c, n_modes=n_modes, 
+                                            n_cpu=n_cpu) for c in chains])
+    else:
+        M = np.array([c.get_contact_map() for c in chains])
+    
+    # simple averaging of cmaps/crosscorr.
     return np.sum(M < 8.0, axis=0)/len(M)
 
 def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
@@ -174,7 +186,26 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
                             cmap:str or np.array=None,
                             af_confs:Iterable[str]=None,
                             filter=False) -> np.array:
-    """ Returns an LxL matrix of the edge weights"""
+    """
+    Returns an LxL matrix representing the edge weights of the protein
+
+    Args:
+        pdb_fp (str): The pdb file to extract edge weights from, or in the case of 
+        'af2' this is the template path for filtering out misfolds.
+        target_seq (str): Target sequence for sanity checking that the pdbs match.
+        edge_opt (str): See src.utils.config.EDGE_OPT
+        n_modes (int, optional): ANM arg. Defaults to 5.
+        n_cpu (int, optional): ANM arg. Defaults to 4.
+        cmap (str or np.array, optional): contact map for 'simple'. Defaults to None.
+        af_confs (Iterable[str], optional): configurations for af2 structs. Defaults to None.
+        filter (bool, optional): Whether or not to filter misfolds in 'af2'. Defaults to False.
+
+    Raises:
+        ValueError: invalid edge option (See `src.utils.config.EDGE_OPT`)
+
+    Returns:
+        np.array: The LxL edge weight matrix
+    """
     # edge weights should be returned as a list of Z weights
     # where Z is the number of edges (|E|)
     if edge_opt is None or edge_opt == 'binary':
@@ -189,20 +220,21 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         # normalize cmap from 0.0 to 1.0 range using min-max normalization
         cmap_min, cmap_max = cmap.min(), cmap.max()
         return (cmap-cmap_min)/(cmap_max-cmap_min)
-    elif edge_opt == 'af2':
+    elif 'af2' in edge_opt:
         chains = [Chain(p) for p in af_confs]
         # filter chains by template modeling score:
         if filter:
             template = Chain(pdb_fp)
             chains = [c for c in chains if 0.85 < c.TM_score(template) < 0.98]
         
-        #TODO: if chains is empty then just return np.zeros matrix
+        # NOTE: if chains (no pdbs found) is empty then we treat all edges as the same
         if len(chains) == 0:
             print(f'WARNING: no af2 pdbs for {pdb_fp}')
-            return np.ones(shape=(len(target_seq), len(target_seq)))
+            # treat all edges as the same if no confirmations are found
+            return np.ones(shape=(len(target_seq), len(target_seq))) 
         else:
-            ew = get_af_edge_weights(chains=chains)
+            ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
             assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
-            return ew
+            return ew        
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')

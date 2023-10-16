@@ -19,7 +19,7 @@ tabulate # for torch_geometric.nn.summary
 ipykernel
 plotly
 requests
-ray[tune]
+#ray[tune]
 
 submitit
 ProDy

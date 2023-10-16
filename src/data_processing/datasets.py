@@ -107,7 +107,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
         
-        assert self.edge_opt != 'af2' or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
+        assert 'af2' not in self.edge_opt or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
         assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
         self.af_conf_dir = af_conf_dir
         
@@ -290,7 +290,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
-            if self.edge_opt == 'af2':
+            if 'af2' in self.edge_opt:
                 af_confs = self.af_conf_files(code)
             else:
                 af_confs = None
@@ -664,7 +664,7 @@ class DavisKibaDataset(BaseDataset):
         
         # Checking that structure and af_confs files are present if edgeW is anm or af2
         no_confs = []
-        if self.edge_opt in ['anm', 'af2']:
+        if self.edge_opt in cfg.STRUCT_EDGE_OPT:
            no_confs = [c for c in codes if (
                (self.pdb_p(c, safe=False) is None) or # no highQ structure
                 (len(self.af_conf_files(c)) < 2))]    # not enough af confirmations.
