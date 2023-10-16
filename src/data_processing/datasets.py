@@ -110,21 +110,24 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
         
-        assert 'af2' not in self.edge_opt or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
-        assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
-        self.af_conf_dir = af_conf_dir
-        
         # Validating subset
         subset = subset or 'full'
         save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}') # e.g.: path/to/root/nomsa_anm
+        print('save_root:', save_root)
+        
         if subset != 'full':
             data_p = os.path.join(save_root, subset)
             if not os.path.isdir(data_p):
                 DatasetNotFound(f"{data_p} Subset does not exist, please create subset before initialization.")
         self.subset = subset
         
-        self.only_download = only_download
+        # checking af2 conf dir if we are creating the dataset from scratch
+        if not os.path.isdir(save_root):
+            assert 'af2' not in self.edge_opt or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
+            assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
+        self.af_conf_dir = af_conf_dir
         
+        self.only_download = only_download
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
               
