@@ -127,13 +127,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
-        
-    def af_conf_files(self, code) -> list[str]:
-        # removing () from string since file names cannot include them and localcolabfold replaces them with _
-        code = re.sub(r'[()]', '_', code)
-        # localcolabfold has 'unrelaxed' as the first part after the code/ID.
-        # output must be in out directory
-        return glob(f'{self.af_conf_dir}/out?/{code}_unrelaxed_rank_*.pdb')            
+              
     
     @abc.abstractmethod
     def pdb_p(self, code) -> str:
@@ -143,11 +137,24 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     @abc.abstractmethod
     def cmap_p(self, code) -> str:
         raise NotImplementedError
-    
+        
     @abc.abstractmethod
     def aln_p(self, code) -> str:
         # path to cleaned input alignment file
         raise NotImplementedError
+    
+    def edgew_p(self, code) -> str:
+        dirname = os.path.join(self.raw_dir, 'edge_weights', self.edge_opt)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        return os.path.join(dirname, f'{code}.npy')
+    
+    def af_conf_files(self, code) -> list[str]:
+        # removing () from string since file names cannot include them and localcolabfold replaces them with _
+        code = re.sub(r'[()]', '_', code)
+        # localcolabfold has 'unrelaxed' as the first part after the code/ID.
+        # output must be in out directory
+        return glob(f'{self.af_conf_dir}/out?/{code}_unrelaxed_rank_*.pdb')
     
     @property
     def raw_dir(self) -> str:
@@ -188,6 +195,22 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if pro_filtered > 0:
             print(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
         return df_new
+    
+    @staticmethod
+    def get_unique_prots(df, verbose=True) -> pd.DataFrame:
+        # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
+        df['seq_len'] = df['prot_seq'].str.len()
+        df = df.sort_values(by='seq_len', ascending=False)
+        
+        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+        df.reset_index(drop=False, inplace=True)
+        unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+        # reverting index to code-based index
+        df.set_index('code', inplace=True)
+        unique_df = df.iloc[unique_pro.index]
+        
+        if verbose: print(len(unique_df), 'unique proteins')
+        return unique_df
     
     def load(self): 
         # 2149 is the max seq length in pdbbind (kiba and davis have seq lengths that are larger)
@@ -270,17 +293,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         ###### Get Protein Graphs ######
         processed_prots = {}
-        # sorting by sequence length before droppping so that we keep the longest protein sequence instead of just the first.
-        self.df['seq_len'] = self.df['prot_seq'].str.len()
-        self.df = self.df.sort_values(by='seq_len', ascending=False)
-        
-        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
-        self.df.reset_index(drop=False, inplace=True)
-        unique_pro = self.df[['prot_id']].drop_duplicates(keep='first')
-        # reverting index to code-based index
-        self.df.set_index('code', inplace=True)
-        unique_df = self.df.iloc[unique_pro.index]
-        print(len(unique_df))
+        unique_df = self.get_unique_prots(self.df)
         for code, (prot_id, pro_seq) in tqdm(
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
@@ -303,11 +316,16 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             else:
                 af_confs = None
             
-            pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
+            # Check to see if edge weights already generated:
+            if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
+                pro_edge_weight = np.load(self.edgew_p(code))
+            else:
+                pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
                                                     edge_opt=self.edge_opt,
                                                     cmap=pro_cmap,
                                                     n_modes=5, n_cpu=4,
                                                     af_confs=af_confs)
+                np.save(self.edgew_p(code), pro_edge_weight)
         
             if pro_edge_weight is None:
                 pro = torchg.data.Data(x=torch.Tensor(pro_feat),
@@ -560,7 +578,7 @@ class DavisKibaDataset(BaseDataset):
             # dont use aln if none provided (will set to zeros)
             return None
         return os.path.join(self.aln_dir, f'{code}.aln')
-    
+        
     @property
     def raw_file_names(self):
         """
