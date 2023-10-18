@@ -61,8 +61,10 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
             for base in np.where(col > 0)[0]: # all bases being used
                 n_i = col[base]
                 P_i = n_i/line_count # number of res of type i/ total res in col
-                ent -= P_i*(math.log(P_i,2))
-            return ent
+                ent -= P_i*(math.log(P_i,2)) # entropy calc
+            
+            # "1 -" so that the larger the value the more conserved that amino acid is. 
+            return 1 - (ent / math.log2(21)) # divided by log2(21) which is the max entropy score for any 21 dimension vector
             
         pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
         pssm = pssm.reshape((len(target_sequence),1))
