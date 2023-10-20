@@ -26,16 +26,16 @@ df['overlap'] = df['run'].str.contains('overlap')
 
 #%%
 import matplotlib.pyplot as plt
-fig2_pro_feat(df, show=False, verbose=True)
+# fig2_pro_feat(df, show=False, verbose=True)
 # plt.tight_layout()
 # plt.savefig('fig2.svg', dpi=300, bbox_inches='tight')
 # plt.show()
 
 
-# fig3_edge_feat(df, show=False)
-# plt.tight_layout()
-# plt.savefig('fig3.svg', dpi=300, bbox_inches='tight')
-# plt.show()
+fig3_edge_feat(df, show=False)
+plt.tight_layout()
+plt.savefig('fig3.png', dpi=300, bbox_inches='tight')
+plt.show()
 
 
 # %%
