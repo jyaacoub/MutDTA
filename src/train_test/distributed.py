@@ -93,23 +93,23 @@ def dtrain(args):
     # ==== Load model ====
     # args.gpu is the local rank for this process
     model = Loader.load_model(MODEL,FEATURE, EDGEW, DROPOUT).cuda(args.gpu)
-    
-    model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-    
-    
-    # ==== train ====
     cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
                             patience=50, min_delta=0.2,
                             dist_rank=args.rank)
+    # load ckpnt
     if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
         print('# Model already trained, loading checkpoint')
-        # load ckpnt
         model.safe_load_state_dict(torch.load(cp_saver.save_path + '_tmp', 
                                 map_location=torch.device(f'cuda:{args.gpu}')))
+        
+    model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+    
     torch.distributed.barrier() # Sync params across GPUs before training
     
+    
+    # ==== train ====
     print("starting training:")
     logs = train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
           device=args.gpu, saver=cp_saver, epochs=EPOCHS, lr_0=LEARNING_RATE)
