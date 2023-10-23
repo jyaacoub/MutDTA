@@ -36,7 +36,6 @@ class BaseModel(nn.Module):
         Args:
             mdl_dict (_type_): torch.load output for loaded model
         """
-        self.load_state_dict(mdl_dict)
         try:
             self.load_state_dict(mdl_dict)
         except RuntimeError as e:
