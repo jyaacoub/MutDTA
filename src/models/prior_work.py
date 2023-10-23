@@ -302,4 +302,4 @@ if __name__ == "__main__":
     # loading checkpoint
     cp = torch.load(model_file_name, map_location=device) 
     
-    model.load_state_dict(cp)
+    model.safe_load_state_dict(cp)

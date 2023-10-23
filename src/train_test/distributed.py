@@ -106,7 +106,7 @@ def dtrain(args):
     if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
         print('# Model already trained, loading checkpoint')
         # load ckpnt
-        model.load_state_dict(torch.load(cp_saver.save_path + '_tmp', 
+        model.safe_load_state_dict(torch.load(cp_saver.save_path + '_tmp', 
                                 map_location=torch.device(f'cuda:{args.gpu}')))
     torch.distributed.barrier() # Sync params across GPUs before training
     

@@ -1,6 +1,6 @@
 from src.models.prior_work import DGraphDTA, GraphDTA
 from src.models.mut_dta import EsmDTA
-from src.models.utils import *
+from src.models.utils import BaseModel
 
 def display_models():
     import torch
@@ -18,7 +18,7 @@ def display_models():
         model.to(device)
         
         cp = torch.load(model_file_name, map_location=device) # loading checkpoint
-        model.load_state_dict(cp)
+        model.safe_load_state_dict(cp)
         
         print(f'\n\n{data} model summary:')
         print(model)
