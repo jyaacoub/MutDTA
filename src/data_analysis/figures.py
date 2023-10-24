@@ -1,3 +1,4 @@
+import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -151,7 +152,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
-def fig3_edge_feat(df, verbose=False, sel_col='cindex', show_simple=True, show=True):
+def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True):
     # comparing nomsa, msa, shannon, and esm
     # group by data type
     
@@ -198,7 +199,10 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', show_simple=True, show=T
         'simple': simple,
         'anm': anm,
         'af2': af2,
+        'af2-anm': af2_anm
     })
+    for c in exclude:
+        plot_data.drop(c, axis=1, inplace=True)
 
     # Melt the DataFrame for Seaborn barplot
     melted_data = pd.melt(plot_data, id_vars=['Dataset'], var_name='Edge type', 
@@ -234,19 +238,18 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', show_simple=True, show=T
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
 
-
-if __name__ == '__main__':
-    csv = 'results/model_media/model_stats.csv'
+def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -> pd.DataFrame:
+    df = pd.read_csv(csv_p)
     
-    df = pd.read_csv(csv)
-    df = pd.concat([df, pd.read_csv('results/model_media/old_model_stats.csv')]) # concat with old model results since we get the max value anyways...
+    if os.path.isfile(old_csv_p):
+        df = pd.concat([df, pd.read_csv(old_csv_p)]) # concat with old model results since we get the max value anyways...
 
     # create data, feat, and overlap columns for easier filtering.
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
     df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
     df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2-anm)E_', expand=False)
     df['ddp'] = df['run'].str.contains('DDP-')
-    df['improved'] = df['run'].str.contains('IM_') # trail of model name will include I if "improved"
+    df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
     df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False)
     
     df.loc[df['run'].str.contains('EDM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
@@ -255,6 +258,11 @@ if __name__ == '__main__':
     df.loc[df['run'].str.contains('EDAIM'), 'feat'] += '-ESM'
 
     df['overlap'] = df['run'].str.contains('overlap')
+    
+    return df
+
+if __name__ == '__main__':
+    df = prepare_df('results/model_media/model_stats.csv')
 
     df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
 
