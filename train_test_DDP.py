@@ -2,22 +2,15 @@
 import os
 import submitit
 
-from src.utils import config # sets up env vars
+from src.utils import config as cfg # sets up env vars
 from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
-#EDIM_PDBbindD_nomsaF_binaryE_20B_0.0001LR_0.4D_2000E
-#DGM_kibaD_shannonF_binaryE_64B_0.0001LR_0.4D_2000E
 args = parse_train_test_args(verbose=True, distributed=True,
             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
-                ' -m DG -d kiba -f nomsa -e anm -lr 0.0001 -bs 32 -do 0.4 --train'+ \
+                ' -m DG -d davis -f nomsa -e af2-anm -lr 0.0001 -bs 32 -do 0.4 --train'+ \
                 ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 2') # 3days == 4320 mins
 
-# args = parse_train_test_args(verbose=True, distributed=True,
-#             jyp_args=' -odir ./slurm_tests/edge_weights/%j'+ \
-#                 ' -m DG -d davis -f nomsa -e binary -lr 0.0001 -bs 32 --protein_overlap'+ \
-#                 ' -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 2') # 3days == 4320 mins
-#-odir ./slurm_tests/edge_weights/%j -m EDI -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 16 -s_t 4320 -s_m 10GB -s_nn 1 -s_ng 4
 # %% PARSE ARGS
 
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
@@ -48,13 +41,14 @@ executor.update_parameters(
     tasks_per_node=args.slurm_ngpus,
     
     slurm_job_name=f'DDP-{args.model_opt[0]}_{args.data_opt[0]}_{args.slurm_ngpus*args.slurm_nnodes}v100',
-    slurm_partition="gpu",
-    slurm_account='kumargroup_gpu',
+    slurm_partition=("gpu" if cfg.ON_H4H else None),         
+    slurm_account=('kumargroup_gpu' if cfg.ON_H4H else None),
     slurm_mem=args.slurm_mem,
+    
     # Might need this since ESM takes up a lot of memory
-    # slurm_constraint='gpu16g', # using small batch size will be sufficient for now
-    # slurm_constraint='gpu32g', # using small batch size will be sufficient for now
-    # v100-34G can handle batch size of 15 -> v100-16G == 7?
+    slurm_constraint=('gpu32g' if cfg.ON_H4H else 'cascade,v100'), 
+    # For CC docs see: (https://docs.alliancecan.ca/wiki/Using_GPUs_with_Slurm)
+    
     slurm_additional_parameters=additional_params
 )
 

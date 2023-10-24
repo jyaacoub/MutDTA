@@ -17,3 +17,7 @@ PRO_FEAT_OPT = ['nomsa', 'msa', 'shannon']
 MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
 MEDIA_SAVE_DIR = 'results/model_media/'
 MODEL_SAVE_DIR = 'results/model_checkpoints/ours'
+
+# cluster based configs:
+import socket
+ON_H4H = 'uhnh4h' in socket.getfqdn().split('.')

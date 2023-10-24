@@ -51,15 +51,7 @@ model = Loader.load_model(MODEL, FEATURE, EDGE, DROPOUT)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 mdl_dict = torch.load(model_p, map_location=device)
-if 'DDP' in MODEL_KEY:
-    # due to https://discuss.pytorch.org/t/check-if-model-is-wrapped-in-nn-dataparallel/67957
-    mdl_dict = {(k[7:] if 'module.' == k[:7] else k):v for k,v in mdl_dict.items()}
-try:
-    model.load_state_dict(mdl_dict)
-except RuntimeError as e:
-    print("ERR:", e)
-    mdl_dict = {(k[7:] if 'module.' == k[:7] else k):v for k,v in mdl_dict.items()}
-    model.load_state_dict(mdl_dict)
+model.safe_load_state_dict(mdl_dict)
     
 model.to(device)
 

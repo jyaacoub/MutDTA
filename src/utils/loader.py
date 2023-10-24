@@ -103,6 +103,7 @@ class Loader():
                     aln_dir  =f'{path}/{data}/aln/',
                     cmap_threshold=-0.5, 
                     feature_opt=pro_feature,
+                    edge_opt=edge_opt,
                     subset=subset
                     )
         else:

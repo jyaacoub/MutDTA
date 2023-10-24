@@ -160,7 +160,7 @@ def add_slurm_dist_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument('-s_cp',
         '--slurm_cpus_per_task',
-        action='store', type=int, default=2,
+        action='store', type=int, default=4,
         help='CPUs per task for DDP (default: 2)'
     )
     return parser

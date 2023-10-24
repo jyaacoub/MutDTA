@@ -3,7 +3,11 @@ pandas
 tqdm
 rdkit
 scipy
+
+# for generating figures:
 matplotlib
+seaborn
+statannotations
 
 lifelines # used for concordance index calc
 #biopython # used for cmap

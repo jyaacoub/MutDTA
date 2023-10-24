@@ -29,3 +29,21 @@ class BaseModel(nn.Module):
         main_str += f'\nmodel size: {size_all_mb:.3f}MB'
         return main_str
     
+    def safe_load_state_dict(self, mdl_dict) -> any:
+        """Error catching version of `load_state_dict` to resolve Exceptions due to `module.` 
+        prefix added by DDP
+
+        Args:
+            mdl_dict (_type_): torch.load output for loaded model
+        """
+        try:
+            self.load_state_dict(mdl_dict)
+        except RuntimeError as e:
+            # if model was distributed then it will have extra "module." prefix
+            # due to https://discuss.pytorch.org/t/check-if-model-is-wrapped-in-nn-dataparallel/67957
+            # print("Error(s) in loading state_dict for EsmDTA")
+            mdl_dict = {(k[7:] if 'module.' == k[:7] else k):v for k,v in mdl_dict.items()}
+            self.load_state_dict(mdl_dict)
+        
+    
+    

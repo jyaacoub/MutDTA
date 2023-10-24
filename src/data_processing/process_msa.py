@@ -144,20 +144,11 @@ if __name__ == '__main__':
     from tqdm import tqdm
     import pandas as pd
     import os
+    from src.data_processing.datasets import BaseDataset
     csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
     df = pd.read_csv(csv, index_col=0)
     #################### Get unique proteins:
-    # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
-    df['seq_len'] = df['prot_seq'].str.len()
-    df = df.sort_values(by='seq_len', ascending=False)
-
-    # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
-    df.reset_index(drop=False, inplace=True)
-    unique_pro = df[['prot_id']].drop_duplicates(keep='first')
-
-    # reverting index to code-based index
-    df.set_index('code', inplace=True)
-    unique_df = df.iloc[unique_pro.index]
+    unique_df = BaseDataset.get_unique_prots(df)
     
     ########################## Get job partition
     num_arrays = 100

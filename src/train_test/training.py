@@ -245,7 +245,7 @@ def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
         assert WEIGHTS in weight_opt, 'WEIGHTS must be one of: kiba, davis, random'
         if WEIGHTS != 'random':
             model_file_name = f'results/model_checkpoints/prior_work/DGraphDTA_{WEIGHTS}_t2.model'
-            model.load_state_dict(torch.load(model_file_name, map_location=device))
+            model.safe_load_state_dict(torch.load(model_file_name, map_location=device))
 
         train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset, 
                             train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
