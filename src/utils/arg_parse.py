@@ -5,9 +5,10 @@ def add_model_args(parser: argparse.ArgumentParser):
     """
     Adds the following arguments to the parser:
         - model_opt
-        - data_opt
         - feature_opt
         - edge_opt
+        - ligand_feature_opt
+        - ligand_edge_opt
         - train
         - debug
     """
@@ -22,6 +23,12 @@ def add_model_args(parser: argparse.ArgumentParser):
             'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
             'and EDA is the same but with esm_only set to False. Additional options:' + \
             '\n\t- EAT: EsmAttentionDTA (no graph for protein rep)' 
+    )
+    # Add the argument for FEATURE_opt
+    parser.add_argument('-f',
+        '--feature_opt',
+        choices=cfg.PRO_FEAT_OPT, nargs='+', required=True,
+        help=f'Select one or more from {cfg.PRO_FEAT_OPT}.'
     )
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
@@ -41,6 +48,21 @@ def add_model_args(parser: argparse.ArgumentParser):
         action='store_true',
         help='Enters debug mode, no training is done, just model initialization.'
     )
+    
+    # Arguments for ligand options
+    parser.add_argument('-lf',
+        '--ligand_feature_opt',
+        choices=cfg.LIG_FEAT_OPT, 
+        nargs='+', default=None, required=False,
+        help=f'Select one or more from {cfg.LIG_FEAT_OPT}.'
+    )
+    parser.add_argument('-le',
+        '--ligand_edge_opt',
+        choices=cfg.LIG_EDGE_OPT,
+        nargs='+', default=None, required=False,
+        help=f'Select one or more from {cfg.LIG_EDGE_OPT}.'
+    )
+    
     return parser
 
 def add_hyperparam_args(parser: argparse.ArgumentParser):
@@ -79,7 +101,6 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     """
     Adds the following dataset arguments to the parser:
         - data_opt
-        - feature_opt
         - train_split
         - val_split
         - shuffle_data
@@ -91,12 +112,6 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         '--data_opt',
         choices=cfg.DATA_OPT, nargs='+',   required=True,
         help=f'Select one of {cfg.DATA_OPT} (default: {cfg.DATA_OPT[0]}).'
-    )
-    # Add the argument for FEATURE_opt
-    parser.add_argument('-f',
-        '--feature_opt',
-        choices=cfg.PRO_FEAT_OPT, nargs='+', required=True,
-        help=f'Select one or more from {cfg.PRO_FEAT_OPT}.'
     )
     parser.add_argument('-ts',
         '--train_split',
@@ -207,7 +222,10 @@ def parse_train_test_args(verbose=True, distributed=False,
         print(f"    Selected data_opt: {args.data_opt}")
         print(f" Selected feature_opt: {args.feature_opt}")
         print(f"    Selected edge_opt: {args.edge_opt}")
-        print(f"      forced training: {args.train}\n")
+        print(f"      forced training: {args.train}")
+        print(f"                   -----")
+        print(f"   ligand_feature_opt: {args.ligand_feature_opt}")
+        print(f"      ligand_edge_opt: {args.ligand_edge_opt}\n")
 
         print(f"-------------- HYPERPARAMETERS -----------")
         print(f"   Global Batch size: {global_bs}")

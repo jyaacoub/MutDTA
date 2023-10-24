@@ -38,6 +38,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  overwrite=False, 
                  max_seq_len:int=None,
                  only_download=False,
+                 ligand_feature:str='original', 
+                 ligand_edge:str='binary',
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -111,8 +113,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.edge_opt = edge_opt
         
         # Validating subset
+        self.ligand_feature = ligand_feature
+        self.ligand_edge = ligand_edge
         subset = subset or 'full'
-        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}') # e.g.: path/to/root/nomsa_anm
+        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
         print('save_root:', save_root)
         
         if subset != 'full':
@@ -350,7 +354,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                             desc='Creating ligand graphs'):
             if lig_seq not in processed_ligs:
                 try:
-                    mol_feat, mol_edge = smile_to_graph(lig_seq)
+                    mol_feat, mol_edge = smile_to_graph(lig_seq, lig_feature=self.ligand_feature, 
+                                                        lig_edge=self.ligand_edge)
                 except ValueError:
                     errors.append(f'L-{lig_seq}')
                     continue
