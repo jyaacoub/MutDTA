@@ -126,9 +126,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.subset = subset
         
         # checking af2 conf dir if we are creating the dataset from scratch
-        if not os.path.isdir(save_root):
-            assert 'af2' not in self.edge_opt or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
-            assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
+        if not os.path.isdir(save_root) and ('af2' in self.edge_opt):
+            assert af_conf_dir is not None, f"{self.edge_opt} edge selected but no af_conf_dir provided!"
+            assert os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
         self.af_conf_dir = af_conf_dir
         
         self.only_download = only_download
@@ -157,6 +157,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return os.path.join(dirname, f'{code}.npy')
     
     def af_conf_files(self, code) -> list[str]:
+        if self.af_conf_dir is None: return None
         # removing () from string since file names cannot include them and localcolabfold replaces them with _
         code = re.sub(r'[()]', '_', code)
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
@@ -571,6 +572,8 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
+        if self.af_conf_dir is None: return None
+        
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
         assert not safe or len(file) == 1, f'Incorrect pdb pathing, {len(file)}# of structures for {code}.'
