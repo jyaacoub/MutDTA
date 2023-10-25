@@ -157,7 +157,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return os.path.join(dirname, f'{code}.npy')
     
     def af_conf_files(self, code) -> list[str]:
-        if self.af_conf_dir is None: return None
+        if 'af2' not in self.edge_opt: return []
         # removing () from string since file names cannot include them and localcolabfold replaces them with _
         code = re.sub(r'[()]', '_', code)
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
@@ -325,27 +325,26 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 af_confs = None
             
             # Check to see if edge weights already generated:
-            if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
-                pro_edge_weight = np.load(self.edgew_p(code))
-            else:
-                pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
-                                                    edge_opt=self.edge_opt,
-                                                    cmap=pro_cmap,
-                                                    n_modes=5, n_cpu=4,
-                                                    af_confs=af_confs)
-                np.save(self.edgew_p(code), pro_edge_weight)
+            pro_edge_weight = None
+            if self.edge_opt != 'binary':
+                if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
+                    pro_edge_weight = np.load(self.edgew_p(code))
+                else:
+                    pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
+                                                        edge_opt=self.edge_opt,
+                                                        cmap=pro_cmap,
+                                                        n_modes=5, n_cpu=4,
+                                                        af_confs=af_confs,
+                                                        edgew_p=self.edgew_p(code))
+                    np.save(self.edgew_p(code), pro_edge_weight)
+                pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
+                
         
-            if pro_edge_weight is None:
-                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(edge_idx),
-                                    pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id)
-            else:
-                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(edge_idx),
-                                    pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id,
-                                    edge_weight=torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]]))
+            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                edge_index=torch.LongTensor(edge_idx),
+                                pro_seq=pro_seq, # protein sequence for downstream esm model
+                                prot_id=prot_id,
+                                edge_weight=pro_edge_weight)
             processed_prots[prot_id] = pro
         
         ###### Get Ligand Graphs ######
@@ -572,7 +571,7 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if self.af_conf_dir is None: return None
+        if 'af2' not in self.edge_opt: return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
