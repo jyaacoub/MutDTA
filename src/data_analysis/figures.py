@@ -73,7 +73,7 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=True):
 
 # Figure 2 - node feature cindex difference
 # Features -> nomsa, msa, shannon, and esm
-def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
+def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap'])]
     
@@ -115,6 +115,8 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
         'shannon': shannon,
         'esm': esm
     })
+    for c in exclude:
+        plot_data.drop(c, axis=1, inplace=True)
 
     # Melt the DataFrame for Seaborn barplot
     melted_data = pd.melt(plot_data, id_vars=['Dataset'], var_name='Node feature', 
@@ -126,6 +128,10 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
     sns.set_context('poster')
     ax = sns.barplot(x='Dataset', y=sel_col, hue='Node feature', 
                      data=melted_data, palette='deep')
+    if add_labels:
+        for i in ax.containers: 
+            ax.bar_label(i, fmt='%.3f', fontsize=13)
+            
     # Set the title
     ax.set_title(f'Node feature performance ({"concordance index" if sel_col == "cindex" else "MSE"})')
     
@@ -152,7 +158,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', show=True):
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
-def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True):
+def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True):
     # comparing nomsa, msa, shannon, and esm
     # group by data type
     
@@ -214,6 +220,9 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True):
     sns.set_context('poster')
     ax = sns.barplot(x='Dataset', y=sel_col, hue='Edge type', 
                         data=melted_data, palette='deep')
+    if add_labels:
+        for i in ax.containers: 
+            ax.bar_label(i, fmt='%.3f', fontsize=13)
     # Set the title
     ax.set_title(f'Edge type performance ({"concordance index" if sel_col == "cindex" else "MSE"})')
 
