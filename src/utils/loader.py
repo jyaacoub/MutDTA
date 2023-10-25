@@ -98,7 +98,6 @@ class Loader():
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str='../data/', 
                      ligand_feature:str=None, ligand_edge:str=None):
-        # NOTE: ligand feature and edge for the datasets can be implemented in datasets class
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
                     data_root=f'{path}/v2020-other-PL/',
@@ -111,7 +110,6 @@ class Loader():
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge
                     )
-            
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
                     save_root=f'{path}/DavisKibaDataset/{data}/',
