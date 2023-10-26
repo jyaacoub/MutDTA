@@ -47,7 +47,8 @@ class Loader():
     def load_model(model:str, pro_feature:str, edge:str, dropout:float, ligand_feature:str=None, ligand_edge:str=None):
         num_feat_pro = 54 if 'msa' in pro_feature else 34
         
-        if ligand_feature is not None or ligand_edge is not None:
+        if (ligand_feature is not None and ligand_feature != 'original') or \
+            (ligand_edge is not None and ligand_edge != 'binary'):
             print('WARNING: currently no support for combining pro and lig modifications, using original pro features.')
             #TODO: add support for above. 
             return DGraphDTALigand(ligand_feature, ligand_edge)
