@@ -1,7 +1,3 @@
-import os
-# for huggingface models:
-os.environ['TRANSFORMERS_CACHE'] = '../hf_models/'
-
 from torch import nn
 from torch_geometric.nn import (GCNConv, global_mean_pool as gep)
 
