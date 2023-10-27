@@ -52,11 +52,16 @@ cp_saver = CheckpointSaver(model=None,
 
 # %% Training loop
 metrics = {}
-for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_opt, 
-                                                     args.feature_opt, args.edge_opt):
+for (MODEL, DATA, 
+     FEATURE, EDGEW, 
+     ligand_feature, ligand_edge) in itertools.product(
+                                                    args.model_opt, args.data_opt, 
+                                                    args.feature_opt, args.edge_opt, 
+                                                    args.ligand_feature_opt, args.ligand_edge_opt):
     print(f'\n{"-"*40}\n({MODEL}, {DATA}, {FEATURE}, {EDGEW})')
-    MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,
-                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,NUM_EPOCHS,
+    MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGEW,
+                                     ligand_feature=ligand_feature, ligand_edge=ligand_edge,
+                                     batch_size=BATCH_SIZE,lr=LEARNING_RATE,dropout=DROPOUT,n_epochs=NUM_EPOCHS,
                                      pro_overlap=args.protein_overlap)
     print(f'# {MODEL_KEY} \n')
     
@@ -80,7 +85,8 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     #                     batch_train=BATCH_SIZE, use_refined=False,
     #                     split_by_prot=not args.protein_overlap)
     
-    loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGEW, path='../data/', 
+    loaders = Loader.load_DataLoaders(data=DATA, pro_feature=FEATURE, edge_opt=EDGEW, path='../data/', 
+                                        ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                         batch_train=BATCH_SIZE,
                                         datasets=['train', 'test', 'val'],
                                         protein_overlap=args.protein_overlap)
@@ -89,7 +95,8 @@ for MODEL, DATA, FEATURE, EDGEW in itertools.product(args.model_opt, args.data_o
     # ==== LOAD MODEL ====
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'#Device: {device}')
-    model = Loader.load_model(MODEL, FEATURE, EDGEW, DROPOUT).to(device)
+    model = Loader.load_model(model=MODEL, pro_feature=FEATURE, edge=EDGEW, dropout=DROPOUT,
+                                ligand_feature=ligand_feature, ligand_edge=ligand_edge).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
     
     if DEBUG: 

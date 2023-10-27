@@ -172,7 +172,8 @@ class EsmDTA(BaseModel):
 
         #### Graph NN ####
         ei = data.edge_index
-        ew = data.edge_weight if self.edge_weight else None
+        ew = data.edge_weight if (self.edge_weight is not None and 
+                                  self.edge_weight != 'binary') else None
 
         # if edge_weight doesnt exist no error is thrown it just passes it as None
         xt = self.pro_conv1(target_x, ei, ew)

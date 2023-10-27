@@ -38,6 +38,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  overwrite=False, 
                  max_seq_len:int=None,
                  only_download=False,
+                 ligand_feature:str='original', 
+                 ligand_edge:str='binary',
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -111,8 +113,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.edge_opt = edge_opt
         
         # Validating subset
+        self.ligand_feature = ligand_feature
+        self.ligand_edge = ligand_edge
         subset = subset or 'full'
-        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}') # e.g.: path/to/root/nomsa_anm
+        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
         print('save_root:', save_root)
         
         if subset != 'full':
@@ -122,9 +126,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.subset = subset
         
         # checking af2 conf dir if we are creating the dataset from scratch
-        if not os.path.isdir(save_root):
-            assert 'af2' not in self.edge_opt or af_conf_dir is not None, f"'af2' edge selected but no af_conf_dir provided!"
-            assert af_conf_dir is None or os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
+        if not os.path.isdir(save_root) and ('af2' in self.edge_opt):
+            assert af_conf_dir is not None, f"{self.edge_opt} edge selected but no af_conf_dir provided!"
+            assert os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
         self.af_conf_dir = af_conf_dir
         
         self.only_download = only_download
@@ -153,6 +157,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return os.path.join(dirname, f'{code}.npy')
     
     def af_conf_files(self, code) -> list[str]:
+        if 'af2' not in self.edge_opt: return []
         # removing () from string since file names cannot include them and localcolabfold replaces them with _
         code = re.sub(r'[()]', '_', code)
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
@@ -320,27 +325,26 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 af_confs = None
             
             # Check to see if edge weights already generated:
-            if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
-                pro_edge_weight = np.load(self.edgew_p(code))
-            else:
-                pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
-                                                    edge_opt=self.edge_opt,
-                                                    cmap=pro_cmap,
-                                                    n_modes=5, n_cpu=4,
-                                                    af_confs=af_confs)
-                np.save(self.edgew_p(code), pro_edge_weight)
+            pro_edge_weight = None
+            if self.edge_opt != 'binary':
+                if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
+                    pro_edge_weight = np.load(self.edgew_p(code))
+                else:
+                    pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
+                                                        edge_opt=self.edge_opt,
+                                                        cmap=pro_cmap,
+                                                        n_modes=5, n_cpu=4,
+                                                        af_confs=af_confs,
+                                                        edgew_p=self.edgew_p(code))
+                    np.save(self.edgew_p(code), pro_edge_weight)
+                pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
+                
         
-            if pro_edge_weight is None:
-                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(edge_idx),
-                                    pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id)
-            else:
-                pro = torchg.data.Data(x=torch.Tensor(pro_feat),
-                                    edge_index=torch.LongTensor(edge_idx),
-                                    pro_seq=pro_seq, # protein sequence for downstream esm model
-                                    prot_id=prot_id,
-                                    edge_weight=torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]]))
+            pro = torchg.data.Data(x=torch.Tensor(pro_feat),
+                                edge_index=torch.LongTensor(edge_idx),
+                                pro_seq=pro_seq, # protein sequence for downstream esm model
+                                prot_id=prot_id,
+                                edge_weight=pro_edge_weight)
             processed_prots[prot_id] = pro
         
         ###### Get Ligand Graphs ######
@@ -350,7 +354,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                             desc='Creating ligand graphs'):
             if lig_seq not in processed_ligs:
                 try:
-                    mol_feat, mol_edge = smile_to_graph(lig_seq)
+                    mol_feat, mol_edge = smile_to_graph(lig_seq, lig_feature=self.ligand_feature, 
+                                                        lig_edge=self.ligand_edge)
                 except ValueError:
                     errors.append(f'L-{lig_seq}')
                     continue
@@ -566,6 +571,8 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
+        if 'af2' not in self.edge_opt: return None
+        
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
         assert not safe or len(file) == 1, f'Incorrect pdb pathing, {len(file)}# of structures for {code}.'
