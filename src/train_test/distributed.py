@@ -92,7 +92,7 @@ def dtrain(args):
     
     # ==== Load model ====
     # args.gpu is the local rank for this process
-    model = Loader.load_model(MODEL,FEATURE, EDGEW, DROPOUT).cuda(args.gpu)
+    model = Loader.init_model(MODEL,FEATURE, EDGEW, DROPOUT).cuda(args.gpu)
     cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
                             patience=50, min_delta=0.2,

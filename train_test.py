@@ -17,7 +17,7 @@ TRAIN_SPLIT= args.train_split # 80% for training (80%)
 VAL_SPLIT = args.val_split # 10% for validation (10%)
 SHUFFLE_DATA = not args.no_shuffle
 
-SAVE_RESULTS = True
+SAVE_RESULTS = False
 SHOW_PLOTS = False
 
 #%%
@@ -95,7 +95,7 @@ for (MODEL, DATA,
     # ==== LOAD MODEL ====
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'#Device: {device}')
-    model = Loader.load_model(model=MODEL, pro_feature=FEATURE, edge=EDGEW, dropout=DROPOUT,
+    model = Loader.init_model(model=MODEL, pro_feature=FEATURE, edge=EDGEW, dropout=DROPOUT,
                                 ligand_feature=ligand_feature, ligand_edge=ligand_edge).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
     
@@ -143,7 +143,6 @@ for (MODEL, DATA,
                 show=SHOW_PLOTS,
                 logs=logs
                 )
-    plt.clf()
     plt.clf()
     
 

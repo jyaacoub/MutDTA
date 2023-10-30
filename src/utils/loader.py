@@ -44,7 +44,7 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def load_model(model:str, pro_feature:str, edge:str, dropout:float, ligand_feature:str=None, ligand_edge:str=None):
+    def init_model(model:str, pro_feature:str, edge:str, dropout:float, ligand_feature:str=None, ligand_edge:str=None):
         num_feat_pro = 54 if 'msa' in pro_feature else 34
         
         if (ligand_feature is not None and ligand_feature != 'original') or \
@@ -99,6 +99,8 @@ class Loader():
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str='../data/', 
                      ligand_feature:str=None, ligand_edge:str=None):
+        # subset is used for train/val/test split.
+        # can also be used to specify the cross-val fold used by train1, train2, etc.
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
                     data_root=f'{path}/v2020-other-PL/',
