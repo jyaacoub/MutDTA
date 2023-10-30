@@ -376,8 +376,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
-    def __init__(self, save_root='../data/PDBbindDataset/nomsa', 
-                 data_root='../data/v2020-other-PL', 
+    def __init__(self, save_root=f'{cfg.DATA_ROOT}/PDBbindDataset/nomsa', 
+                 data_root=f'{cfg.DATA_ROOT}/v2020-other-PL', 
                  aln_dir=None,
                  cmap_threshold=8.0, feature_opt='nomsa', *args, **kwargs):
         """
@@ -539,9 +539,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
 
   
 class DavisKibaDataset(BaseDataset):
-    def __init__(self, save_root='../data/DavisKibaDataset/', 
-                 data_root='../data/davis_kiba/davis/', 
-                 aln_dir='../data/davis_kiba/davis/aln/',
+    def __init__(self, save_root=f'{cfg.DATA_ROOT}/DavisKibaDataset/', 
+                 data_root=f'{cfg.DATA_ROOT}/davis_kiba/davis/', 
+                 aln_dir=f'{cfg.DATA_ROOT}/davis_kiba/davis/aln/',
                  cmap_threshold=-0.5, feature_opt='nomsa', *args, **kwargs):
         """
         InMemoryDataset for davis or kiba. This dataset is used to train graph models.

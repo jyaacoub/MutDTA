@@ -27,9 +27,8 @@ import numpy as np
 import torch
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 
-from src.utils import config # sets up env vars
+from src.utils import config as cfg # sets up env vars
 from src.utils.config import MODEL_STATS_CSV, MEDIA_SAVE_DIR, MODEL_SAVE_DIR
 
 from src.train_test.training import train, test
@@ -85,7 +84,7 @@ for (MODEL, DATA,
     #                     batch_train=BATCH_SIZE, use_refined=False,
     #                     split_by_prot=not args.protein_overlap)
     
-    loaders = Loader.load_DataLoaders(data=DATA, pro_feature=FEATURE, edge_opt=EDGEW, path='../data/', 
+    loaders = Loader.load_DataLoaders(data=DATA, pro_feature=FEATURE, edge_opt=EDGEW, path=cfg.DATA_ROOT, 
                                         ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                         batch_train=BATCH_SIZE,
                                         datasets=['train', 'test', 'val'],
