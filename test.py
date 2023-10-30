@@ -76,7 +76,7 @@ get_metrics(actual, pred,
             save_results=True,
             save_path=media_save_p,
             model_key=MODEL_KEY,
-            csv_file=cfg    MODEL_STATS_CSV_VAL,
+            csv_file=cfg.MODEL_STATS_CSV_VAL,
             show=False,
             )
 
