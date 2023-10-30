@@ -22,9 +22,7 @@ LEARNING_RATE = args.learning_rate
 DROPOUT = args.dropout
 EPOCHS = args.num_epochs
 
-media_save_dir = cfg.MODEL_SAVE_DIR
-media_save_p = f'{media_save_dir}/{DATA}/'
-MODEL_STATS_CSV = cfg.MODEL_STATS_CSV
+media_save_p = f'{cfg.MEDIA_SAVE_DIR}/{DATA}/'
 
 MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGE,
                                      BATCH_SIZE,LEARNING_RATE,DROPOUT,EPOCHS,
@@ -39,10 +37,6 @@ assert os.path.isfile(model_p), f"MISSING MODEL CHECKPOINT {model_p}"
 
 print(model_p)
 
-# %%
-subset = 'test-overlap' if args.protein_overlap else 'test'
-test_dataset = Loader.load_dataset(DATA, FEATURE, EDGE, subset=subset, path='../data')
-test_loader = DataLoader(test_dataset, 1, shuffle=False)
 
 
 #%% Initialize model and load checkpoint
@@ -54,6 +48,11 @@ model.safe_load_state_dict(mdl_dict)
     
 model.to(device)
 
+# %% Load test data
+subset = 'test-overlap' if args.protein_overlap else 'test'
+test_dataset = Loader.load_dataset(DATA, FEATURE, EDGE, subset=subset, path=cfg.DATA_ROOT)
+test_loader = DataLoader(test_dataset, 1, shuffle=False)
+
 #%% Run model on test set
 loss, pred, actual = test(model, test_loader, device)
 print(f'# Test loss: {loss}')
@@ -61,9 +60,27 @@ get_metrics(actual, pred,
             save_results=True,
             save_path=media_save_p,
             model_key=MODEL_KEY,
-            csv_file=MODEL_STATS_CSV,
+            csv_file=cfg.MODEL_STATS_CSV,
             show=False,
             )
+
+#%% Load Val data
+subset = 'val-overlap' if args.protein_overlap else 'val'
+val_dataset = Loader.load_dataset(DATA, FEATURE, EDGE, subset=subset, path=cfg.DATA_ROOT)
+val_loader = DataLoader(val_dataset, 1, shuffle=False)
+
+#%% Run model on val set
+loss, pred, actual = test(model, val_loader, device)
+print(f'# Val loss: {loss}')
+get_metrics(actual, pred,
+            save_results=True,
+            save_path=media_save_p,
+            model_key=MODEL_KEY,
+            csv_file=cfg    MODEL_STATS_CSV_VAL,
+            show=False,
+            )
+
+
 # %% renaming checkpoint to remove _tmp specification
 if (not os.path.isfile(model_p) and  # ensuring no overwrite
     os.path.isfile(model_p_tmp)):
