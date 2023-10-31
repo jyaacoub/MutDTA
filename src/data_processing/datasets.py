@@ -27,10 +27,10 @@ from src.data_processing.downloaders import Downloader
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
-    FEATURE_OPTIONS = cfg.PRO_FEAT_OPT
     EDGE_OPTIONS = cfg.EDGE_OPT
-    LIGAND_FEATURE_OPTIONS = cfg.LIG_FEAT_OPT
+    FEATURE_OPTIONS = cfg.PRO_FEAT_OPT
     LIGAND_EDGE_OPTIONS = cfg.LIG_EDGE_OPT
+    LIGAND_FEATURE_OPTIONS = cfg.LIG_FEAT_OPT
     
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
@@ -92,7 +92,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
         self.overwrite = overwrite
-        max_seq_len = 100000 or max_seq_len
+        max_seq_len = max_seq_len or 100000
         assert max_seq_len >= 100, 'max_seq_len cant be smaller than 100.'
         self.max_seq_len = max_seq_len
         
@@ -383,7 +383,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
-    def __init__(self, save_root=f'{cfg.DATA_ROOT}/PDBbindDataset/nomsa', 
+    def __init__(self, save_root=f'{cfg.DATA_ROOT}/PDBbindDataset', 
                  data_root=f'{cfg.DATA_ROOT}/v2020-other-PL', 
                  aln_dir=None,
                  cmap_threshold=8.0, feature_opt='nomsa', *args, **kwargs):

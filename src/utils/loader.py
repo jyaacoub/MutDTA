@@ -111,7 +111,8 @@ class Loader():
                     subset=subset,
                     af_conf_dir='../colabfold/pdbbind_af2_out/out0',
                     ligand_feature=ligand_feature,
-                    ligand_edge=ligand_edge
+                    ligand_edge=ligand_edge,
+                    max_seq_len=1500
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
@@ -123,7 +124,8 @@ class Loader():
                     edge_opt=edge_opt,
                     subset=subset,
                     ligand_feature=ligand_feature,
-                    ligand_edge=ligand_edge
+                    ligand_edge=ligand_edge,
+                    max_seq_len=1500
                     )
         else:
             raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
