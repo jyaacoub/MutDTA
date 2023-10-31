@@ -198,7 +198,7 @@ def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray,
 def train_tune(config, model:str, pro_feature:str, train_dataset:BaseDataset, val_dataset:BaseDataset):
     from ray.air import session
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Loader.load_model(model, pro_feature, config['edge'], config['dropout'])
+    model = Loader.init_model(model, pro_feature, config['edge'], config['dropout'])
     model.to(device)
     
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], 

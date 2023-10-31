@@ -23,7 +23,7 @@ def atom_features(atom):
         [atom.GetIsAromatic()]))
 
 # mol smile to mol graph edge index
-def smile_to_graph(smile):
+def smile_to_graph(smile, lig_feature:str, lig_edge:str):
     try:
         mol = Chem.MolFromSmiles(smile)
     except AttributeError as e:

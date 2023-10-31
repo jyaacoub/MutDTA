@@ -1,7 +1,5 @@
-from typing import Any, Mapping
 import torch
 from torch import nn
-import torch.nn.functional as F
 
 from torch_geometric.nn import (GCNConv, GATConv, 
                                 global_max_pool as gmp, 

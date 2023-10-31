@@ -11,44 +11,53 @@ from src.feature_extraction.protein_nodes import create_pfm_np_files
 from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
 from src.train_test.utils import train_val_test_split
 
-def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str], 
-                    pro_overlap:bool, data_root_dir:str) -> None:
-    for data, FEATURE, EDGE in itertools.product(data_opt, feat_opt, edge_opt):
+def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
+                    pro_overlap:bool, data_root_dir:str, 
+                    ligand_features:Iterable[str]=['original'],
+                    ligand_edges:Iterable[str]='binary') -> None:
+    for data,     FEATURE,      EDGE, ligand_feature, ligand_edge in itertools.product(
+        data_opt, feat_opt, edge_opt, ligand_features, ligand_edges):
+        
         print('\n', data, FEATURE, EDGE)
         if data in ['davis', 'kiba']:
-            DATA_ROOT = f'{data_root_dir}/{data}/'
             if FEATURE == 'msa':
                 # position frequency matrix creation -> important for msa feature
-                create_pfm_np_files(DATA_ROOT+'/aln/', processes=4) 
+                create_pfm_np_files(f'{data_root_dir}/{data}/aln', processes=4)
+                
             dataset = DavisKibaDataset(
-                    save_root=f'../data/DavisKibaDataset/{data}/',
-                    data_root=DATA_ROOT,
-                    aln_dir=f'{DATA_ROOT}/aln/', 
+                    save_root=f'{data_root_dir}/DavisKibaDataset/{data}/',
+                    data_root=f'{data_root_dir}/{data}/',
+                    aln_dir=f'{data_root_dir}/{data}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
-                    af_conf_dir=f'../colabfold/{data}_af2_out/',
-                    edge_opt=EDGE
+                    af_conf_dir=f'../colabfold/{data}_af2_out/', # colabfold not needed if no structure required methods are used (see config)
+                    edge_opt=EDGE,
+                    ligand_feature=ligand_feature,
+                    ligand_edge=ligand_edge
             )
         elif data == 'PDBbind':
-            # create_pfm_np_files('../data/PDBbind_aln/', processes=4)
             dataset = PDBbindDataset(
-                    save_root=f'../data/PDBbindDataset/',
-                    data_root=f'../data/v2020-other-PL/',
-                    aln_dir=f'../data/PDBbind_a3m',
+                    save_root=f'{data_root_dir}/PDBbindDataset/',
+                    data_root=f'{data_root_dir}/v2020-other-PL/',
+                    aln_dir=f'{data_root_dir}/PDBbind_a3m',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
                     af_conf_dir='../colabfold/pdbbind_af2_out/',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
+                    ligand_feature=ligand_feature,
+                    ligand_edge=ligand_edge
                     )
         elif data == 'Platinum':
             dataset = PlatinumDataset(
-                save_root=f'../data/PlatinumDataset/',
-                data_root=f'../data/PlatinumDataset/raw',
+                save_root=f'{data_root_dir}/PlatinumDataset/',
+                data_root=f'{data_root_dir}/PlatinumDataset/raw',
                 aln_dir=None,
                 cmap_threshold=8.0,
                 feature_opt=FEATURE,
-                edge_opt=EDGE
+                edge_opt=EDGE,
+                ligand_feature=ligand_feature,
+                ligand_edge=ligand_edge
                 )
         
         # saving training, validation, and test sets
