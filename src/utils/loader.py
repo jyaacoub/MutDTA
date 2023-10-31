@@ -98,7 +98,7 @@ class Loader():
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str=cfg.DATA_ROOT, 
-                     ligand_feature:str=None, ligand_edge:str=None):
+                     ligand_feature:str='original', ligand_edge:str='binary'):
         # subset is used for train/val/test split.
         # can also be used to specify the cross-val fold used by train1, train2, etc.
         if data == 'PDBbind':

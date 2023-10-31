@@ -29,6 +29,8 @@ from src.data_processing.downloaders import Downloader
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     FEATURE_OPTIONS = cfg.PRO_FEAT_OPT
     EDGE_OPTIONS = cfg.EDGE_OPT
+    LIGAND_FEATURE_OPTIONS = cfg.LIG_FEAT_OPT
+    LIGAND_EDGE_OPTIONS = cfg.LIG_EDGE_OPT
     
     def __init__(self, save_root:str, data_root:str, aln_dir:str,
                  cmap_threshold:float, feature_opt='nomsa',
@@ -112,9 +114,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
         self.edge_opt = edge_opt
         
-        # Validating subset
+        # check ligand options:
+        assert ligand_feature in self.LIGAND_FEATURE_OPTIONS, \
+            f"Invalid ligand_feature '{ligand_feature}', choose from {self.LIGAND_FEATURE_OPTIONS}"
         self.ligand_feature = ligand_feature
+        assert ligand_edge in self.LIGAND_EDGE_OPTIONS, \
+            f"Invalid ligand_edge '{ligand_edge}', choose from {self.LIGAND_EDGE_OPTIONS}"
         self.ligand_edge = ligand_edge
+        
+        # Validating subset
         subset = subset or 'full'
         save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
         print('save_root:', save_root)
@@ -334,8 +342,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         edge_opt=self.edge_opt,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
-                                                        af_confs=af_confs,
-                                                        edgew_p=self.edgew_p(code))
+                                                        af_confs=af_confs)
                     np.save(self.edgew_p(code), pro_edge_weight)
                 pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
                 
@@ -473,15 +480,11 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         missing_pid = df_pid.prot_id == '------'
         df_pid[missing_pid] = df_pid[missing_pid].assign(prot_id = df_pid[missing_pid].index)
         
-        ############# get pdb codes based on data root dir #############
-        pdb_codes = os.listdir(self.data_root)
-        # filter out readme and index folders
-        pdb_codes = [p for p in pdb_codes if p != 'index' and p != 'readme']
-        
-        ############# creating MSA: #############
-        #NOTE: assuming MSAs are already created, since this would take a long time to do.
-        # create_aln_files(df_seq, self.aln_p)
-        if self.aln_dir is not None:
+        pdb_codes = df_binding.index # pdbcodes
+        ############# validating codes #############
+        if self.aln_dir is not None: # create msa if 'msaF' is selected
+            #NOTE: assuming MSAs are already created, since this would take a long time to do.
+            # create_aln_files(df_seq, self.aln_p)
             # WARNING: use feature_extraction.process_msa method instead
             # PDBbindProcessor.fasta_to_aln_dir(self.aln_dir, 
             #                                   os.path.join(os.path.dirname(self.aln_dir), 
@@ -491,11 +494,13 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
             # filters out those that do not have aln file
             print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
-            pdb_codes = valid_codes
+        else: # check if exists
+            valid_codes = [c for c in pdb_codes if os.path.isfile(self.pdb_p(c))]
             
-        #TODO: filter out pdbs that dont have confirmations if edge type af2
-        
-        
+        pdb_codes = valid_codes
+        #TODO: filter out pdbs that dont have confirmations if edge type is af2
+        # currently we treat all edges as the same if no confirmations are found... 
+        # (see protein_edges.get_target_edge_weights():232)
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
             
         
