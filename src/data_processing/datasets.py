@@ -142,7 +142,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.only_download = only_download
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
-              
     
     @abc.abstractmethod
     def pdb_p(self, code) -> str:

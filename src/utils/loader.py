@@ -1,6 +1,7 @@
 # TODO: create a trainer class for modularity
 from functools import wraps
 from typing import Iterable
+from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
 from src.models.lig_mod import DGraphDTALigand
@@ -144,23 +145,27 @@ class Loader():
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT, 
                       batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
-                      training_fold:int=0, # for cross-val
+                      training_fold:int=None, # for cross-val. None for no cross-val
                       protein_overlap:bool=False, 
                       ligand_feature:str=None, ligand_edge:str=None):
         loaders = {}
+        # no overlap or cross-val
+        subsets = datasets
         
-        # different list for subset so that loader keys are the same name as input
-        if protein_overlap:
-            subsets = [d+'-overlap' for d in datasets]
-        elif training_fold > 0: # training folds are identified by train1, train2, etc.
-            subsets = [d+str(training_fold) for d in datasets]
+        # training folds are identified by train1, train2, etc. 
+        # (see model_key fn above)
+        if training_fold is not None:
+            subsets = [d+str(training_fold) for d in subsets]
             try:
                 # making sure test set is not renamed
                 subsets[datasets.index('test')] = 'test'
             except ValueError:
                 pass
-        else: # no overlap or cross-val
-            subsets = datasets
+            
+        # Overlap is identified by adding '-overlap' to the subset name (after cross-val)
+        if protein_overlap:
+            subsets = [d+'-overlap' for d in subsets]
+        
             
         for d, s in zip(datasets, subsets):
             dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
@@ -171,6 +176,59 @@ class Loader():
             bs = 1 if d == 'test' else batch_train
             loader = DataLoader(dataset=dataset, batch_size=bs, 
                                 shuffle=False)
+            loaders[d] = loader
+            
+        return loaders
+    
+    @staticmethod
+    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
+                    'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
+    def load_distributed_DataLoaders(num_replicas:int, rank:int, seed:int, data:str, # additional args for distributed
+                                     
+                                     pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT,
+                                     batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+                                     training_fold:int=None, # for cross-val. None for no cross-val
+                                     protein_overlap:bool=False, 
+                                     
+                                     ligand_feature:str=None, ligand_edge:str=None,
+                                     
+                                     num_workers:int=4):
+        loaders = {}
+        # no overlap or cross-val
+        subsets = datasets
+        
+        # training folds are identified by train1, train2, etc. 
+        # (see model_key fn above)
+        if training_fold is not None:
+            subsets = [d+str(training_fold) for d in subsets]
+            try:
+                # making sure test set is not renamed
+                subsets[datasets.index('test')] = 'test'
+            except ValueError:
+                pass
+            
+        # Overlap is identified by adding '-overlap' to the subset name (after cross-val)
+        if protein_overlap:
+            subsets = [d+'-overlap' for d in subsets]
+        
+            
+        for d, s in zip(datasets, subsets):
+            dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
+                                          subset=s, path=path, 
+                                          ligand_feature=ligand_feature, 
+                                          ligand_edge=ligand_edge)
+            sampler = DistributedSampler(dataset, shuffle=True,
+                                            num_replicas=num_replicas,
+                                            rank=rank, seed=seed)
+                                            
+            bs = 1 if d == 'test' else batch_train
+            loader = DataLoader(dataset=dataset, 
+                                sampler=sampler,
+                                batch_size=bs, # should be per gpu batch size (local batch size)
+                                num_workers=num_workers,
+                                shuffle=False,
+                                pin_memory=True,
+                                drop_last=True) # drop last batch if not divisible by batch size
             loaders[d] = loader
             
         return loaders

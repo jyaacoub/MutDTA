@@ -87,6 +87,7 @@ for (MODEL, DATA,
                                         ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                         batch_train=BATCH_SIZE,
                                         datasets=['train', 'test', 'val'],
+                                        training_fold=args.fold_selection, # default is None from arg_parse
                                         protein_overlap=args.protein_overlap)
 
 
