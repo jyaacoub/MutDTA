@@ -34,7 +34,7 @@ def dtrain(args):
     media_save_p = f'{MEDIA_SAVE_DIR}/{DATA}/'
     MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGEW,
                                      ligand_feature=ligand_feature, ligand_edge=ligand_edge,
-                                     batch_size=args.batch_size,
+                                     batch_size=args.batch_size*args.world_size,
                                      lr=args.learning_rate,dropout=args.dropout,
                                      n_epochs=args.num_epochs,
                                      pro_overlap=args.protein_overlap)
