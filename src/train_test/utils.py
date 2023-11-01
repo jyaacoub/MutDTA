@@ -229,9 +229,9 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
         train_indices, val_indices = [], []
         for idx in range(dataset_size): # O(n)
             if dataset[idx]['prot_id'] in fold:
-                train_indices.append(idx)
-            elif dataset[idx]['prot_id'] not in test_prots:
                 val_indices.append(idx)
+            elif dataset[idx]['prot_id'] not in test_prots:
+                train_indices.append(idx)
         train_sampler = SubsetRandomSampler(train_indices)
         val_sampler = SubsetRandomSampler(val_indices)
         train_loaders.append(DataLoader(dataset, batch_size=batch_train,
