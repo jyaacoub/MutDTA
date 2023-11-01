@@ -15,7 +15,7 @@ from src.train_test.utils import train_val_test_split, train_val_test_split_kfol
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
                     pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
                     ligand_features:Iterable[str]=['original'],
-                    ligand_edges:Iterable[str]='binary',
+                    ligand_edges:Iterable[str]=['binary'],
                     k_folds:int=None,
                     random_seed:int=0,
                     train_split:float=0.8,

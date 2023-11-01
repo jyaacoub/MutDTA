@@ -220,8 +220,8 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
     print(f'Number of unique proteins in each fold: {fold_size}')
     
     ## looping through folds to create train and val loaders
-    train_loaders, val_loaders = [], [], []    
-    for i, fold in enumerate(k_folds):
+    train_loaders, val_loaders = [], []
+    for i, fold in enumerate(prot_folds):
         train_indices, val_indices = [], []
         for idx in range(dataset_size): # O(n)
             if dataset[idx]['prot_id'] in fold:
