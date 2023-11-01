@@ -141,10 +141,10 @@ def train_val_test_split(dataset: InMemoryDataset,
     
     return train_loader, val_loader, test_loader
 
-def train_val_test_split_kfolds(dataset: InMemoryDataset, 
-                         train_split=.8, val_split=.1, 
+def train_val_test_split_kfolds(dataset: InMemoryDataset,
+                         k_folds:int=5, test_split=.1,
                          shuffle_dataset=True, random_seed=None,
-                         batch_train=128, k_folds:int=5) -> tuple[DataLoader]:
+                         batch_train=128) -> tuple[DataLoader]:
     """
     Same as train_val_test_split but splits the training set into k_folds.
     This assumes that use_refined is False and split_by_prot is True.
@@ -153,18 +153,16 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
     ----------
     `dataset` : InMemoryDataset
         The dataset to split
-    `train_split` : float, optional
-        How much goes to just training, by default .8
-    `val_split` : float, optional
-        How much for validation (remainder goes to test), by default .1
+    `test_split` : float, optional
+        What percentage of the dataset to use for testing, by default .1
+    `k_folds` : int, optional
+        Number of folds to split the training set into, by default 5
     `shuffle_dataset` : bool, optional
         self explainatory, by default True
     `random_seed` : _type_, optional
         seed for shuffle, by default None
     `batch_train` : int, optional
         size of batch, by default 128
-    `k_folds` : int, optional
-        Number of folds to split the training set into, by default 5
 
     Returns
     -------
@@ -182,9 +180,7 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
     # Get size for each dataset and indices
     dataset_size = len(dataset)
     indices = list(range(dataset_size))
-    tr_size = int(np.floor(train_split * dataset_size))
-    v_size = int(np.floor(val_split * dataset_size))
-    te_size = dataset_size - tr_size - v_size
+    test_size = int(test_split * dataset_size)
     if shuffle_dataset:
         np.random.shuffle(indices) # in-place shuffle
 
@@ -198,7 +194,7 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
     count = 0
     test_prots = {}
     for p in prots: # O(k); k = number of proteins
-        if count + prot_counts[p] <= te_size:
+        if count + prot_counts[p] <= test_size:
             test_prots[p] = True
             count += prot_counts[p]
             
