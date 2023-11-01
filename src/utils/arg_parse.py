@@ -105,6 +105,7 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         - val_split
         - shuffle_data
         - rand_seed
+        - fold_selection
     """
 
     # Add the argument for data_opt
@@ -134,6 +135,11 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         '--rand_seed',
         action='store', type=int, default=0,
         help='Random seed for shuffling (default: 0)'
+    )
+    parser.add_argument('-folds',
+        '--fold_selection',
+        action='store', type=int, default=None,
+        help='Fold selection (default: None - no fold selection)'
     )
     return parser
 
@@ -216,7 +222,8 @@ def parse_train_test_args(verbose=True, distributed=False,
             global_bs *= args.slurm_nnodes * args.slurm_ngpus
         print(f"---------------- DATA OPT ----------------")
         print(f"             data_opt: {args.data_opt}")
-        print(f"      protein_overlap: {args.protein_overlap}\n")
+        print(f"      protein_overlap: {args.protein_overlap}")
+        print(f"       fold_selection: {args.fold_selection}\n")
         print(f"---------------- MODEL OPT ---------------")
         print(f"   Selected model_opt: {args.model_opt}")
         print(f"    Selected data_opt: {args.data_opt}")

@@ -37,10 +37,15 @@ def dtrain(args):
                                      batch_size=args.batch_size*args.world_size,
                                      lr=args.learning_rate,dropout=args.dropout,
                                      n_epochs=args.num_epochs,
-                                     pro_overlap=args.protein_overlap)
+                                     pro_overlap=args.protein_overlap,
+                                     fold=args.fold_selection)
     
     print(os.getcwd())
     print(MODEL_KEY)
+    print(f'---------------- DATA OPT ----------------')
+    print(f"             data_opt: {args.data_opt}")
+    print(f"      protein_overlap: {args.protein_overlap}")
+    print(f"       fold_selection: {args.fold_selection}\n")
     print(f"---------------- MODEL OPT ---------------")
     print(f"     Selected og_model_opt: {args.model_opt}")
     print(f"         Selected data_opt: {args.data_opt}")

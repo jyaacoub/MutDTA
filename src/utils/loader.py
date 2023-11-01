@@ -29,8 +29,10 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def get_model_key(model:str, data:str, pro_feature:str, edge:str, ligand_feature:str, ligand_edge:str,
-                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False):
+    def get_model_key(model:str, data:str, pro_feature:str, edge:str,
+                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False,
+                      fold:int=None, ligand_feature:str=None, ligand_edge:str=None):
+        data += f'{fold}' if fold is not None else '' # for cross-val
         data += '-overlap' if pro_overlap else ''
         
         if model in ['EAT']: # no edgew or features for this model type
@@ -39,7 +41,12 @@ class Loader():
         else:
             model_key = f'{model}M_{data}D_{pro_feature}F_{edge}E_{batch_size}B_{lr}LR_{dropout}D_{n_epochs}E'
         
-        return model_key + f'_{ligand_feature}LF_{ligand_edge}LE'
+        # add ligand modifications if specified
+        if ligand_feature is not None:
+            model_key += f'_{ligand_feature}LF'
+        if ligand_edge is not None:
+            model_key += f'_{ligand_edge}LE'
+        return model_key
         
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,

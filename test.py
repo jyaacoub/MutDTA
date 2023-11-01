@@ -24,9 +24,11 @@ EPOCHS = args.num_epochs
 
 media_save_p = f'{cfg.MEDIA_SAVE_DIR}/{DATA}/'
 
-MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGE,
-                                     BATCH_SIZE,LEARNING_RATE,DROPOUT,EPOCHS,
-                                     pro_overlap=args.protein_overlap)
+MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGE,
+                                batch_size=BATCH_SIZE,lr=LEARNING_RATE,
+                                dropout=DROPOUT,n_epochs=EPOCHS,
+                                pro_overlap=args.protein_overlap,
+                                fold=args.fold_selection)
 
 model_p_tmp = f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model_tmp'
 model_p = f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model'

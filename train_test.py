@@ -60,7 +60,7 @@ for (MODEL, DATA,
     MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGEW,
                                      ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                      batch_size=BATCH_SIZE,lr=LEARNING_RATE,dropout=DROPOUT,n_epochs=NUM_EPOCHS,
-                                     pro_overlap=args.protein_overlap)
+                                     pro_overlap=args.protein_overlap, fold=args.fold_selection)
     print(f'# {MODEL_KEY} \n')
     
     # init paths for media and model checkpoints

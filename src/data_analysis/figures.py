@@ -255,6 +255,7 @@ def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -
 
     # create data, feat, and overlap columns for easier filtering.
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
+    df['fold'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)(\d*)', expand=True)[1] # fold number if available
     df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
     df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2-anm)E_', expand=False)
     df['ddp'] = df['run'].str.contains('DDP-')
