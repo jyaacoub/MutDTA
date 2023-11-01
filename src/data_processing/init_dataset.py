@@ -15,7 +15,11 @@ from src.train_test.utils import train_val_test_split
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
                     pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
                     ligand_features:Iterable[str]=['original'],
-                    ligand_edges:Iterable[str]='binary') -> None:
+                    ligand_edges:Iterable[str]='binary',
+                    k_folds:int=None,
+                    random_seed:int=0,
+                    train_split:float=0.8,
+                    val_split:float=0.1,) -> None:
     """
     Creates the datasets for the given data, feature, and edge options.
 
@@ -36,6 +40,9 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         Ligand features to use, by default ['original']
     `ligand_edges` : Iterable[str], optional
         Ligand edges to use, by default 'binary'
+    `k_folds` : int, optional
+        If not None, the number of folds to split the final training set into for 
+        cross validation, by default None
     """
     
     # Loop through all combinations of data, feature, and edge options
@@ -86,16 +93,22 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         
         # saving training, validation, and test sets
         train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-                                train_split=0.8, val_split=0.1, random_seed=0,
-                                split_by_prot=not pro_overlap)
+                                train_split=train_split, val_split=val_split, 
+                                random_seed=random_seed, split_by_prot=not pro_overlap, 
+                                k_folds=k_folds)
+        subset_names = ['train', 'val', 'test']
         if pro_overlap:
-            dataset.save_subset(train_loader, 'train-overlap')
-            dataset.save_subset(val_loader, 'val-overlap')
-            dataset.save_subset(test_loader, 'test-overlap')
+            subset_names = [s+'-overlap' for s in subset_names]
+        
+        if k_folds is None:
+            dataset.save_subset(train_loader, subset_names[0])
+            dataset.save_subset(val_loader, subset_names[1])
         else:
-            dataset.save_subset(train_loader, 'train')
-            dataset.save_subset(val_loader, 'val')
-            dataset.save_subset(test_loader, 'test')
+            # loops through all k folds and saves as train1, train2, etc.
+            dataset.save_subset_folds(train_loader, subset_names[0])
+            dataset.save_subset_folds(val_loader, subset_names[1])
+            
+        dataset.save_subset(test_loader, subset_names[2])
             
         del dataset # free up memory
 

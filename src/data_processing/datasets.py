@@ -266,6 +266,18 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
         return path
     
+    def save_subset_folds(self, idxs:Iterable[Iterable[int]]|Iterable[data.Sampler]|Iterable[data.DataLoader],
+                          subset_name:str) -> list[str]:
+        """
+        Saves multiple folds of the same dataset for some subset (e.g.: training or val).
+        Name of each fold will be `subset_name` + fold number (e.g.: train0, train1, ...).
+        """
+        paths = []
+        for i, idx in enumerate(idxs):
+            p = self.save_subset(idx, f'{subset_name}{i}')
+            paths.append(p)
+        return paths        
+    
     def load_subset(self, subset_name:str):
         path = os.path.join(self.root, subset_name)
         

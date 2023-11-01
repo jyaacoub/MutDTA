@@ -135,14 +135,22 @@ class Loader():
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT, 
                       batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+                      training_fold:int=0, # for cross-val
                       protein_overlap:bool=False, 
-                     ligand_feature:str=None, ligand_edge:str=None):
+                      ligand_feature:str=None, ligand_edge:str=None):
         loaders = {}
         
         # different list for subset so that loader keys are the same name as input
         if protein_overlap:
             subsets = [d+'-overlap' for d in datasets]
-        else:
+        elif training_fold > 0: # training folds are identified by train1, train2, etc.
+            subsets = [d+str(training_fold) for d in datasets]
+            try:
+                # making sure test set is not renamed
+                subsets[datasets.index('test')] = 'test'
+            except ValueError:
+                pass
+        else: # no overlap or cross-val
             subsets = datasets
             
         for d, s in zip(datasets, subsets):
