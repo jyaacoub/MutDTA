@@ -11,7 +11,7 @@ from src.data_analysis.metrics import get_metrics
 from src.train_test.training import train, test
 from src.train_test.utils import CheckpointSaver, init_node, init_dist_gpu, print_device_info
 
-from src.utils.config import MODEL_STATS_CSV,MEDIA_SAVE_DIR, MODEL_SAVE_DIR
+from src.utils.config import MODEL_STATS_CSV, MEDIA_SAVE_DIR, MODEL_SAVE_DIR
 
 # distributed training fn
 def dtrain(args):
@@ -23,23 +23,24 @@ def dtrain(args):
     init_dist_gpu(args)
     
     # TODO: update this to loop through all options.
-    DATA = args.data_opt[0] # only one data option for now
-    FEATURE = args.feature_opt[0] # only one feature option for now
-    EDGEW = args.edge_opt[0] # only one edge option for now
-    MODEL = args.model_opt[0] # only one model option for now
-    
-    BATCH_SIZE = args.batch_size
-    DROPOUT = args.dropout
-    LEARNING_RATE = args.learning_rate
-    EPOCHS = args.num_epochs
+    # only support for a single option for now:
+    MODEL = args.model_opt[0]
+    DATA = args.data_opt[0]
+    FEATURE = args.feature_opt[0]
+    EDGEW = args.edge_opt[0]
+    ligand_feature = args.ligand_feature_opt[0]
+    ligand_edge = args.ligand_edge_opt[0]
     
     media_save_p = f'{MEDIA_SAVE_DIR}/{DATA}/'
-    MODEL_KEY = Loader.get_model_key(MODEL,DATA,FEATURE,EDGEW,BATCH_SIZE*args.world_size,
-                                     LEARNING_RATE,DROPOUT,EPOCHS,
+    MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGEW,
+                                     ligand_feature=ligand_feature, ligand_edge=ligand_edge,
+                                     batch_size=args.batch_size,
+                                     lr=args.learning_rate,dropout=args.dropout,
+                                     n_epochs=args.num_epochs,
                                      pro_overlap=args.protein_overlap)
-    # MODEL_KEY = "DDP-" + MODEL_KEY
     
     print(os.getcwd())
+    print(MODEL_KEY)
     print(f"---------------- MODEL OPT ---------------")
     print(f"     Selected og_model_opt: {args.model_opt}")
     print(f"         Selected data_opt: {args.data_opt}")
@@ -53,8 +54,8 @@ def dtrain(args):
     print(f"               Num epochs: {args.num_epochs}\n")
     
     print(f"----------------- DISTRIBUTED ARGS -----------------")
-    print(f"         Local Batch size: {BATCH_SIZE}")
-    print(f"        Global Batch size: {BATCH_SIZE*args.world_size}")
+    print(f"         Local Batch size: {args.batch_size}")
+    print(f"        Global Batch size: {args.batch_size*args.world_size}")
     print(f"                      GPU: {args.gpu}")
     print(f"                     Rank: {args.rank}")
     print(f"               World Size: {args.world_size}")
@@ -78,7 +79,7 @@ def dtrain(args):
         sampler = DistributedSampler(dataset, shuffle=True, 
                                     num_replicas=args.world_size,
                                     rank=args.rank, seed=args.rand_seed)
-        bs = 1 if d == 'test' else BATCH_SIZE
+        bs = 1 if d == 'test' else args.batch_size
         loader = DataLoader(dataset=dataset, 
                                 sampler=sampler,
                                 batch_size=bs, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
@@ -92,7 +93,7 @@ def dtrain(args):
     
     # ==== Load model ====
     # args.gpu is the local rank for this process
-    model = Loader.init_model(MODEL,FEATURE, EDGEW, DROPOUT).cuda(args.gpu)
+    model = Loader.init_model(MODEL, FEATURE, EDGEW, args.dropout).cuda(args.gpu)
     cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
                             patience=50, min_delta=0.2,
@@ -112,7 +113,7 @@ def dtrain(args):
     # ==== train ====
     print("starting training:")
     logs = train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
-          device=args.gpu, saver=cp_saver, epochs=EPOCHS, lr_0=LEARNING_RATE)
+          device=args.gpu, saver=cp_saver, epochs=args.num_epochs, lr_0=args.learning_rate)
     torch.distributed.barrier() # Sync params across GPUs
     
     cp_saver.save()

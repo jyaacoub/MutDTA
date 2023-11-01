@@ -98,7 +98,7 @@ class Loader():
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str=cfg.DATA_ROOT, 
-                     ligand_feature:str=None, ligand_edge:str=None):
+                     ligand_feature:str='original', ligand_edge:str='binary'):
         # subset is used for train/val/test split.
         # can also be used to specify the cross-val fold used by train1, train2, etc.
         if data == 'PDBbind':
@@ -111,7 +111,8 @@ class Loader():
                     subset=subset,
                     af_conf_dir='../colabfold/pdbbind_af2_out/out0',
                     ligand_feature=ligand_feature,
-                    ligand_edge=ligand_edge
+                    ligand_edge=ligand_edge,
+                    max_seq_len=1500
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
@@ -123,7 +124,8 @@ class Loader():
                     edge_opt=edge_opt,
                     subset=subset,
                     ligand_feature=ligand_feature,
-                    ligand_edge=ligand_edge
+                    ligand_edge=ligand_edge,
+                    max_seq_len=1500
                     )
         else:
             raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
