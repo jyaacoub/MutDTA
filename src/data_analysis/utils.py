@@ -119,7 +119,7 @@ if __name__ == '__main__':
         df_b = bins[i][1]
         pkd_y, pkd_z = df_b['actual_pkd'].to_numpy(), df_b['vina_pkd'].to_numpy()
         print(f'\nBin {i}, size: {len(df_b)}, {col}: {bins[i][0]}')
-        metrics.append(get_metrics(pkd_y, pkd_z, save_results=False, show=False))
+        metrics.append(get_metrics(pkd_y, pkd_z, save_figs=False, show=False))
     print("sample metrics:", *metrics[0])
 
     # %%

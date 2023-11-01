@@ -57,7 +57,7 @@ test_loader = DataLoader(test_dataset, 1, shuffle=False)
 loss, pred, actual = test(model, test_loader, device)
 print(f'# Test loss: {loss}')
 get_metrics(actual, pred,
-            save_results=True,
+            save_figs=False,
             save_path=media_save_p,
             model_key=MODEL_KEY,
             csv_file=cfg.MODEL_STATS_CSV,
@@ -73,7 +73,7 @@ val_loader = DataLoader(val_dataset, 1, shuffle=False)
 loss, pred, actual = test(model, val_loader, device)
 print(f'# Val loss: {loss}')
 get_metrics(actual, pred,
-            save_results=True,
+            save_figs=False,
             save_path=media_save_p,
             model_key=MODEL_KEY,
             csv_file=cfg.MODEL_STATS_CSV_VAL,

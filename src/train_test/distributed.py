@@ -11,7 +11,7 @@ from src.data_analysis.metrics import get_metrics
 from src.train_test.training import train, test
 from src.train_test.utils import CheckpointSaver, init_node, init_dist_gpu, print_device_info
 
-from src.utils.config import MODEL_STATS_CSV, MEDIA_SAVE_DIR, MODEL_SAVE_DIR
+from src.utils import config as cfg
 
 # distributed training fn
 def dtrain(args):
@@ -31,7 +31,7 @@ def dtrain(args):
     ligand_feature = args.ligand_feature_opt[0]
     ligand_edge = args.ligand_edge_opt[0]
     
-    media_save_p = f'{MEDIA_SAVE_DIR}/{DATA}/'
+    media_save_p = f'{cfg.MEDIA_SAVE_DIR}/{DATA}/'
     MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGEW,
                                      ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                      batch_size=args.batch_size*args.world_size,
@@ -94,7 +94,7 @@ def dtrain(args):
     # ==== Load model ====
     # args.gpu is the local rank for this process
     model = Loader.init_model(MODEL, FEATURE, EDGEW, args.dropout).cuda(args.gpu)
-    cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
+    cp_saver = CheckpointSaver(model=model, save_path=f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
                             patience=50, min_delta=0.2,
                             dist_rank=args.rank)
@@ -121,13 +121,27 @@ def dtrain(args):
     
     # ==== Evaluate ====
     loss, pred, actual = test(model, loaders['test'], args.gpu)
-    print("Test loss:", loss)
+    torch.distributed.barrier() # Sync params across GPUs
     if args.rank == 0:
+        print("Test loss:", loss)
         get_metrics(actual, pred,
-                    save_results=True,
+                    save_figs=False,
                     save_path=media_save_p,
                     model_key=MODEL_KEY,
-                    csv_file=MODEL_STATS_CSV,
+                    csv_file=cfg.MODEL_STATS_CSV,
                     show=False,
                     logs=logs
+                    )
+        
+    # validation
+    loss, pred, actual = test(model, loaders['val'], args.gpu)
+    torch.distributed.barrier() # Sync params across GPUs
+    if args.rank == 0:
+        print(f'# Val loss: {loss}')
+        get_metrics(actual, pred,
+                    save_figs=False,
+                    save_path=media_save_p,
+                    model_key=MODEL_KEY,
+                    csv_file=cfg.MODEL_STATS_CSV_VAL,
+                    show=False,
                     )
