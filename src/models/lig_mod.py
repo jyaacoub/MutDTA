@@ -10,7 +10,7 @@ class DGraphDTALigand(DGraphDTA):
         super(DGraphDTA, self).__init__(*args, **kwargs)
 
         print('DGraphDTA Loaded')
-        num_features_mol = 78
+        num_features_mol = 128
         
         #### ChemGPT ####
 
