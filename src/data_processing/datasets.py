@@ -115,6 +115,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.edge_opt = edge_opt
         
         # check ligand options:
+        ligand_feature = ligand_feature or 'original'
+        ligand_edge = ligand_edge or 'binary'
         assert ligand_feature in self.LIGAND_FEATURE_OPTIONS, \
             f"Invalid ligand_feature '{ligand_feature}', choose from {self.LIGAND_FEATURE_OPTIONS}"
         self.ligand_feature = ligand_feature
