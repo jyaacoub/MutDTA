@@ -159,8 +159,8 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True,
         print(f"MAE: {mae:.3f}")
         print(f"RMSE: {rmse:.3f}")
 
-    # creating stats csv if it doesnt exist
-    if not os.path.exists(csv_file): 
+    # creating stats csv if it doesnt exist or empty/incomplete header
+    if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
         stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
         stats.set_index('run', inplace=True)
         stats.to_csv(csv_file)
