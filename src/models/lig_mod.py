@@ -38,10 +38,15 @@ class DGraphDTALigand(DGraphDTA):
 
 
 
-        # get selifes from smile
-        selfies = [encoder(s) for s in mol_x]
 
- 
+
+        try:
+            # get selifes from smile
+            selfies = [encoder(s) for s in mol_x]
+        except AttributeError as e:
+            print(mol_x)
+            raise e
+
 
         # get tokens
         res = self.tokenizer(selfies, return_tensors="pt", padding=True)
