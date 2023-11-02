@@ -59,7 +59,7 @@ class Loader():
             (ligand_edge is not None and ligand_edge != 'binary'):
             print('WARNING: currently no support for combining pro and lig modifications, using original pro features.')
             #TODO: add support for above. 
-            return DGraphDTALigand(ligand_feature, ligand_edge, dropout=dropout)
+            return DGraphDTALigand(ligand_feature, ligand_edge)
         
         if model == 'DG':
             model = DGraphDTA(num_features_pro=num_feat_pro, 
