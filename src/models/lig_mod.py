@@ -1,6 +1,8 @@
 from torch import nn
 from torch_geometric.nn import (GCNConv, global_mean_pool as gep)
 
+from transformers import AutoTokenizer, AutoModel
+
 from src.models.prior_work import DGraphDTA
 
 class DGraphDTALigand(DGraphDTA):
@@ -10,6 +12,11 @@ class DGraphDTALigand(DGraphDTA):
         print('DGraphDTA Loaded')
         num_features_mol = 78
         
+        #### ChemGPT ####
+
+        tokenizer = AutoTokenizer.from_pretrained("ncfrey/ChemGPT-4.7M")
+        model = AutoModel.from_pretrained("ncfrey/ChemGPT-4.7M")
+
         # if ligand_feature == 'some new feature list':
         #       num_features_mol = updated number
         
