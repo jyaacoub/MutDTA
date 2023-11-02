@@ -20,6 +20,8 @@ class DGraphDTALigand(DGraphDTA):
         self.tokenizer = AutoTokenizer.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
         self.model = AutoModel.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
 
+        self.model.requires_grad_(False) # freeze weights
+
         # adding a new token '[PAD]' to the tokenizer, and then using it as the padding token
         self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
@@ -36,9 +38,7 @@ class DGraphDTALigand(DGraphDTA):
         # get smiles list input
         mol_x = data_mol.lig_seq
 
-
-
-
+        print(data_mol.x.device, self.model.device)
 
         try:
             # get selifes from smile
