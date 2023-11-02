@@ -25,6 +25,8 @@ class DGraphDTALigand(DGraphDTA):
         # adding a new token '[PAD]' to the tokenizer, and then using it as the padding token
         self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
+        self.relu = nn.ReLU()
+
         # if ligand_feature == 'some new feature list':
         #       num_features_mol = updated number
         
