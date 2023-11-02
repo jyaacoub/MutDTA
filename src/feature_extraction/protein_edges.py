@@ -233,6 +233,7 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             # treat all edges as the same if no confirmations are found
             return np.ones(shape=(len(target_seq), len(target_seq))) 
         else:
+            # NOTE: af2-anm gets run here:
             ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
             assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
             return ew        
@@ -301,3 +302,63 @@ if __name__ == '__main__':
                                                 n_modes=5, n_cpu=4,
                                                 af_confs=af_confs)
             np.save(out_fp, pro_edge_weight)
+            
+    ################################ ANM VERSION IS PRETTY MUCH THE SAME:
+    # for multiprocessing across multiple job arrays 
+    from tqdm import tqdm
+    import pandas as pd
+    import numpy as np
+    import os, re
+
+    from glob import glob
+    from src.data_processing.datasets import BaseDataset
+    from src.feature_extraction.protein_edges import get_target_edge_weights
+
+    data = 'davis'
+    edgew = 'anm'
+    data_dir = '/cluster/home/t122995uhn/projects/data/'
+    csv = f'{data_dir}/DavisKibaDataset/davis/nomsa_anm_original_binary/full/XY.csv'
+    raw_dir = f'{data_dir}/{data}/'
+    af_conf_dir = f'../colabfold/{data}_af2_out/'
+
+    def pdb_p(code, safe=True):
+        code = re.sub(r'[()]', '_', code)
+        # davis and kiba dont have their own structures so this must be made using 
+        # af or some other method beforehand.
+        file = glob(os.path.join(af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
+        # should only be one file
+        assert not safe or len(file) == 1, f'Incorrect pdb pathing, {len(file)}# of structures for {code}.'
+        return file[0] if len(file) >= 1 else None
+
+
+    # Get protein names:
+    df = pd.read_csv(csv, index_col=0)
+    unique_df = BaseDataset.get_unique_prots(df)
+
+    #%%## Get job partition ###
+    num_arrays = 140 # NOTE: number of ARRAYS HERE
+    array_idx = 46#${SLURM_ARRAY_TASK_ID}
+    partition_size = len(unique_df) / num_arrays
+    start, end = int(array_idx*partition_size), int((array_idx+1)*partition_size)
+
+    unique_df_part = unique_df[start:end]
+
+    print(unique_df_part.index)
+
+    #%%### Run anm simulation ###
+    np_dir = os.path.join(raw_dir, 'edge_weights', 'anm')
+    os.makedirs(np_dir, exist_ok=True)
+
+    # running
+    for code, (prot_id, pro_seq) in tqdm(
+                    unique_df_part[['prot_id', 'prot_seq']].iterrows(), 
+                    desc='Running edgw',
+                    total=len(unique_df_part)):
+        out_fp = os.path.join(np_dir, f"{code}.npy")
+
+        if not os.path.isfile(out_fp):
+            pro_edge_weight = get_target_edge_weights(pdb_p(code), pro_seq, 
+                                                edge_opt='anm',
+                                                n_modes=5, n_cpu=4)
+            np.save(out_fp, pro_edge_weight)
+
