@@ -1,7 +1,9 @@
+import torch
 from torch import nn
 from torch_geometric.nn import (GCNConv, global_mean_pool as gep)
 
 from transformers import AutoTokenizer, AutoModel
+from selfies import encoder
 
 from src.models.prior_work import DGraphDTA
 
@@ -27,24 +29,26 @@ class DGraphDTALigand(DGraphDTA):
         self.mol_fc_g2 = nn.Linear(1024, output_dim)
     
     def forward_mol(self, data_mol):
-        # get graph input
-        mol_x, mol_edge_index, mol_batch = data_mol.x, data_mol.edge_index, data_mol.batch
+        # get smiles list input
+        mol_x = data_mol.x
 
-        x = self.mol_conv1(mol_x, mol_edge_index)
-        x = self.relu(x)
+        # get tokenizer and model
+        tokenizer = AutoTokenizer.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
+        model = AutoModel.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
 
-        # mol_edge_index, _ = dropout_adj(mol_edge_index, training=self.training)
-        x = self.mol_conv2(x, mol_edge_index)
-        x = self.relu(x)
+        # get selifes from smile
+        selfies = [encoder(s) for s in mol_x]
 
-        # mol_edge_index, _ = dropout_adj(mol_edge_index, training=self.training)
-        x = self.mol_conv3(x, mol_edge_index)
-        x = self.relu(x)
-        x = gep(x, mol_batch)  # global pooling
+        # adding a new token '[PAD]' to the tokenizer, and then using it as the padding token
+        tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
 
-        # flatten
-        x = self.relu(self.mol_fc_g1(x))
-        x = self.dropout(x)
-        x = self.mol_fc_g2(x)
-        x = self.dropout(x)
+        # get tokens
+        res = tokenizer(selfies, return_tensors="pt", padding=True)
+
+        # model
+        model_output = model(**res).last_hidden_state
+
+        # flatten to [L, 128]
+        x = torch.mean(model_output, dim=1)
+
         return x
