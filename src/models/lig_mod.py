@@ -34,7 +34,7 @@ class DGraphDTALigand(DGraphDTA):
     
     def forward_mol(self, data_mol):
         # get smiles list input
-        mol_x = data_mol.x
+        mol_x = data_mol.lig_seq
 
 
 
