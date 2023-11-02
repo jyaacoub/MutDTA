@@ -13,17 +13,10 @@ def display_models():
     print('device:', device)
 
     for data in  ['davis', 'kiba']:
-        # get tokenizer and model
-        tokenizer = AutoTokenizer.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
-        model = AutoModel.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
+        model_file_name = f'results/model_checkpoints/prior_work/DGraphDTA_{data}_t2.model'
+        model = DGraphDTA()
+        model.to(device)
         
-        # get selifes from smile
-        selfies = [encoder(s) for s in data]
-
-        # adding a new token '[PAD]' to the tokenizer, and then using it as the padding token
-        tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
-
-        # stuff that was here before
         cp = torch.load(model_file_name, map_location=device) # loading checkpoint
         model.safe_load_state_dict(cp)
         

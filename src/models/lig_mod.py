@@ -32,17 +32,23 @@ class DGraphDTALigand(DGraphDTA):
         # get smiles list input
         mol_x = data_mol.x
 
+        # get tokenizer and model
+        tokenizer = AutoTokenizer.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
+        model = AutoModel.from_pretrained("../hf_models/models--ncfrey--ChemGPT-4.7M/snapshots/7438a282460b3038e17a27e25b85b1376e9a23e2/", local_files_only=True)
+
+        # get selifes from smile
+        selfies = [encoder(s) for s in mol_x]
+
+        # adding a new token '[PAD]' to the tokenizer, and then using it as the padding token
+        tokenizer.add_special_tokens({'pad_token': '[PAD]'}) 
+
         # get tokens
-        res = self.tokenizer(selfies, return_tensors="pt", padding=True)
+        res = tokenizer(selfies, return_tensors="pt", padding=True)
 
         # model
-        model_output = self.model(**res).last_hidden_state
+        model_output = model(**res).last_hidden_state
 
         # flatten to [L, 128]
         x = torch.mean(model_output, dim=1)
-        
-        x = self.relu(self.mol_fc_g1(x))
-        x = self.dropout(x)
-        x = self.mol_fc_g2(x)
-        x = self.dropout(x)
+
         return x
