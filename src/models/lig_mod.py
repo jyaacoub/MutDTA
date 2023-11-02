@@ -51,6 +51,9 @@ class DGraphDTALigand(DGraphDTA):
         # get tokens
         res = self.tokenizer(selfies, return_tensors="pt", padding=True)
 
+        res['input_ids'] = res['input_ids'].to(data_mol.x.device)
+        res['attention_mask'] = res['attention_mask'].to(data_mol.x.device)
+
         # model
         model_output = self.model(**res).last_hidden_state
 
