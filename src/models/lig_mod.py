@@ -33,7 +33,7 @@ class DGraphDTALigand(DGraphDTA):
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
         self.mol_conv2 = GCNConv(num_features_mol, num_features_mol * 2)
         self.mol_conv3 = GCNConv(num_features_mol * 2, num_features_mol * 4)
-        self.mol_fc_g1 = nn.Linear(num_features_mol * 4, 1024)
+        self.mol_fc_g1 = nn.Linear(num_features_mol, 1024)
         self.mol_fc_g2 = nn.Linear(1024, output_dim)
     
     def forward_mol(self, data_mol):
