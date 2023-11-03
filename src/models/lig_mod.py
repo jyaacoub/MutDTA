@@ -8,8 +8,8 @@ from selfies import encoder
 from src.models.prior_work import DGraphDTA
 
 class DGraphDTALigand(DGraphDTA):
-    def __init__(self, ligand_feature='original', ligand_edge='binary', output_dim=128, *args, **kwargs):
-        super(DGraphDTA, self).__init__(pro_feat=None, edge_weight_opt='binary', *args, **kwargs)
+    def __init__(self, ligand_feature='original', ligand_edge='binary', output_dim=128,, dropout=0.2, *args, **kwargs):
+        super(DGraphDTA, self).__init__(dropout=dropout, pro_feat=None, edge_weight_opt='binary', *args, **kwargs)
 
         print('DGraphDTA Loaded')
         num_features_mol = 128
@@ -26,6 +26,7 @@ class DGraphDTALigand(DGraphDTA):
         self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
 
         self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
 
         # if ligand_feature == 'some new feature list':
         #       num_features_mol = updated number
