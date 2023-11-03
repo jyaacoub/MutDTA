@@ -6,13 +6,13 @@ from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
 
 
-MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT']
+MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT', 'CD']
 
 STRUCT_EDGE_OPT = ['anm', 'af2', 'af2-anm'] # edge options that require structural info (pdbs)
 EDGE_OPT = ['simple', 'binary'] + STRUCT_EDGE_OPT
 PRO_FEAT_OPT = ['nomsa', 'msa', 'shannon']
 
-LIG_FEAT_OPT = [None, 'original', 'chemGPT']
+LIG_FEAT_OPT = [None, 'original']
 LIG_EDGE_OPT = [None, 'binary']
 
 DATA_OPT = ['davis', 'kiba', 'PDBbind']

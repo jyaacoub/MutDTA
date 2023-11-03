@@ -94,7 +94,7 @@ for (MODEL, DATA,
     # ==== LOAD MODEL ====
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print(f'#Device: {device}')
-    model = Loader.init_model(model=MODEL, pro_feature=FEATURE, edge=EDGEW, dropout=DROPOUT,
+    model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGEW, dropout=DROPOUT,
                                 ligand_feature=ligand_feature, ligand_edge=ligand_edge).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
     

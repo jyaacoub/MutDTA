@@ -46,7 +46,7 @@ print(model_p)
 
 
 # %% Initialize model and load checkpoint
-model = Loader.init_model(MODEL, FEATURE, EDGE, DROPOUT)
+model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGE, dropout=DROPOUT)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 mdl_dict = torch.load(model_p, map_location=device)

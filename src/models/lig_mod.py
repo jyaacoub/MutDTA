@@ -7,9 +7,9 @@ from selfies import encoder
 
 from src.models.prior_work import DGraphDTA
 
-class DGraphDTALigand(DGraphDTA):
-    def __init__(self, ligand_feature='original', ligand_edge='binary', output_dim=128, dropout=0.2, *args, **kwargs):
-        super(DGraphDTALigand, self).__init__(dropout=dropout, edge_weight_opt='binary', *args, **kwargs)
+class ChemDTA(DGraphDTA):
+    def __init__(self, mol_output_dim=128, dropout=0.2, *args, **kwargs):
+        super(ChemDTA, self).__init__(dropout=dropout, edge_weight_opt='binary', *args, **kwargs)
 
         print('DGraphDTA Loaded')
         num_features_mol = 128
@@ -23,17 +23,10 @@ class DGraphDTALigand(DGraphDTA):
         self.model.requires_grad_(False) # freeze weights
 
         # adding a new token '[PAD]' to the tokenizer, and then using it as the padding token
-        self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-
-        # self.relu = nn.ReLU()
-        # self.dropout = nn.Dropout(dropout)
-
-        # if ligand_feature == 'some new feature list':
-        #       num_features_mol = updated number
-        
+        self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})       
 
         self.mol_fc_g1 = nn.Linear(num_features_mol, 1024)
-        self.mol_fc_g2 = nn.Linear(1024, output_dim)
+        self.mol_fc_g2 = nn.Linear(1024, mol_output_dim)
     
     def forward_mol(self, data_mol):
         # get smiles list input
