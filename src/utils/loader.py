@@ -1,9 +1,10 @@
 # TODO: create a trainer class for modularity
 from functools import wraps
 from typing import Iterable
+from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
-from src.models.lig_mod import DGraphDTALigand
+from src.models.lig_mod import ChemDTA
 from src.models.pro_mod import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
@@ -29,8 +30,10 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def get_model_key(model:str, data:str, pro_feature:str, edge:str, ligand_feature:str, ligand_edge:str,
-                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False):
+    def get_model_key(model:str, data:str, pro_feature:str, edge:str,
+                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False,
+                      fold:int=None, ligand_feature:str=None, ligand_edge:str=None):
+        data += f'{fold}' if fold is not None else '' # for cross-val
         data += '-overlap' if pro_overlap else ''
         
         if model in ['EAT']: # no edgew or features for this model type
@@ -39,58 +42,63 @@ class Loader():
         else:
             model_key = f'{model}M_{data}D_{pro_feature}F_{edge}E_{batch_size}B_{lr}LR_{dropout}D_{n_epochs}E'
         
-        return model_key + f'_{ligand_feature}LF_{ligand_edge}LE'
+        # add ligand modifications if specified
+        if ligand_feature is not None:
+            model_key += f'_{ligand_feature}LF'
+        if ligand_edge is not None:
+            model_key += f'_{ligand_edge}LE'
+        return model_key
         
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def init_model(model:str, pro_feature:str, edge:str, dropout:float, ligand_feature:str=None, ligand_edge:str=None):
-        num_feat_pro = 54 if 'msa' in pro_feature else 34
-        
-        if (ligand_feature is not None and ligand_feature != 'original') or \
-            (ligand_edge is not None and ligand_edge != 'binary'):
-            print('WARNING: currently no support for combining pro and lig modifications, using original pro features.')
-            #TODO: add support for above. 
-            return DGraphDTALigand(ligand_feature, ligand_edge)
-        
+    def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float, 
+                   ligand_feature:str=None, ligand_edge:str=None):
+        # node and edge features that dont change architecture are changed at the dataset level and not model level (e.g.: nomsa)
+        # here they are only used to set the input dimensions:
+        num_feat_pro = 34 if pro_feature == 'shannon' else 54
+                
         if model == 'DG':
             model = DGraphDTA(num_features_pro=num_feat_pro, 
-                            dropout=dropout, edge_weight_opt=edge)
+                            dropout=dropout, edge_weight_opt=pro_edge)
         elif model == 'DGI':
             model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                                    dropout=dropout, edge_weight_opt=edge)
+                                    dropout=dropout, edge_weight_opt=pro_edge)
         elif model == 'ED':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320, # only esm features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
                         pro_feat='esm_only',
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EDA':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320+num_feat_pro, # esm features + other features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
                         pro_feat='all', # to include all feats
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EDI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320,
                         pro_emb_dim=512, # increase embedding size
                         dropout=dropout,
                         pro_feat='esm_only',
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EDAI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320 + num_feat_pro,
                         pro_emb_dim=512,
                         dropout=dropout,
                         pro_feat='all',
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EAT':
             # this model only needs protein sequence, no additional features.
             model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                                     dropout=dropout)
+        elif model == 'CD':
+            # this model only needs sequence, no additional features.
+            model = ChemDTA(dropout=dropout)
             
         return model
     
@@ -137,15 +145,27 @@ class Loader():
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT, 
                       batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+                      training_fold:int=None, # for cross-val. None for no cross-val
                       protein_overlap:bool=False, 
-                     ligand_feature:str=None, ligand_edge:str=None):
+                      ligand_feature:str=None, ligand_edge:str=None):
         loaders = {}
+        # no overlap or cross-val
+        subsets = datasets
         
-        # different list for subset so that loader keys are the same name as input
+        # training folds are identified by train1, train2, etc. 
+        # (see model_key fn above)
+        if training_fold is not None:
+            subsets = [d+str(training_fold) for d in subsets]
+            try:
+                # making sure test set is not renamed
+                subsets[datasets.index('test')] = 'test'
+            except ValueError:
+                pass
+            
+        # Overlap is identified by adding '-overlap' to the subset name (after cross-val)
         if protein_overlap:
-            subsets = [d+'-overlap' for d in datasets]
-        else:
-            subsets = datasets
+            subsets = [d+'-overlap' for d in subsets]
+        
             
         for d, s in zip(datasets, subsets):
             dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
@@ -156,6 +176,59 @@ class Loader():
             bs = 1 if d == 'test' else batch_train
             loader = DataLoader(dataset=dataset, batch_size=bs, 
                                 shuffle=False)
+            loaders[d] = loader
+            
+        return loaders
+    
+    @staticmethod
+    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
+                    'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
+    def load_distributed_DataLoaders(num_replicas:int, rank:int, seed:int, data:str, # additional args for distributed
+                                     
+                                     pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT,
+                                     batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+                                     training_fold:int=None, # for cross-val. None for no cross-val
+                                     protein_overlap:bool=False, 
+                                     
+                                     ligand_feature:str=None, ligand_edge:str=None,
+                                     
+                                     num_workers:int=4):
+        loaders = {}
+        # no overlap or cross-val
+        subsets = datasets
+        
+        # training folds are identified by train1, train2, etc. 
+        # (see model_key fn above)
+        if training_fold is not None:
+            subsets = [d+str(training_fold) for d in subsets]
+            try:
+                # making sure test set is not renamed
+                subsets[datasets.index('test')] = 'test'
+            except ValueError:
+                pass
+            
+        # Overlap is identified by adding '-overlap' to the subset name (after cross-val)
+        if protein_overlap:
+            subsets = [d+'-overlap' for d in subsets]
+        
+            
+        for d, s in zip(datasets, subsets):
+            dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
+                                          subset=s, path=path, 
+                                          ligand_feature=ligand_feature, 
+                                          ligand_edge=ligand_edge)
+            sampler = DistributedSampler(dataset, shuffle=True,
+                                            num_replicas=num_replicas,
+                                            rank=rank, seed=seed)
+                                            
+            bs = 1 if d == 'test' else batch_train
+            loader = DataLoader(dataset=dataset, 
+                                sampler=sampler,
+                                batch_size=bs, # should be per gpu batch size (local batch size)
+                                num_workers=num_workers,
+                                shuffle=False,
+                                pin_memory=True,
+                                drop_last=True) # drop last batch if not divisible by batch size
             loaders[d] = loader
             
         return loaders

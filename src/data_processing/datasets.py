@@ -115,6 +115,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.edge_opt = edge_opt
         
         # check ligand options:
+        ligand_feature = ligand_feature or 'original'
+        ligand_edge = ligand_edge or 'binary'
         assert ligand_feature in self.LIGAND_FEATURE_OPTIONS, \
             f"Invalid ligand_feature '{ligand_feature}', choose from {self.LIGAND_FEATURE_OPTIONS}"
         self.ligand_feature = ligand_feature
@@ -142,7 +144,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.only_download = only_download
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
-              
     
     @abc.abstractmethod
     def pdb_p(self, code) -> str:
@@ -165,7 +166,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return os.path.join(dirname, f'{code}.npy')
     
     def af_conf_files(self, code) -> list[str]:
-        if 'af2' not in self.edge_opt: return []
         # removing () from string since file names cannot include them and localcolabfold replaces them with _
         code = re.sub(r'[()]', '_', code)
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
@@ -274,6 +274,18 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
         return path
     
+    def save_subset_folds(self, idxs:Iterable[Iterable[int]]|Iterable[data.Sampler]|Iterable[data.DataLoader],
+                          subset_name:str) -> list[str]:
+        """
+        Saves multiple folds of the same dataset for some subset (e.g.: training or val).
+        Name of each fold will be `subset_name` + fold number (e.g.: train0, train1, ...).
+        """
+        paths = []
+        for i, idx in enumerate(idxs):
+            p = self.save_subset(idx, f'{subset_name}{i}')
+            paths.append(p)
+        return paths        
+    
     def load_subset(self, subset_name:str):
         path = os.path.join(self.root, subset_name)
         
@@ -299,11 +311,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if self.only_download:
             return
         
-        if not os.path.isfile(self.processed_paths[0]):
-            self.df = self.pre_process()
-        else:
+        # checking for XY.csv
+        if (os.path.isfile(self.processed_paths[0]) and  # file exists
+            not (os.path.getsize(self.processed_paths[0]) <= 50)):  # and is not empty
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             print(f'{self.processed_paths[0]} file found, using it to create the dataset')
+        else:
+            self.df = self.pre_process()
         self.df = self.filter_pro_len(self.df, self.max_seq_len)
         print(f'Number of codes: {len(self.df)}')
         
@@ -327,9 +341,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
+            # for perf we only search for them if need be
             if 'af2' in self.edge_opt:
                 af_confs = self.af_conf_files(code)
-            else:
+            else: 
                 af_confs = None
             
             # Check to see if edge weights already generated:
@@ -576,7 +591,7 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if 'af2' not in self.edge_opt: return None
+        if self.edge_opt not in cfg.STRUCT_EDGE_OPT: return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -719,6 +734,8 @@ class DavisKibaDataset(BaseDataset):
         # filtering out invalid codes:
         lig_r = [r for i,r in enumerate(lig_r) if codes[prot_c[i]] not in invalid_codes]
         prot_c = [c for c in prot_c if codes[c] not in invalid_codes]
+        
+        assert len(prot_c) > 10, f"Not enough proteins in dataset, {len(prot_c)} total."
         
         # creating binding dataframe:
         #   code,SMILE,pkd,prot_seq

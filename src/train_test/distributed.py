@@ -11,7 +11,7 @@ from src.data_analysis.metrics import get_metrics
 from src.train_test.training import train, test
 from src.train_test.utils import CheckpointSaver, init_node, init_dist_gpu, print_device_info
 
-from src.utils.config import MODEL_STATS_CSV, MEDIA_SAVE_DIR, MODEL_SAVE_DIR
+from src.utils import config as cfg
 
 # distributed training fn
 def dtrain(args):
@@ -31,16 +31,21 @@ def dtrain(args):
     ligand_feature = args.ligand_feature_opt[0]
     ligand_edge = args.ligand_edge_opt[0]
     
-    media_save_p = f'{MEDIA_SAVE_DIR}/{DATA}/'
+    media_save_p = f'{cfg.MEDIA_SAVE_DIR}/{DATA}/'
     MODEL_KEY = Loader.get_model_key(model=MODEL,data=DATA,pro_feature=FEATURE,edge=EDGEW,
                                      ligand_feature=ligand_feature, ligand_edge=ligand_edge,
-                                     batch_size=args.batch_size,
+                                     batch_size=args.batch_size*args.world_size,
                                      lr=args.learning_rate,dropout=args.dropout,
                                      n_epochs=args.num_epochs,
-                                     pro_overlap=args.protein_overlap)
+                                     pro_overlap=args.protein_overlap,
+                                     fold=args.fold_selection)
     
     print(os.getcwd())
     print(MODEL_KEY)
+    print(f'---------------- DATA OPT ----------------')
+    print(f"             data_opt: {args.data_opt}")
+    print(f"      protein_overlap: {args.protein_overlap}")
+    print(f"       fold_selection: {args.fold_selection}\n")
     print(f"---------------- MODEL OPT ---------------")
     print(f"     Selected og_model_opt: {args.model_opt}")
     print(f"         Selected data_opt: {args.data_opt}")
@@ -66,35 +71,24 @@ def dtrain(args):
     
     
     # ==== Load up training dataset ====
-    loaders = {}
-    datasets = ['train', 'test', 'val']
-    # different list for subset so that loader keys are the same name as input
-    if args.protein_overlap:
-        subsets = [d+'-overlap' for d in datasets]
-    else:
-        subsets = datasets
-        
-    for d, s in zip(datasets, subsets):
-        dataset = Loader.load_dataset(DATA, FEATURE, EDGEW, subset=s)
-        sampler = DistributedSampler(dataset, shuffle=True, 
-                                    num_replicas=args.world_size,
-                                    rank=args.rank, seed=args.rand_seed)
-        bs = 1 if d == 'test' else args.batch_size
-        loader = DataLoader(dataset=dataset, 
-                                sampler=sampler,
-                                batch_size=bs, # batch size per gpu (https://stackoverflow.com/questions/73899097/distributed-data-parallel-ddp-batch-size)
-                                num_workers=args.slurm_cpus_per_task, # number of subproc used for data loading
-                                pin_memory=True,
-                                drop_last=True
-                                )
-        loaders[d] = loader
+    loaders = Loader.load_distributed_DataLoaders(
+        num_replicas=args.world_size, rank=args.rank, seed=args.rand_seed,
+        data=DATA, pro_feature=FEATURE, edge_opt=EDGEW,
+        batch_train=args.batch_size, # local batch size (per gpu)
+        datasets=['train', 'test', 'val'],
+        training_fold=args.fold_selection, # default is None from arg_parse
+        protein_overlap=args.protein_overlap,
+        ligand_feature=ligand_feature, ligand_edge=ligand_edge,
+        num_workers=args.slurm_cpus_per_task, # number of subproc used for data loading
+    )
     print(f"Data loaded")
     
     
     # ==== Load model ====
     # args.gpu is the local rank for this process
-    model = Loader.init_model(MODEL, FEATURE, EDGEW, args.dropout).cuda(args.gpu)
-    cp_saver = CheckpointSaver(model=model, save_path=f'{MODEL_SAVE_DIR}/{MODEL_KEY}.model',
+    model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGEW, 
+                              dropout=args.dropout).cuda(args.gpu)
+    cp_saver = CheckpointSaver(model=model, save_path=f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
                             patience=50, min_delta=0.2,
                             dist_rank=args.rank)
@@ -109,7 +103,6 @@ def dtrain(args):
     
     torch.distributed.barrier() # Sync params across GPUs before training
     
-    
     # ==== train ====
     print("starting training:")
     logs = train(model=model, train_loader=loaders['train'], val_loader=loaders['val'], 
@@ -121,13 +114,27 @@ def dtrain(args):
     
     # ==== Evaluate ====
     loss, pred, actual = test(model, loaders['test'], args.gpu)
-    print("Test loss:", loss)
+    torch.distributed.barrier() # Sync params across GPUs
     if args.rank == 0:
+        print("Test loss:", loss)
         get_metrics(actual, pred,
-                    save_results=True,
+                    save_figs=False,
                     save_path=media_save_p,
                     model_key=MODEL_KEY,
-                    csv_file=MODEL_STATS_CSV,
+                    csv_file=cfg.MODEL_STATS_CSV,
                     show=False,
                     logs=logs
+                    )
+        
+    # validation
+    loss, pred, actual = test(model, loaders['val'], args.gpu)
+    torch.distributed.barrier() # Sync params across GPUs
+    if args.rank == 0:
+        print(f'# Val loss: {loss}')
+        get_metrics(actual, pred,
+                    save_figs=False,
+                    save_path=media_save_p,
+                    model_key=MODEL_KEY,
+                    csv_file=cfg.MODEL_STATS_CSV_VAL,
+                    show=False,
                     )

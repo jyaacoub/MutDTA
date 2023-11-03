@@ -57,7 +57,7 @@ if __name__ == '__main__':
         log_z = -np.log(z*1e-6)
 
         get_metrics(log_y, log_z, 
-                    save_results=save,
+                    save_figs=save,
                     save_path=save_path,
                     model_key=f'{run_num}',
                     csv_file=f'{save_path}/vina_stats.csv',

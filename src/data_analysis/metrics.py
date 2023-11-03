@@ -72,12 +72,13 @@ try:
 except:
     pass
 
-def get_metrics(y_true: np.array, y_pred: np.array, save_results=True, 
+def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, 
                 save_path='results/model_media',
                 model_key='trained_davis_test',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
                 show=True,
                 title_prefix='', 
+                dataset='test', # for discriminating between test and val
                 logs=None) -> Tuple[Number]:
     """
     Display and save metrics
@@ -88,7 +89,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
         The actual pkd values
     `y_pred` : np.array
         Predicted pkd values
-    `save_results` : bool, optional
+    `save_figs` : bool, optional
         If Fase dont save anything, by default True
     `save_path` : str, optional
         Media save path for models, by default 'results/model_media'
@@ -107,12 +108,14 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
     Tuple[Number]
         Tuple for the stats (c_index, p_corr, s_corr, mse, mae, rmse)
     """
+    dataset = '' if dataset == 'test' else dataset # To maintain compatibility with prev figs
+    
     plt.clf()
     plt.hist(y_true, bins=10, alpha=0.5)
     plt.hist(y_pred, bins=10, alpha=0.5)
     plt.legend(['Experimental', model_key])
     plt.title(f'{title_prefix}Histogram of affinity values (pkd)')
-    if save_results: plt.savefig(f'{save_path}/{model_key}_his.png')
+    if save_figs: plt.savefig(f'{save_path}/{model_key}_his{dataset}.png')
     if show: plt.show()
     plt.clf()
 
@@ -125,12 +128,12 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
     plt.ylabel(f'{model_key} prediction')
     plt.title(f'{title_prefix}Scatter plot of affinity values (pkd)')
 
-    if save_results: plt.savefig(f'{save_path}/{model_key}_scatter.png')
+    if save_figs: plt.savefig(f'{save_path}/{model_key}_scatter{dataset}.png')
     if show: plt.show()
     plt.clf()
 
-
-    # Stats
+    ########### saving metrics to csv file ###########
+    # get metrics:
     try:
         # cindex throws zero division error if all values are the same
         c_index = concordance_index(y_true, y_pred)
@@ -156,21 +159,19 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
         print(f"MAE: {mae:.3f}")
         print(f"RMSE: {rmse:.3f}")
 
-    # saving to csv file
-    if save_results:
-        # creating stats csv if it doesnt exist
-        if not os.path.exists(csv_file): 
-            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-            stats.set_index('run', inplace=True)
-            stats.to_csv(csv_file)
+    # creating stats csv if it doesnt exist or empty/incomplete header
+    if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
+        stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+        stats.set_index('run', inplace=True)
+        stats.to_csv(csv_file)
 
-        # replacing existing record if run_num already exists
-        stats = pd.read_csv(csv_file, index_col=0)
-        stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
-        stats.to_csv(csv_file)    
+    # replacing existing record if run_num already exists
+    stats = pd.read_csv(csv_file, index_col=0)
+    stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
+    stats.to_csv(csv_file)    
     plt.clf()
     
-    # display train val plot
+    ############ display train val plot ###########
     if logs is not None: 
         ax = plt.figure().gca()
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -183,7 +184,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_results=True,
         # plt.xticks(range(0,NUM_EPOCHS+1, 2))
         # plt.xlim(0, NUM_EPOCHS)
         plt.ylabel('Loss')
-        if save_results: plt.savefig(f'{save_path}/{model_key}_loss.png')
+        if save_figs: plt.savefig(f'{save_path}/{model_key}_loss{dataset}.png')
         if show: plt.show()
     
     return c_index, p_corr, s_corr, mse, mae, rmse

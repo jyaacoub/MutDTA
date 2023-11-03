@@ -108,9 +108,6 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
                 # Update tqdm progress bar
                 progress_bar.set_postfix({"Train Loss": train_loss / (progress_bar.n + 1)})
                 progress_bar.update(1)
-                del batch_pro, batch_mol, labels, predictions, loss
-                gc.collect()
-                torch.cuda.empty_cache()
 
             # Compute average training loss for the epoch
             train_loss /= len(train_loader)
