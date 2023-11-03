@@ -9,7 +9,7 @@ from src.models.prior_work import DGraphDTA
 
 class DGraphDTALigand(DGraphDTA):
     def __init__(self, ligand_feature='original', ligand_edge='binary', output_dim=128, dropout=0.2, *args, **kwargs):
-        super(DGraphDTALigand, self).__init__(dropout=dropout, pro_feat=None, edge_weight_opt='binary', *args, **kwargs)
+        super(DGraphDTALigand, self).__init__(dropout=dropout, edge_weight_opt='binary', *args, **kwargs)
 
         print('DGraphDTA Loaded')
         num_features_mol = 128
