@@ -6,7 +6,7 @@ from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
 
 
-MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT', 'CD']
+MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT', 'CD', 'CED']
 
 STRUCT_EDGE_OPT = ['anm', 'af2', 'af2-anm'] # edge options that require structural info (pdbs)
 EDGE_OPT = ['simple', 'binary'] + STRUCT_EDGE_OPT
