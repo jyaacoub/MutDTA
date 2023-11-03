@@ -12,7 +12,7 @@ STRUCT_EDGE_OPT = ['anm', 'af2', 'af2-anm'] # edge options that require structur
 EDGE_OPT = ['simple', 'binary'] + STRUCT_EDGE_OPT
 PRO_FEAT_OPT = ['nomsa', 'msa', 'shannon']
 
-LIG_FEAT_OPT = [None, 'original']
+LIG_FEAT_OPT = [None, 'original', 'chemGPT']
 LIG_EDGE_OPT = [None, 'binary']
 
 DATA_OPT = ['davis', 'kiba', 'PDBbind']
