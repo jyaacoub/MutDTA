@@ -4,7 +4,7 @@ from typing import Iterable
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
-from src.models.lig_mod import DGraphDTALigand
+from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.pro_mod import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
@@ -52,54 +52,60 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def init_model(model:str, pro_feature:str, edge:str, dropout:float, ligand_feature:str=None, ligand_edge:str=None):
-        num_feat_pro = 54 if 'msa' in pro_feature else 34
-        
-        if (ligand_feature is not None and ligand_feature != 'original') or \
-            (ligand_edge is not None and ligand_edge != 'binary'):
-            print('WARNING: currently no support for combining pro and lig modifications, using original pro features.')
-            #TODO: add support for above. 
-            return DGraphDTALigand(ligand_feature, ligand_edge)
-        
+    def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float, 
+                   ligand_feature:str=None, ligand_edge:str=None):
+        # node and edge features that dont change architecture are changed at the dataset level and not model level (e.g.: nomsa)
+        # here they are only used to set the input dimensions:
+        num_feat_pro = 34 if pro_feature == 'shannon' else 54
+                
         if model == 'DG':
             model = DGraphDTA(num_features_pro=num_feat_pro, 
-                            dropout=dropout, edge_weight_opt=edge)
+                            dropout=dropout, edge_weight_opt=pro_edge)
         elif model == 'DGI':
             model = DGraphDTAImproved(num_features_pro=num_feat_pro, output_dim=128, # 128 is the same as the original model
-                                    dropout=dropout, edge_weight_opt=edge)
+                                    dropout=dropout, edge_weight_opt=pro_edge)
         elif model == 'ED':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320, # only esm features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
                         pro_feat='esm_only',
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EDA':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320+num_feat_pro, # esm features + other features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
                         pro_feat='all', # to include all feats
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EDI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320,
                         pro_emb_dim=512, # increase embedding size
                         dropout=dropout,
                         pro_feat='esm_only',
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EDAI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320 + num_feat_pro,
                         pro_emb_dim=512,
                         dropout=dropout,
                         pro_feat='all',
-                        edge_weight_opt=edge)
+                        edge_weight_opt=pro_edge)
         elif model == 'EAT':
             # this model only needs protein sequence, no additional features.
             model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                                     dropout=dropout)
-            
+        elif model == 'CD':
+            # this model only needs sequence, no additional features.
+            model = ChemDTA(dropout=dropout)
+        elif model == 'CED':
+            model = ChemEsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                num_features_pro=320,
+                pro_emb_dim=512, # increase embedding size
+                dropout=dropout,
+                pro_feat='esm_only',
+                edge_weight_opt=pro_edge)
         return model
     
     @staticmethod

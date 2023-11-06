@@ -1,12 +1,19 @@
-# %% Creating Data folds for Davis
-from src.data_processing.init_dataset import create_datasets
+# %%
+from src.data_analysis.figures import prepare_df, fig3_edge_feat
+from src.utils import config
 
-create_datasets(
-    data_opt=['davis'],
-    feat_opt=['nomsa'],
-    edge_opt=['binary'],
-    pro_overlap=False,
-    k_folds=5   
-)
+from transformers import AutoTokenizer, AutoModel
+
+
+df = prepare_df('results/model_media/model_stats.csv')
 
 # %%
+fig3_edge_feat(df, show=True, exclude=[])
+
+# %%
+print('test')
+
+#### ChemGPT ####
+
+tokenizer = AutoTokenizer.from_pretrained("ncfrey/ChemGPT-4.7M")
+model = AutoModel.from_pretrained("ncfrey/ChemGPT-4.7M")
