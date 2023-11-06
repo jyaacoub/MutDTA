@@ -4,7 +4,7 @@ from typing import Iterable
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
-from src.models.lig_mod import ChemDTA
+from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.pro_mod import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
@@ -99,7 +99,13 @@ class Loader():
         elif model == 'CD':
             # this model only needs sequence, no additional features.
             model = ChemDTA(dropout=dropout)
-            
+        elif model == 'CED':
+            model = ChemEsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                num_features_pro=320,
+                pro_emb_dim=512, # increase embedding size
+                dropout=dropout,
+                pro_feat='esm_only',
+                edge_weight_opt=pro_edge)
         return model
     
     @staticmethod
