@@ -17,7 +17,7 @@ args = parse_train_test_args(verbose=True, distributed=True,
 os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
 
 # Model name and dataset cannot be added since we can provide a list of them
-args.output_dir += f'_{"-".join(args.model_opt)}_{"-".join(args.data_opt)}_'+\
+args.output_dir += f'_{"-".join(args.model_opt)}_{"-".join(args.data_opt)}{args.fold_selection or ""}_'+\
                    f'{"-".join(args.edge_opt)}_{args.learning_rate}_{args.batch_size*args.slurm_nnodes*args.slurm_ngpus}'
 print("out_dir:", args.output_dir)
 
@@ -41,7 +41,7 @@ executor.update_parameters(
     slurm_gpus_per_node=f'v100:{args.slurm_ngpus}',
     tasks_per_node=args.slurm_ngpus,
     
-    slurm_job_name=f'DDP-{args.model_opt[0]}_{args.data_opt[0]}_{args.slurm_ngpus*args.slurm_nnodes}v100',
+    slurm_job_name=f'DDP-{args.model_opt[0]}_{args.data_opt[0]}{args.fold_selection or ""}_{args.slurm_ngpus*args.slurm_nnodes}v100',
     slurm_partition=("gpu" if cfg.ON_H4H else None),         
     slurm_account=('kumargroup_gpu' if cfg.ON_H4H else None),
     slurm_mem=args.slurm_mem,
