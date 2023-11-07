@@ -27,3 +27,6 @@ requests==2.31.0
 
 submitit==1.4.5
 ProDy==2.4.1
+
+# for chemgpt
+selfies==1.0.4

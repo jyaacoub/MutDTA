@@ -1,19 +1,16 @@
 # %%
-from src.data_analysis.figures import prepare_df, fig3_edge_feat
-from src.utils import config
+import pandas as pd
 
-from transformers import AutoTokenizer, AutoModel
+df = pd.read_csv('/cluster/home/t122995uhn/projects/data/DavisKibaDataset/davis/nomsa_binary_original_binary/train/XY.csv', index_col=0)
+dft = pd.read_csv('/cluster/home/t122995uhn/projects/data/DavisKibaDataset/davis/nomsa_binary_original_binary/test/XY.csv', index_col=0)
+dfv = pd.read_csv('/cluster/home/t122995uhn/projects/data/DavisKibaDataset/davis/nomsa_binary_original_binary/val/XY.csv', index_col=0)
 
+trainp = df['prot_id'].drop_duplicates()
+testp = dft['prot_id'].drop_duplicates()
+valp = dfv['prot_id'].drop_duplicates()
 
-df = prepare_df('results/model_media/model_stats.csv')
+overlap_train_test = trainp[trainp.isin(testp)]
+overlap_train_val = trainp[trainp.isin(valp)]
+overlap_test_val = testp[testp.isin(valp)]
 
 # %%
-fig3_edge_feat(df, show=True, exclude=[])
-
-# %%
-print('test')
-
-#### ChemGPT ####
-
-tokenizer = AutoTokenizer.from_pretrained("ncfrey/ChemGPT-4.7M")
-model = AutoModel.from_pretrained("ncfrey/ChemGPT-4.7M")

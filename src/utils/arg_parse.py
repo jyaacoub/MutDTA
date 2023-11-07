@@ -138,8 +138,8 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument('-folds',
         '--fold_selection',
-        action='store', type=int, default=None,
-        help='Fold selection (default: None - no fold selection)'
+        action='store', type=int, default=0,
+        help='Fold selection (default: 0 - first fold)'
     )
     return parser
 
