@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 import os, math
 import pandas as pd
+from src.utils import config as cfg
 from src.utils.residue import ResInfo, Chain
 from src.feature_extraction.protein_nodes import get_pfm, target_to_feature
 from src.feature_extraction.protein_edges import get_target_edge
@@ -14,7 +15,8 @@ from src.feature_extraction.protein_edges import get_target_edge
 ###################### Protein Feature Extraction ######################
 ########################################################################
 def target_to_graph(target_sequence:str, contact_map:str or np.array, 
-                    threshold=10.5, aln_file:str=None, shannon=False) -> tuple[np.array,np.array]:
+                    threshold=10.5, pro_feat='nomsa', aln_file:str=None,
+                    pdb_fp:str=None) -> tuple[np.array,np.array]:
     """
     Feature extraction for protein sequence using contact map to generate
     edge index and node features.
@@ -31,50 +33,59 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         this to be anything **above** the value (useful for when the cmap 
         is probability based, anything above 0.5 is considered in contact),
         by default 10.5
+    `pro_feat` : str, optional
+        Type of protein node feature to use, by default 'nomsa'
     `aln_file` : str, optional
         Path to alignment file for PSSM matrix, by default None
-    `shannon` : bool, optional
-        If True, shannon entropy instead of PSSM matrix is used for 
-        protein features, by default False.
+    `pdb_fp` : str, optional
+        Path to pdb file for foldseek feature, by default None
 
     Returns
     -------
     Tuple[np.array]
         tuple of (target_feature, target_edge_index)
     """
-    edge_index, _ = get_target_edge(target_sequence, contact_map, threshold)
-    # getting node features
+    assert pro_feat in cfg.PRO_FEAT_OPT, \
+        f'Invalid protein feature option: {pro_feat}, must be one of {cfg.PRO_FEAT_OPT}'
     
-    # aln_dir = 'data/' + dataset + '/aln'
-    if aln_file is not None:
-        pssm, line_count = get_pfm(aln_file, target_sequence)
-    else:
+    edge_index, _ = get_target_edge(target_sequence, contact_map, threshold)
+    
+    # Geting simple residue one hot and property features.
+    pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
+    
+    # getting node features
+    if pro_feat == 'nomsa':
         #NOTE: DGraphDTA never uses pssm due to logic error 
         # (see: https://github.com/595693085/DGraphDTA/issues/16)
         # returns Lx21 matrix of amino acid distribution for each node
         pssm = np.zeros((len(target_sequence), len(ResInfo.amino_acids)))
         line_count = 1
-    
-    if shannon:
-        def entropy(col):
-            ent = 0.0
-            for base in np.where(col > 0)[0]: # all bases being used
-                n_i = col[base]
-                P_i = n_i/line_count # number of res of type i/ total res in col
-                ent -= P_i*(math.log(P_i,2)) # entropy calc
-            
-            # "1 -" so that the larger the value the more conserved that amino acid is. 
-            return 1 - (ent / math.log2(21)) # divided by log2(21) which is the max entropy score for any 21 dimension vector
-            
-        pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
-        pssm = pssm.reshape((len(target_sequence),1))
-        #TODO: *1 if max prob matches target seq node *-1 otherwise
+        target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
+    elif pro_feat == 'msa' or pro_feat == 'shannon':
+        # get pssm matrix from alignment file
+        pssm, line_count = get_pfm(aln_file, target_sequence)
+        if pro_feat == 'shannon':
+            def entropy(col):
+                ent = 0.0
+                for base in np.where(col > 0)[0]: # all bases being used
+                    n_i = col[base]
+                    P_i = n_i/line_count # number of res of type i/ total res in col
+                    ent -= P_i*(math.log(P_i,2)) # entropy calc
+                # "1 -" so that the larger the value the more conserved that amino acid is. 
+                return 1 - (ent / math.log2(21)) # divided by log2(21) which is the max entropy score for any 21 dimension vector
+                
+            pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
+            pssm = pssm.reshape((len(target_sequence),1))
+        else: # normal pssm
+            pseudocount = 0.8
+            pssm = (pssm + pseudocount / 4) / (float(line_count) + pseudocount)
+        target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
+    elif pro_feat == 'foldseek':
+        # include foldseek token in the feature vector
+        # foldseek = get_foldseek(target_sequence, pdb_file)
+        target_feature = np.concatenate((pro_hot, pro_property), axis=1)
     else:
-        pseudocount = 0.8
-        pssm = (pssm + pseudocount / 4) / (float(line_count) + pseudocount)
-    
-    pro_hot, pro_property = target_to_feature(target_sequence) # shapes=Lx21 and Lx12
-    target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
+        raise NotImplementedError(f'Invalid protein feature option: {pro_feat}')
     
     return target_feature, edge_index
 
