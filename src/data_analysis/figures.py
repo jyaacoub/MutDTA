@@ -75,7 +75,7 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=True):
 # Features -> nomsa, msa, shannon, and esm
 def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True):
     # Extract relevant data
-    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap'])]
+    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())] # NOTE 
     
     # Initialize lists to store cindex values for each dataset type
     nomsa = []
@@ -155,6 +155,34 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
         
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
+
+# similar to above but only for one dataset to show significance between ESM and other features
+# this will be plotted as a jitter plot with error bars
+def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
+                         show=True, add_labels=True, add_stats=False):
+    # Extract relevant data
+    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
+
+    # show all with fold info
+    filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
+    nomsa = filtered_df[(filtered_df['feat'] == 'nomsa')][sel_col]
+    msa = filtered_df[(filtered_df['feat'] == 'msa')][sel_col]
+    shannon = filtered_df[(filtered_df['feat'] == 'shannon')][sel_col]
+    esm = filtered_df[(filtered_df['feat'] == 'ESM')][sel_col]
+
+    # Might have different length for each feature
+    ax = sns.violinplot(data=[nomsa, msa, shannon, esm])
+    ax.set_xticklabels(['nomsa', 'msa', 'shannon', 'esm'])
+    ax.set_ylabel(sel_col)
+    ax.set_xlabel('Features')
+    ax.set_title(f'Feature {sel_col} for {sel_dataset}')
+    
+    # %% Annotation for stats
+    if add_stats:
+        pairs=[('nomsa', 'msa'), ('nomsa', 'shannon'), ('msa', 'shannon')]
+        annotator = Annotator(ax, pairs, data=filtered_df, x='feat', y=sel_col, verbose=verbose)
+        annotator.configure(test='Mann-Whitney', text_format='star', loc='outside')
+        annotator.apply_and_annotate()
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
@@ -245,7 +273,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
         plt.show()
         
     # reset stylesheet back to defaults
-    mpl.rcParams.update(mpl.rcParamsDefault)
+    mpl.rcParams.update(mpl.rcParamsDefault)    
 
 def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -> pd.DataFrame:
     df = pd.read_csv(csv_p)
@@ -262,10 +290,15 @@ def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
     df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False)
     
+    # ESM models
     df.loc[df['run'].str.contains('EDM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
     df.loc[df['run'].str.contains('EDAM'), 'feat'] += '-ESM'
     df.loc[df['run'].str.contains('EDIM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
     df.loc[df['run'].str.contains('EDAIM'), 'feat'] += '-ESM'
+
+    # ChemGPT models
+    df.loc[df['run'].str.contains('CDM'), 'lig_feat'] = 'ChemGPT'
+    #TODO: account for ChemGPT with additional features
 
     df['overlap'] = df['run'].str.contains('overlap')
     
