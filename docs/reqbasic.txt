@@ -1,0 +1,31 @@
+numpy
+pandas
+tqdm
+rdkit
+scipy
+
+# for generating figures:
+matplotlib
+seaborn
+statannotations
+
+lifelines
+#biopython # used for cmap
+
+# model building
+torch
+torch-geometric
+transformers
+
+# optional:
+torchsummary
+tabulate
+ipykernel
+plotly
+requests
+
+submitit
+ProDy
+
+# for chemgpt
+selfies
