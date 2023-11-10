@@ -29,4 +29,22 @@ CHECKPOINT_SAVE_DIR = MODEL_SAVE_DIR # alias for clarity
 
 # cluster based configs:
 import socket
-ON_H4H = 'uhnh4h' in socket.getfqdn().split('.')
+DOMAIN_NAME = socket.getfqdn().split('.')
+CLUSTER = DOMAIN_NAME[1]
+
+SLURM_CONSTRAINT = None
+SLURM_PARTITION = None
+SLURM_ACCOUNT = None
+SLURM_GPU_NAME = 'v100'
+
+if 'uhnh4h' in DOMAIN_NAME:
+    CLUSTER = 'h4h'
+    SLURM_PARTITION = 'gpu'
+    SLURM_CONSTRAINT = 'gpu32g'
+    SLURM_ACCOUNT = 'kumargroup_gpu'
+elif 'graham' in DOMAIN_NAME:
+    CLUSTER = 'graham'
+    SLURM_CONSTRAINT = 'cascade,v100'
+elif 'cedar' in DOMAIN_NAME:
+    CLUSTER = 'cedar'
+    SLURM_GPU_NAME = 'v100l'
