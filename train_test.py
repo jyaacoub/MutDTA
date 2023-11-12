@@ -73,16 +73,7 @@ for (MODEL, DATA,
     os.makedirs(f'{media_save_p}/train_log/', exist_ok=True)
 
 
-    # ==== LOAD DATA ====
-    # WARNING: Deprecating use of split to ensure all models train on same dataset splits.
-    # dataset = Loader.load_dataset(DATA, FEATURE, EDGEW, subset='full')
-    # print(f'# Number of samples: {len(dataset)}')
-    # train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-    #                     train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
-    #                     shuffle_dataset=True, random_seed=args.rand_seed, 
-    #                     batch_train=BATCH_SIZE, use_refined=False,
-    #                     split_by_prot=not args.protein_overlap)
-    
+    # ==== LOAD DATA ====    
     loaders = Loader.load_DataLoaders(data=DATA, pro_feature=FEATURE, edge_opt=EDGEW, path=cfg.DATA_ROOT, 
                                         ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                         batch_train=BATCH_SIZE,
