@@ -275,6 +275,8 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
                             hide_non_significant=True)
         annotator.apply_and_annotate()
 
+    if show:
+        plt.show()
 
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
@@ -303,6 +305,9 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
         annotator = Annotator(ax, pairs, data=filtered_df, x='edge', y=sel_col, verbose=verbose)
         annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True)
         annotator.apply_and_annotate()
+        
+    if show:
+        plt.show()
 
 
 
