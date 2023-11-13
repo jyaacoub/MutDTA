@@ -50,4 +50,5 @@ elif 'cedar' in DOMAIN_NAME:
     SLURM_GPU_NAME = 'v100l'
     
 # bin paths
-FOLDSEEK_BIN = '~/lib/foldseek/bin/foldseek'
+from pathlib import Path
+FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
