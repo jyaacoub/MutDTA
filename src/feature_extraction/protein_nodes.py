@@ -76,7 +76,7 @@ def get_foldseek_onehot(combined_seq):
     # the target sequence includes 3Di foldseek tokens alternating with the actual sequence
     # so we divide by 2 to get the length of the actual sequence
     fld_hot = np.zeros((len(combined_seq)//2, len(ResInfo.foldseek_tokens)))
-    for i in range(1, len(combined_seq), step=2):
+    for i in range(1, len(combined_seq), 2):
         fld_hot[i // 2,] = one_hot(combined_seq[i], ResInfo.foldseek_tokens)
     return fld_hot
 
