@@ -150,6 +150,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         """path to pdbfile for a particular protein"""
         raise NotImplementedError
     
+    def pddlt_p(self, code) -> str:
+        """path to plddt file for a particular protein"""
+        return None
+    
     @abc.abstractmethod
     def cmap_p(self, code) -> str:
         raise NotImplementedError
@@ -332,10 +336,12 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
                 pro_cmap = np.load(self.cmap_p(code))
-                extra_feat, edge_idx = target_to_graph(pro_seq, pro_cmap,
-                                                            threshold=self.cmap_threshold,
-                                                            aln_file=self.aln_p(code),
-                                                            shannon=self.shannon)
+                extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, contact_map=pro_cmap,
+                                                       threshold=self.cmap_threshold, pro_feat=self.feature_opt,
+                                                       aln_file=self.aln_p(code), 
+                                                       # for foldseek feats
+                                                       pdb_fp=self.pdb_p(code), 
+                                                       pddlt_fp=self.pddlt_p(code))
             except Exception as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
@@ -597,6 +603,14 @@ class DavisKibaDataset(BaseDataset):
         # should only be one file
         assert not safe or len(file) == 1, f'Incorrect pdb pathing, {len(file)}# of structures for {code}.'
         return file[0] if len(file) >= 1 else None
+    
+    def pddlt_p(self, code, safe=True):
+        # this contains confidence scores for each predicted residue position in the protein
+        pdb_p = self.pdb_p(code, safe=safe)
+        if pdb_p is None: return None
+        # from O00141_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000.pdb
+        # to   O00141_scores_rank_001_alphafold2_ptm_model_1_seed_000.json
+        return pdb_p.replace('unrelaxed', 'scores').replace('.pdb', '.json')
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')

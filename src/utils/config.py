@@ -5,7 +5,7 @@ os.environ['TRANSFORMERS_CACHE'] = '../hf_models/'
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
 
-
+# model and data options
 MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT', 'CD', 'CED']
 
 STRUCT_EDGE_OPT = ['anm', 'af2', 'af2-anm'] # edge options that require structural info (pdbs)
@@ -48,3 +48,6 @@ elif 'graham' in DOMAIN_NAME:
 elif 'cedar' in DOMAIN_NAME:
     CLUSTER = 'cedar'
     SLURM_GPU_NAME = 'v100l'
+    
+# bin paths
+FOLDSEEK_BIN = '~/lib/foldseek/bin/foldseek'
