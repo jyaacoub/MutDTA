@@ -338,7 +338,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                                     pro_feat=self.feature_opt,
                                                                     aln_file=self.aln_p(code), 
                                                                     # for foldseek feats
-                                                                    pdb_fp=self.pdb_p(code), 
+                                                                    pdb_fp=self.pdb_p(code),
                                                                     pddlt_fp=self.pddlt_p(code))
             except Exception as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
@@ -595,7 +595,8 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if self.edge_opt not in cfg.STRUCT_EDGE_OPT: return None
+        if (self.edge_opt not in cfg.STRUCT_EDGE_OPT) and \
+            (self.feature_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -730,17 +731,21 @@ class DavisKibaDataset(BaseDataset):
         no_cmap = [c for c in codes if not os.path.isfile(self.cmap_p(c))]
         print(f'Number of codes without cmap files: {len(no_cmap)} out of {len(codes)}')
         
-        # Checking that structure and af_confs files are present if edgeW is anm or af2
+        # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.edge_opt in cfg.STRUCT_EDGE_OPT:
-           no_confs = [c for c in codes if (
-               (self.pdb_p(c, safe=False) is None) or # no highQ structure
-                (len(self.af_conf_files(c)) < 2))]    # not enough af confirmations.
+        if self.edge_opt in cfg.STRUCT_EDGE_OPT or self.feature_opt in cfg.STRUCT_PRO_FEAT_OPT:
+            if self.feature_opt == 'foldseek':
+                # we only need HighQ structures for foldseek
+                no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
+            else:
+                no_confs = [c for c in codes if (
+                (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                    (len(self.af_conf_files(c)) < 2))]    # only if not for foldseek
            
-           # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
-           no_confs.append('TESK1')
+            # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
+            no_confs.append('TESK1')
            
-           print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
+            print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
            
         invalid_codes = set(no_aln + no_cmap + no_confs)
         # filtering out invalid codes:
