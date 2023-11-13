@@ -100,15 +100,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         assert feature_opt in self.FEATURE_OPTIONS, \
             f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
             
-        self.shannon = False
         self.feature_opt = feature_opt
-        if feature_opt == 'nomsa':
-            self.aln_dir = None # none treats it as np.zeros
-        elif feature_opt == 'msa':
+        self.aln_dir = None # none treats it as np.zeros
+        if feature_opt in ['msa', 'shannon']:
             self.aln_dir =  aln_dir # path to sequence alignments
-        elif feature_opt == 'shannon':
-            self.aln_dir = aln_dir
-            self.shannon = True
             
         assert edge_opt in self.EDGE_OPTIONS, \
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
