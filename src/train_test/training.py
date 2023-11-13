@@ -1,5 +1,3 @@
-import itertools
-import gc
 from typing import Tuple
 
 from tqdm import tqdm
@@ -10,14 +8,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.loader import DataLoader
 
 from src.data_analysis.metrics import concordance_index
-from src.data_processing.datasets import BaseDataset
-
 from src.models.utils import BaseModel
-from src.models.prior_work import DGraphDTA
-
-from src.train_test.utils import train_val_test_split, CheckpointSaver
-
-from src.utils.loader import Loader
+from src.train_test.utils import CheckpointSaver
 
 
 def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader, 
@@ -190,70 +182,3 @@ def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray,
         test_loss /= len(test_loader)
     
     return test_loss, pred, actual
-
-
-def train_tune(config, model:str, pro_feature:str, train_dataset:BaseDataset, val_dataset:BaseDataset):
-    from ray.air import session
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    model = Loader.init_model(model, pro_feature, config['edge'], config['dropout'])
-    model.to(device)
-    
-    train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], 
-                            shuffle=True,
-                            num_workers=2)
-    val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], 
-                            shuffle=True,
-                            num_workers=2)
-    
-    saver = CheckpointSaver(model, debug=True)
-    for i in range(10): # 10 epochs
-        logs = train(model, train_loader, val_loader, device, epochs=1, 
-              lr_0=config['lr'], silent=True, saver=saver)
-        val_loss = logs['val_loss'][0]
-
-        # Send the current training result back to Tune
-        session.report({"val_loss": val_loss})
-
-        if i % 5 == 0:
-            # This saves the model to the trial directory
-            torch.save(model.state_dict(), "./model.pth")
-    
-
-
-def grid_search(pdb_dataset, TRAIN_SPLIT=0.8, VAL_SPLIT=0.1, RAND_SEED=42,
-                epoch_opt = [5],
-                weight_opt = ['kiba', 'davis', 'random'],
-                batch_size_opt = [32, 64, 128],
-                lr_opt = [0.0001, 0.001, 0.01],
-                dropout_opt = [0.1, 0.2, 0.3]):
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    print(f'Device: {device}')
-    model_results = {}
-    for WEIGHTS, BATCH_SIZE, \
-        LEARNING_RATE, DROPOUT, NUM_EPOCHS in \
-        itertools.product(weight_opt, batch_size_opt, \
-                        lr_opt, dropout_opt, epoch_opt):
-        MODEL_KEY = f'{WEIGHTS}W_{BATCH_SIZE}B_{LEARNING_RATE}LR_{DROPOUT}DO_{NUM_EPOCHS}E'
-        print(f'\n\n{MODEL_KEY}')
-        
-
-        model = DGraphDTA(dropout=DROPOUT)
-        model.to(device)
-        assert WEIGHTS in weight_opt, 'WEIGHTS must be one of: kiba, davis, random'
-        if WEIGHTS != 'random':
-            model_file_name = f'results/model_checkpoints/prior_work/DGraphDTA_{WEIGHTS}_t2.model'
-            model.safe_load_state_dict(torch.load(model_file_name, map_location=device))
-
-        train_loader, val_loader, test_loader = train_val_test_split(pdb_dataset, 
-                            train_split=TRAIN_SPLIT, val_split=VAL_SPLIT,
-                            shuffle_dataset=True, random_seed=RAND_SEED, 
-                            batch_size=BATCH_SIZE)
-        logs = train(model, train_loader, val_loader, device, 
-                epochs=NUM_EPOCHS, lr_0=LEARNING_RATE)
-
-        loss, pred, actual = test(model, test_loader, device)
-        model_results[MODEL_KEY] = {'test_loss': loss, 
-                                    'train_loss': logs['train_loss'][-1],
-                                    'val_loss': logs['val_loss'][-1]}
-    return model_results
-

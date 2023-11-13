@@ -1,14 +1,13 @@
 from multiprocessing import Pool
 from typing import Callable, Iterable
 import numpy as np
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 import os, math
 import pandas as pd
 from src.utils import config as cfg
 from src.utils.residue import ResInfo, Chain
-from src.feature_extraction.protein_nodes import get_pfm, target_to_feature
+from src.feature_extraction.protein_nodes import get_pfm, target_to_feature, get_foldseek_onehot, run_foldseek
 from src.feature_extraction.protein_edges import get_target_edge
 
 ########################################################################
@@ -16,7 +15,7 @@ from src.feature_extraction.protein_edges import get_target_edge
 ########################################################################
 def target_to_graph(target_sequence:str, contact_map:str or np.array, 
                     threshold=10.5, pro_feat='nomsa', aln_file:str=None,
-                    pdb_fp:str=None) -> tuple[np.array,np.array]:
+                    pdb_fp:str=None, pddlt_fp:str=None) -> tuple[np.array,np.array]:
     """
     Feature extraction for protein sequence using contact map to generate
     edge index and node features.
@@ -39,11 +38,13 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         Path to alignment file for PSSM matrix, by default None
     `pdb_fp` : str, optional
         Path to pdb file for foldseek feature, by default None
+    `pddlt_fp` : str, optional
+        Path to pddlt (confidence) file for foldseek if pdb is a predicted structure, by default None
 
     Returns
     -------
     Tuple[np.array]
-        tuple of (target_feature, target_edge_index)
+        tuple of (target_sequence, target_feature, target_edge_index)
     """
     assert pro_feat in cfg.PRO_FEAT_OPT, \
         f'Invalid protein feature option: {pro_feat}, must be one of {cfg.PRO_FEAT_OPT}'
@@ -77,17 +78,31 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
             pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
             pssm = pssm.reshape((len(target_sequence),1))
         else: # normal pssm
-            pseudocount = 0.8
+            pseudocount = 0.8 # pseudocount to avoid divide by 0
             pssm = (pssm + pseudocount / 4) / (float(line_count) + pseudocount)
         target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
     elif pro_feat == 'foldseek':
-        # include foldseek token in the feature vector
-        # foldseek = get_foldseek(target_sequence, pdb_file)
-        target_feature = np.concatenate((pro_hot, pro_property), axis=1)
+        # returns {chain: [seq, struct_seq, combined_seq]} dict
+        seq_dict = run_foldseek(pdb_fp, plddt_fp=pddlt_fp)
+        
+        # use matching sequence from foldseek
+        combined_seq = None
+        for c in seq_dict:
+            if seq_dict[c][0] == target_sequence:
+                combined_seq = seq_dict[c][2]
+                break
+        assert combined_seq is not None, f'Could not find matching foldseek 3Di sequence for {pdb_fp}'
+        
+        # input sequences should now include 3di tokens
+        pro_hot_3di = get_foldseek_onehot(combined_seq)
+        target_feature = np.concatenate((pro_hot, pro_hot_3di), axis=1)
+        
+        # updating target sequence to include 3di tokens
+        target_sequence = combined_seq
     else:
         raise NotImplementedError(f'Invalid protein feature option: {pro_feat}')
     
-    return target_feature, edge_index
+    return target_sequence, target_feature, edge_index
 
 
 ######################################################################

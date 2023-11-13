@@ -156,34 +156,6 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
 
-# similar to above but only for one dataset to show significance between ESM and other features
-# this will be plotted as a jitter plot with error bars
-def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
-                         show=True, add_labels=True, add_stats=False):
-    # Extract relevant data
-    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
-
-    # show all with fold info
-    filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
-    nomsa = filtered_df[(filtered_df['feat'] == 'nomsa')][sel_col]
-    msa = filtered_df[(filtered_df['feat'] == 'msa')][sel_col]
-    shannon = filtered_df[(filtered_df['feat'] == 'shannon')][sel_col]
-    esm = filtered_df[(filtered_df['feat'] == 'ESM')][sel_col]
-
-    # Might have different length for each feature
-    ax = sns.violinplot(data=[nomsa, msa, shannon, esm])
-    ax.set_xticklabels(['nomsa', 'msa', 'shannon', 'esm'])
-    ax.set_ylabel(sel_col)
-    ax.set_xlabel('Features')
-    ax.set_title(f'Feature {sel_col} for {sel_dataset}')
-    
-    # %% Annotation for stats
-    if add_stats:
-        pairs=[('nomsa', 'msa'), ('nomsa', 'shannon'), ('msa', 'shannon')]
-        annotator = Annotator(ax, pairs, data=filtered_df, x='feat', y=sel_col, verbose=verbose)
-        annotator.configure(test='Mann-Whitney', text_format='star', loc='outside')
-        annotator.apply_and_annotate()
-
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
 def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True):
@@ -275,6 +247,70 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)    
 
+# Figure 4: violin plot with error bars for Cross-validation results to show significance among pro feats
+def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
+                         show=True, add_labels=True, add_stats=False):
+    # Extract relevant data
+    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
+
+    # show all with fold info
+    filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
+    nomsa = filtered_df[(filtered_df['feat'] == 'nomsa')][sel_col]
+    msa = filtered_df[(filtered_df['feat'] == 'msa')][sel_col]
+    shannon = filtered_df[(filtered_df['feat'] == 'shannon')][sel_col]
+    esm = filtered_df[(filtered_df['feat'] == 'ESM')][sel_col]
+
+    # Get values for each node feature
+    ax = sns.violinplot(data=[nomsa, msa, shannon, esm])
+    ax.set_xticklabels(['nomsa', 'msa', 'shannon', 'esm'])
+    ax.set_ylabel(sel_col)
+    ax.set_xlabel('Features')
+    ax.set_title(f'Feature {sel_col} for {sel_dataset}')
+    
+    # Annotation for stats
+    if add_stats:
+        pairs=[('nomsa', 'msa'), ('nomsa', 'shannon'), ('msa', 'shannon')]
+        annotator = Annotator(ax, pairs, data=filtered_df, x='feat', y=sel_col, verbose=verbose)
+        annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
+                            hide_non_significant=True)
+        annotator.apply_and_annotate()
+
+    if show:
+        plt.show()
+
+# Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
+def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
+                            show=True, add_labels=True, add_stats=False):
+    filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'].isna())]
+    filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
+
+    filtered_df.sort_values(by=['edge'], inplace=True)
+
+    # Get values for each edge type
+    binary = filtered_df[filtered_df['edge'] == 'binary'][sel_col]
+    simple = filtered_df[filtered_df['edge'] == 'simple'][sel_col]
+    anm = filtered_df[filtered_df['edge'] == 'anm'][sel_col]
+    af2 = filtered_df[filtered_df['edge'] == 'af2'][sel_col]
+
+    # plot violin plot with annotations
+    ax = sns.violinplot(data=[binary, simple, anm, af2])
+    ax.set_xticklabels(['binary', 'simple', 'anm', 'af2'])
+    ax.set_ylabel(sel_col)
+    ax.set_xlabel('Edge type')
+    ax.set_title(f'Edge type {sel_col} for {sel_dataset}')
+
+    if add_stats:
+        pairs = [('binary', 'simple'), ('binary', 'anm'), ('binary', 'af2'), 
+                ('simple', 'anm'), ('simple', 'af2'), ('anm', 'af2')]
+        annotator = Annotator(ax, pairs, data=filtered_df, x='edge', y=sel_col, verbose=verbose)
+        annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True)
+        annotator.apply_and_annotate()
+        
+    if show:
+        plt.show()
+
+
+
 def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -> pd.DataFrame:
     df = pd.read_csv(csv_p)
     
@@ -303,6 +339,9 @@ def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -
     df['overlap'] = df['run'].str.contains('overlap')
     
     return df
+
+
+
 
 if __name__ == '__main__':
     df = prepare_df('results/model_media/model_stats.csv')

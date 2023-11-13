@@ -100,15 +100,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         assert feature_opt in self.FEATURE_OPTIONS, \
             f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
             
-        self.shannon = False
         self.feature_opt = feature_opt
-        if feature_opt == 'nomsa':
-            self.aln_dir = None # none treats it as np.zeros
-        elif feature_opt == 'msa':
+        self.aln_dir = None # none treats it as np.zeros
+        if feature_opt in ['msa', 'shannon']:
             self.aln_dir =  aln_dir # path to sequence alignments
-        elif feature_opt == 'shannon':
-            self.aln_dir = aln_dir
-            self.shannon = True
             
         assert edge_opt in self.EDGE_OPTIONS, \
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
@@ -149,6 +144,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def pdb_p(self, code) -> str:
         """path to pdbfile for a particular protein"""
         raise NotImplementedError
+    
+    def pddlt_p(self, code) -> str:
+        """path to plddt file for a particular protein"""
+        return None
     
     @abc.abstractmethod
     def cmap_p(self, code) -> str:
@@ -332,10 +331,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
                 pro_cmap = np.load(self.cmap_p(code))
-                extra_feat, edge_idx = target_to_graph(pro_seq, pro_cmap,
-                                                            threshold=self.cmap_threshold,
-                                                            aln_file=self.aln_p(code),
-                                                            shannon=self.shannon)
+                # updated_seq is for updated foldseek 3di combined seq
+                updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
+                                                                    contact_map=pro_cmap,
+                                                                    threshold=self.cmap_threshold, 
+                                                                    pro_feat=self.feature_opt,
+                                                                    aln_file=self.aln_p(code), 
+                                                                    # for foldseek feats
+                                                                    pdb_fp=self.pdb_p(code),
+                                                                    pddlt_fp=self.pddlt_p(code))
             except Exception as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
@@ -364,7 +368,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
             pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(edge_idx),
-                                pro_seq=pro_seq, # protein sequence for downstream esm model
+                                pro_seq=updated_seq, # Protein sequence for downstream esm model
                                 prot_id=prot_id,
                                 edge_weight=pro_edge_weight)
             processed_prots[prot_id] = pro
@@ -591,12 +595,21 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if self.edge_opt not in cfg.STRUCT_EDGE_OPT: return None
+        if (self.edge_opt not in cfg.STRUCT_EDGE_OPT) and \
+            (self.feature_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
         assert not safe or len(file) == 1, f'Incorrect pdb pathing, {len(file)}# of structures for {code}.'
         return file[0] if len(file) >= 1 else None
+    
+    def pddlt_p(self, code, safe=True):
+        # this contains confidence scores for each predicted residue position in the protein
+        pdb_p = self.pdb_p(code, safe=safe)
+        if pdb_p is None: return None
+        # from O00141_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000.pdb
+        # to   O00141_scores_rank_001_alphafold2_ptm_model_1_seed_000.json
+        return pdb_p.replace('unrelaxed', 'scores').replace('.pdb', '.json')
     
     def cmap_p(self, code):
         return os.path.join(self.data_root, 'pconsc4', f'{code}.npy')
@@ -718,17 +731,21 @@ class DavisKibaDataset(BaseDataset):
         no_cmap = [c for c in codes if not os.path.isfile(self.cmap_p(c))]
         print(f'Number of codes without cmap files: {len(no_cmap)} out of {len(codes)}')
         
-        # Checking that structure and af_confs files are present if edgeW is anm or af2
+        # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.edge_opt in cfg.STRUCT_EDGE_OPT:
-           no_confs = [c for c in codes if (
-               (self.pdb_p(c, safe=False) is None) or # no highQ structure
-                (len(self.af_conf_files(c)) < 2))]    # not enough af confirmations.
+        if self.edge_opt in cfg.STRUCT_EDGE_OPT or self.feature_opt in cfg.STRUCT_PRO_FEAT_OPT:
+            if self.feature_opt == 'foldseek':
+                # we only need HighQ structures for foldseek
+                no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
+            else:
+                no_confs = [c for c in codes if (
+                (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                    (len(self.af_conf_files(c)) < 2))]    # only if not for foldseek
            
-           # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
-           no_confs.append('TESK1')
+            # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
+            no_confs.append('TESK1')
            
-           print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
+            print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
            
         invalid_codes = set(no_aln + no_cmap + no_confs)
         # filtering out invalid codes:
