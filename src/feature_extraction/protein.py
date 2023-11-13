@@ -44,7 +44,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
     Returns
     -------
     Tuple[np.array]
-        tuple of (target_feature, target_edge_index)
+        tuple of (target_sequence, target_feature, target_edge_index)
     """
     assert pro_feat in cfg.PRO_FEAT_OPT, \
         f'Invalid protein feature option: {pro_feat}, must be one of {cfg.PRO_FEAT_OPT}'
@@ -97,10 +97,13 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         # input sequences should now include 3di tokens
         pro_hot_3di = get_foldseek_onehot(combined_seq)
         target_feature = np.concatenate((pro_hot, pro_hot_3di), axis=1)
+        
+        # updating target sequence to include 3di tokens
+        target_sequence = combined_seq
     else:
         raise NotImplementedError(f'Invalid protein feature option: {pro_feat}')
     
-    return target_feature, edge_index
+    return target_sequence, target_feature, edge_index
 
 
 ######################################################################

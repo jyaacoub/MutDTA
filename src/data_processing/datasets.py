@@ -336,12 +336,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
                 pro_cmap = np.load(self.cmap_p(code))
-                extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, contact_map=pro_cmap,
-                                                       threshold=self.cmap_threshold, pro_feat=self.feature_opt,
-                                                       aln_file=self.aln_p(code), 
-                                                       # for foldseek feats
-                                                       pdb_fp=self.pdb_p(code), 
-                                                       pddlt_fp=self.pddlt_p(code))
+                # updated_seq is for updated foldseek 3di combined seq
+                updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
+                                                                    contact_map=pro_cmap,
+                                                                    threshold=self.cmap_threshold, 
+                                                                    pro_feat=self.feature_opt,
+                                                                    aln_file=self.aln_p(code), 
+                                                                    # for foldseek feats
+                                                                    pdb_fp=self.pdb_p(code), 
+                                                                    pddlt_fp=self.pddlt_p(code))
             except Exception as e:
                 raise Exception(f"error on protein graph creation for code {code}") from e
             
@@ -370,7 +373,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
             pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                                 edge_index=torch.LongTensor(edge_idx),
-                                pro_seq=pro_seq, # protein sequence for downstream esm model
+                                pro_seq=updated_seq, # Protein sequence for downstream esm model
                                 prot_id=prot_id,
                                 edge_weight=pro_edge_weight)
             processed_prots[prot_id] = pro
