@@ -85,6 +85,14 @@ class Loader():
                         dropout=dropout,
                         pro_feat='esm_only',
                         edge_weight_opt=pro_edge)
+        elif model == 'SPD':
+            #SaProt
+            model = EsmDTA(esm_head='westlake-repl/SaProt_35M_AF2',
+                        num_features_pro=320,
+                        pro_emb_dim=512, # increase embedding size
+                        dropout=dropout,
+                        pro_feat='esm_only',
+                        edge_weight_opt=pro_edge)
         elif model == 'EDAI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320 + num_feat_pro,
