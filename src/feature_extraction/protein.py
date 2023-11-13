@@ -87,10 +87,9 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
         
         # use matching sequence from foldseek
         combined_seq = None
-        for chain in seq_dict:
-            seq = seq_dict[chain][0]
-            if seq == target_sequence:
-                combined_seq = seq_dict[seq][2]
+        for c in seq_dict:
+            if seq_dict[c][0] == target_sequence:
+                combined_seq = seq_dict[c][2]
                 break
         assert combined_seq is not None, f'Could not find matching foldseek 3Di sequence for {pdb_fp}'
         
