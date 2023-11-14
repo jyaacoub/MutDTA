@@ -28,8 +28,11 @@ class ChemDTA(DGraphDTA):
         self.tokenizer.add_special_tokens({'pad_token': '[PAD]'})       
 
         self.mol_fc_g1 = nn.Linear(num_features_mol, 1024)
-        self.mol_fc_g2 = nn.Linear(1024, mol_output_dim)
-    
+        self.mol_fc_g2 = nn.Linear(1024, 512)
+        self.mol_fc_g3 = nn.Linear(512,256)
+        self.mol_fc_g4 = nn.Linear(256, mol_output_dim)
+
+
     def forward_mol(self, data_mol):
         # get smiles list input
         mol_x = data_mol.lig_seq
@@ -53,8 +56,10 @@ class ChemDTA(DGraphDTA):
 
         x = self.relu(self.mol_fc_g1(x))
         x = self.dropout(x)
-        x = self.mol_fc_g2(x)
+        x = self.relu(self.mol_fc_g2(x))
         x = self.dropout(x)
+        x = self.relu(self.mol_fc_g3(x))
+        x = self.mol_fc_g4(x)
         return x
     
 class ChemEsmDTA(EsmDTA):
