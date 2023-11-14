@@ -4,7 +4,7 @@ from typing import Iterable
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
-from src.models.lig_mod import ChemDTA
+from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.pro_mod import EsmDTA, EsmAttentionDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
@@ -85,6 +85,14 @@ class Loader():
                         dropout=dropout,
                         pro_feat='esm_only',
                         edge_weight_opt=pro_edge)
+        elif model == 'SPD':
+            #SaProt
+            model = EsmDTA(esm_head='westlake-repl/SaProt_35M_AF2',
+                        num_features_pro=320,
+                        pro_emb_dim=512, # increase embedding size
+                        dropout=dropout,
+                        pro_feat='esm_only',
+                        edge_weight_opt=pro_edge)
         elif model == 'EDAI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320 + num_feat_pro,
@@ -99,7 +107,13 @@ class Loader():
         elif model == 'CD':
             # this model only needs sequence, no additional features.
             model = ChemDTA(dropout=dropout)
-            
+        elif model == 'CED':
+            model = ChemEsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
+                num_features_pro=320,
+                pro_emb_dim=512, # increase embedding size
+                dropout=dropout,
+                pro_feat='esm_only',
+                edge_weight_opt=pro_edge)
         return model
     
     @staticmethod
@@ -143,12 +157,11 @@ class Loader():
     @staticmethod
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT, 
-                      batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+    def load_datasets(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT,
+                      datasets:Iterable[str]=['train', 'test', 'val'],
                       training_fold:int=None, # for cross-val. None for no cross-val
                       protein_overlap:bool=False, 
                       ligand_feature:str=None, ligand_edge:str=None):
-        loaders = {}
         # no overlap or cross-val
         subsets = datasets
         
@@ -166,15 +179,37 @@ class Loader():
         if protein_overlap:
             subsets = [d+'-overlap' for d in subsets]
         
-            
+        loaded_datasets = {}
         for d, s in zip(datasets, subsets):
             dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
                                           subset=s, path=path, 
                                           ligand_feature=ligand_feature, 
                                           ligand_edge=ligand_edge)                
-                                            
+            loaded_datasets[d] = dataset
+        return loaded_datasets
+    
+    @staticmethod
+    @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
+                    'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
+    def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT, 
+                      batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+                      training_fold:int=None, # for cross-val. None for no cross-val
+                      protein_overlap:bool=False, 
+                      ligand_feature:str=None, ligand_edge:str=None,
+                      loaded_datasets=None):
+        # loaded_datasets is used to avoid loading the same dataset multiple times when we just want 
+        # to create a new dataloader (e.g.: for testing with different batch size)
+        if loaded_datasets is None:
+            loaded_datasets = Loader.load_datasets(data=data, pro_feature=pro_feature, edge_opt=edge_opt, 
+                                               path=path, datasets=datasets, training_fold=training_fold, 
+                                               protein_overlap=protein_overlap, ligand_feature=ligand_feature, 
+                                               ligand_edge=ligand_edge)
+        
+        loaders = {}
+        for d in loaded_datasets:
             bs = 1 if d == 'test' else batch_train
-            loader = DataLoader(dataset=dataset, batch_size=bs, 
+            loader = DataLoader(dataset=loaded_datasets[d], 
+                                batch_size=bs, 
                                 shuffle=False)
             loaders[d] = loader
             
@@ -193,30 +228,15 @@ class Loader():
                                      ligand_feature:str=None, ligand_edge:str=None,
                                      
                                      num_workers:int=4):
+        
+        loaded_datasets = Loader.load_datasets(data=data, pro_feature=pro_feature, edge_opt=edge_opt, 
+                                               path=path, datasets=datasets, training_fold=training_fold, 
+                                               protein_overlap=protein_overlap, ligand_feature=ligand_feature, 
+                                               ligand_edge=ligand_edge)
+        
         loaders = {}
-        # no overlap or cross-val
-        subsets = datasets
-        
-        # training folds are identified by train1, train2, etc. 
-        # (see model_key fn above)
-        if training_fold is not None:
-            subsets = [d+str(training_fold) for d in subsets]
-            try:
-                # making sure test set is not renamed
-                subsets[datasets.index('test')] = 'test'
-            except ValueError:
-                pass
-            
-        # Overlap is identified by adding '-overlap' to the subset name (after cross-val)
-        if protein_overlap:
-            subsets = [d+'-overlap' for d in subsets]
-        
-            
-        for d, s in zip(datasets, subsets):
-            dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
-                                          subset=s, path=path, 
-                                          ligand_feature=ligand_feature, 
-                                          ligand_edge=ligand_edge)
+        for d in loaded_datasets:
+            dataset = loaded_datasets[d]
             sampler = DistributedSampler(dataset, shuffle=True,
                                             num_replicas=num_replicas,
                                             rank=rank, seed=seed)

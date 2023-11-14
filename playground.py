@@ -1,19 +1,21 @@
+#%%
+from src.data_analysis.stratify_protein import check_davis_names, kinbase_to_df
+
+df = kinbase_to_df()
 # %%
-from src.data_analysis.figures import prepare_df, fig3_edge_feat
-from src.utils import config
+import json
+prot_dict = json.load(open('/home/jyaacoub/projects/data/davis/proteins.txt', 'r'))
+# %%
+# returns a dictionary of davis protein names (keys) and a truple of the protein name, main family, and subgroup (values)
+prots = check_davis_names(prot_dict, df)
 
-from transformers import AutoTokenizer, AutoModel
+# %% plot histogram of main families and their counts
+import seaborn as sns
+import pandas as pd
 
+main_families = [v[1] for v in prots.values()]
+main_families = pd.Series(main_families)
+sns.histplot(main_families)
 
-df = prepare_df('results/model_media/model_stats.csv')
 
 # %%
-fig3_edge_feat(df, show=True, exclude=[])
-
-# %%
-print('test')
-
-#### ChemGPT ####
-
-tokenizer = AutoTokenizer.from_pretrained("ncfrey/ChemGPT-4.7M")
-model = AutoModel.from_pretrained("ncfrey/ChemGPT-4.7M")

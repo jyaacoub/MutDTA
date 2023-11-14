@@ -6,10 +6,11 @@ import os
 def one_hot(x, allowable_set, cap=False):
     """Return the one-hot encoding of x as a numpy array."""
     if x not in allowable_set:
-        if not cap:
-            raise Exception('input {0} not in allowable set{1}:'.format(x, allowable_set))
-        else:
+        if cap: # last element is the catch all/unknown
             x = allowable_set[-1]
+        else:
+            raise Exception('input {0} not in allowable set{1}:'.format(x, allowable_set))
+            
     return np.eye(len(allowable_set))[allowable_set.index(x)]
 
 
@@ -36,7 +37,12 @@ class ResInfo():
     
     amino_acids = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 
                    'I', 'K', 'L', 'M', 'N', 'P', 'Q', 
-                   'R', 'S', 'T', 'V', 'W', 'Y', 'X']
+                   'R', 'S', 'T', 'V', 'W', 'Y', 'X'] # X is unknown
+    
+    foldseek_tokens = ['a', 'c', 'd', 'e', 'f', 'g', 'h', 
+                       'i', 'k', 'l', 'm', 'n', 'p', 'q', 
+                       'r', 's', 't', 'v', 'w', 'y', '#'] # '#' is mask/unknown
+    
     
     res_to_i = {k: i for i, k in enumerate(amino_acids)}
 
@@ -103,6 +109,7 @@ class ResInfo():
     pl = normalize_add_x(pl)
     hydrophobic_ph2 = normalize_add_x(hydrophobic_ph2)
     hydrophobic_ph7 = normalize_add_x(hydrophobic_ph7)
+    
 
 
 from collections import OrderedDict
