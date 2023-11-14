@@ -1,21 +1,21 @@
-# # %%
-# from src.data_processing.init_dataset import create_datasets
-
-# create_datasets(
-#     data_opt=['davis'],
-#     feat_opt=['foldseek'],
-#     edge_opt=['binary']
-# )
-# # %%
-# from src.utils.loader import Loader
-# d2 = Loader.load_dataset(data='davis', pro_feature='nomsa',
-#                         edge_opt='anm')
-# %%
-from src.data_analysis.figures import fig4_pro_feat_violin, prepare_df
-
-df = prepare_df('results/model_media/model_stats.csv')
-
 #%%
-fig4_pro_feat_violin(df, sel_dataset='davis', sel_col='mse',
-                     add_stats=True, verbose=False)
+from src.data_analysis.stratify_protein import check_davis_names, kinbase_to_df
+
+df = kinbase_to_df()
+# %%
+import json
+prot_dict = json.load(open('/home/jyaacoub/projects/data/davis/proteins.txt', 'r'))
+# %%
+# returns a dictionary of davis protein names (keys) and a truple of the protein name, main family, and subgroup (values)
+prots = check_davis_names(prot_dict, df)
+
+# %% plot histogram of main families and their counts
+import seaborn as sns
+import pandas as pd
+
+main_families = [v[1] for v in prots.values()]
+main_families = pd.Series(main_families)
+sns.histplot(main_families)
+
+
 # %%
