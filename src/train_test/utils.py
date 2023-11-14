@@ -16,7 +16,7 @@ from torch_geometric.loader import DataLoader
 from torch_geometric.data import InMemoryDataset
 
 from src.models.utils import BaseModel
-from src.data_processing.datasets import DavisKibaDataset
+from src.data_processing.datasets import DavisKibaDataset, BaseDataset
 
 
 # Creating data indices for training and validation splits:
@@ -141,7 +141,7 @@ def train_val_test_split(dataset: InMemoryDataset,
     
     return train_loader, val_loader, test_loader
 
-def train_val_test_split_kfolds(dataset: InMemoryDataset,
+def train_val_test_split_kfolds(dataset: DavisKibaDataset,
                          k_folds:int=5, test_split=.1,
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128) -> tuple[DataLoader]:
@@ -151,7 +151,7 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
 
     Parameters
     ----------
-    `dataset` : InMemoryDataset
+    `dataset` : DavisKibaDataset
         The dataset to split
     `test_split` : float, optional
         What percentage of the dataset to use for testing, by default .1
@@ -212,6 +212,110 @@ def train_val_test_split_kfolds(dataset: InMemoryDataset,
     # splitting up remaining proteins into k_folds
     # for davis dataset creating folds is trivial since each protein has the exact same number of samples
     # so we can just divide by k_folds
+    fold_size = len(prots) // k_folds
+    prot_folds = [] # list of lists of proteins for each fold
+    for i in range(k_folds):
+        prot_folds.append(set(prots[i*fold_size:(i+1)*fold_size])) # set for faster lookup
+        
+    print(f'Number of unique proteins in each fold: {fold_size}')
+    
+    ## looping through folds to create train and val loaders
+    train_loaders, val_loaders = [], []
+    for i, fold in enumerate(prot_folds):
+        train_indices, val_indices = [], []
+        for idx in range(dataset_size): # O(n)
+            if dataset[idx]['prot_id'] in fold:
+                val_indices.append(idx)
+            elif dataset[idx]['prot_id'] not in test_prots:
+                train_indices.append(idx)
+        train_sampler = SubsetRandomSampler(train_indices)
+        val_sampler = SubsetRandomSampler(val_indices)
+        train_loaders.append(DataLoader(dataset, batch_size=batch_train,
+                                        sampler=train_sampler, pin_memory=True))
+        val_loaders.append(DataLoader(dataset, batch_size=batch_train,
+                                        sampler=val_sampler, pin_memory=True))
+        
+    t_count = len(train_sampler)
+    v_count = len(val_sampler)
+    te_count = len(test_sampler)
+    
+    print(f'       Folds: {len(train_loaders)}')
+    print(f' Train0 size: {t_count}')
+    print(f'   Val0 size: {v_count}')
+    print(f'   Test size: {te_count}')
+    print(f'            = {t_count+v_count+te_count}')
+    print(f'Dataset size: {dataset_size}')
+    assert te_count > 0, 'Test set is empty'
+    
+    return train_loaders, val_loaders, test_loader
+
+def stratified_kfold_group(dataset: BaseDataset,
+                         k_folds:int=5, test_split=.1,
+                         shuffle_dataset=True, random_seed=None,
+                         batch_train=128) -> tuple[DataLoader]:
+    """
+    Same as train_val_test_split_kfold but we make considerations for the 
+    fact that each protein might not show up in equal proportions (e.g.: 
+    in PDBbind there are some proteins that appear only once and others 
+    that appear hundreds of times).
+
+    Parameters
+    ----------
+    `dataset` : BaseDataset
+        The dataset to split
+    `test_split` : float, optional
+        What percentage of the dataset to use for testing, by default .1
+    `k_folds` : int, optional
+        Number of folds to split the training set into, by default 5
+    `shuffle_dataset` : bool, optional
+        self explainatory, by default True
+    `random_seed` : _type_, optional
+        seed for shuffle, by default None
+    `batch_train` : int, optional
+        size of batch, by default 128
+
+    Returns
+    -------
+    tuple[DataLoader]
+        Train, val, and test loaders
+    """
+    if random_seed is not None: 
+        np.random.seed(random_seed)
+        torch.manual_seed(random_seed)
+    
+    # Get size for each dataset and indices
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    test_size = int(test_split * dataset_size)
+    if shuffle_dataset:
+        np.random.shuffle(indices) # in-place shuffle
+
+    ########## Splitting into train, val, and test ##########
+    # getting counts for each unique protein
+    prot_counts = dataset.get_protein_counts()
+    prots = list(prot_counts.keys())
+    np.random.shuffle(prots)
+    
+    #### Getting test set 
+    count = 0
+    test_prots = {}
+    for p in prots: # O(k); k = number of proteins
+        if count + prot_counts[p] <= test_size:
+            test_prots[p] = True
+            count += prot_counts[p]
+            
+    # looping through dataset to get indices for test
+    test_indices = [i for i in range(dataset_size) if dataset[i]['prot_id'] in test_prots]
+    test_sampler = SubsetRandomSampler(test_indices)
+    test_loader = DataLoader(dataset, batch_size=1, # batch size 1 for testing
+                            sampler=test_sampler, pin_memory=True)
+            
+    # removing selected proteins from prots
+    prots = [p for p in prots if p not in test_prots]
+    print(f'Number of unique proteins in test set: {len(test_prots)} == {count} samples')
+    
+    #### Getting train and val sets #NOTE: this is where this function differs
+    # splitting up remaining proteins into k_folds
     fold_size = len(prots) // k_folds
     prot_folds = [] # list of lists of proteins for each fold
     for i in range(k_folds):

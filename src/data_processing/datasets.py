@@ -191,16 +191,16 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     @property
     def ligands(self):
-        # returns unique ligands in dataset
+        """returns unique ligands in dataset"""
         return self.df['SMILE'].unique()
     
     @property
     def proteins(self):
-        # returns unique proteins in dataset
+        """returns unique proteins in dataset"""
         return self.df['prot_id'].unique()
     
     def get_protein_counts(self) -> Counter:
-        # returns dict of protein counts
+        """returns dict of protein counts from `collections.Counter` object"""
         return Counter(self.df['prot_id'])
     
     @staticmethod
