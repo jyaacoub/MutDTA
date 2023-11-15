@@ -249,10 +249,11 @@ def train_val_test_split_kfolds(dataset: DavisKibaDataset,
     
     return train_loaders, val_loaders, test_loader
 
-def stratified_kfold_group(dataset: BaseDataset,
+def balanced_kfold_split(dataset: BaseDataset,
                          k_folds:int=5, test_split=.1,
                          shuffle_dataset=True, random_seed=None,
-                         batch_train=128) -> tuple[DataLoader]:
+                         batch_train=128,
+                         verbose=True) -> tuple[DataLoader]:
     """
     Same as train_val_test_split_kfold but we make considerations for the 
     fact that each protein might not show up in equal proportions (e.g.: 
@@ -290,7 +291,7 @@ def stratified_kfold_group(dataset: BaseDataset,
     if shuffle_dataset:
         np.random.shuffle(indices) # in-place shuffle
 
-    ########## Splitting into train, val, and test ##########
+    ########## Sampling for test set ##########
     # getting counts for each unique protein
     prot_counts = dataset.get_protein_counts()
     prots = list(prot_counts.keys())
@@ -314,16 +315,40 @@ def stratified_kfold_group(dataset: BaseDataset,
     prots = [p for p in prots if p not in test_prots]
     print(f'Number of unique proteins in test set: {len(test_prots)} == {count} samples')
     
-    #### Getting train and val sets #NOTE: this is where this function differs
-    # splitting up remaining proteins into k_folds
-    fold_size = len(prots) // k_folds
-    prot_folds = [] # list of lists of proteins for each fold
-    for i in range(k_folds):
-        prot_folds.append(set(prots[i*fold_size:(i+1)*fold_size])) # set for faster lookup
+    ########## split remaining proteins into k_folds ##########
+    # Steps for this basically follow Greedy Number Partitioning
+    # tuple of (list of proteins, total weight, current-score):
+    prot_folds = [[[], 0, -1] for i in range(k_folds)] 
+    # score = fold.weight - abs(fold.weight/len(fold) - item.weight)
+    prot_counts = sorted(list(prot_counts.items()), key=lambda x: x[1], reverse=True)
+    for p, c in prot_counts:
+        # Update scores for each fold
+        for fold in prot_folds:
+            f_len = len(fold[0])
+            if f_len == 0:
+                continue
+            
+            # calculate score for adding protein to fold
+            fold[2] = fold[1] #- abs(fold[1]/f_len - c)
+            
+        # Finding optimal fold to add protein to (minimize score)
+        best_fold = min(prot_folds, key=lambda x: x[2])
         
-    print(f'Number of unique proteins in each fold: {fold_size}')
+        # Add protein to fold
+        best_fold[0].append(p)
+        # update weight
+        best_fold[1] += c
     
-    ## looping through folds to create train and val loaders
+    if verbose:
+        print(f'{"#":>10} | {"num_prots":^10} | {"total_count":^12} | {"final_score":^10}')
+        print('-'*53)
+        for i,f in enumerate(prot_folds): 
+            print(f'{"Fold "+str(i):>10} | {len(f[0]):^10} | {f[1]:^12} | {f[2]:^10}')
+    
+    # convert folds to set after done selecting for faster lookup
+    prot_folds = [set(f[0]) for f in prot_folds]
+
+    ########## create train and val loaders ##########
     train_loaders, val_loaders = [], []
     for i, fold in enumerate(prot_folds):
         train_indices, val_indices = [], []
