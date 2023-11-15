@@ -253,7 +253,7 @@ def balanced_kfold_split(dataset: BaseDataset,
                          k_folds:int=5, test_split=.1,
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128,
-                         verbose=True) -> tuple[DataLoader]:
+                         verbose=False) -> tuple[DataLoader]:
     """
     Same as train_val_test_split_kfold but we make considerations for the 
     fact that each protein might not show up in equal proportions (e.g.: 

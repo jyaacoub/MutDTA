@@ -70,10 +70,10 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
             dataset = PDBbindDataset(
                     save_root=f'{data_root}/PDBbindDataset/',
                     data_root=f'{data_root}/v2020-other-PL/',
-                    aln_dir=f'{data_root}/PDBbind_a3m',
+                    aln_dir=f'{data_root}/PDBbind_aln/',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir='../colabfold/pdbbind_af2_out/',
+                    af_conf_dir=f'{data_root}/PDBbind_afConf/',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
