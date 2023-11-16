@@ -22,7 +22,7 @@ tabulate
 ipykernel
 plotly
 requests
-ray[tune]
+#ray[tune]
 
 submitit
 ProDy
