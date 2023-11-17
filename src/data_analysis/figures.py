@@ -89,7 +89,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
         if verbose: print(group[['cindex', 'mse', 'feat']])
         
         # Extract max or min values based on sel_col
-        if sel_col == 'cindex':
+        if sel_col in ['cindex', 'pearson', 'spearman']:
             nomsa_v = group[group['feat'] == 'nomsa'][sel_col].max()
             msa_v = group[group['feat'] == 'msa'][sel_col].max()
             shannon_v = group[group['feat'] == 'shannon'][sel_col].max()
@@ -133,7 +133,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
             ax.bar_label(i, fmt='%.3f', fontsize=13)
             
     # Set the title
-    ax.set_title(f'Node feature performance ({"concordance index" if sel_col == "cindex" else "MSE"})')
+    ax.set_title(f'Node feature performance ({"concordance index" if sel_col == "cindex" else sel_col})')
     
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles=handles, labels=labels, loc='upper right')
@@ -184,7 +184,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
         for edge_value in ['binary', 'simple', 'anm', 'af2', 'af2-anm']:
             filtered_group = group[group['edge'] == edge_value]
 
-            if sel_col == 'cindex':
+            if sel_col == ['cindex', 'pearson', 'spearman']:
                 value = filtered_group[sel_col].max()
             else:
                 value = filtered_group[sel_col].min()
@@ -224,7 +224,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
         for i in ax.containers: 
             ax.bar_label(i, fmt='%.3f', fontsize=13)
     # Set the title
-    ax.set_title(f'Edge type performance ({"concordance index" if sel_col == "cindex" else "MSE"})')
+    ax.set_title(f'Edge type performance ({"concordance index" if sel_col == "cindex" else sel_col})')
 
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles=handles, labels=labels, loc='upper right')

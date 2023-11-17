@@ -50,6 +50,9 @@ elif 'graham' in DOMAIN_NAME:
 elif 'cedar' in DOMAIN_NAME:
     CLUSTER = 'cedar'
     SLURM_GPU_NAME = 'v100l'
+elif 'narval' in DOMAIN_NAME:
+    CLUSTER = 'narval'
+    SLURM_GPU_NAME = 'a100'
     
 # bin paths
 from pathlib import Path
