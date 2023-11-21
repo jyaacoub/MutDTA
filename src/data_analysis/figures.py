@@ -269,8 +269,9 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
     
     # Annotation for stats
     if add_stats:
-        pairs=[('nomsa', 'msa'), ('nomsa', 'shannon'), ('msa', 'shannon'),
-               ('ESM', 'nomsa'), ('ESM', 'msa'), ('ESM', 'shannon')]
+        pairs=[('nomsa', 'msa'), ('nomsa', 'shannon'), ('msa', 'shannon')]
+        if len(esm) > 0: 
+            pairs += [('ESM', 'nomsa'), ('ESM', 'msa'), ('ESM', 'shannon')]
         annotator = Annotator(ax, pairs, data=filtered_df, x='feat', y=sel_col, verbose=verbose)
         annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
                             hide_non_significant=not verbose)
