@@ -145,7 +145,8 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     
     # Add statistical annotations
     pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
-    annotator = Annotator(ax, pairs, data=df, x='data', y='cindex', order=['PDBbind', 'davis', 'kiba'])
+    annotator = Annotator(ax, pairs, data=df, x='data', y='cindex', order=['PDBbind', 'davis', 'kiba'], 
+                          verbose=verbose)
     annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
                         line_height=0.005, verbose=verbose)
     annotator.apply_and_annotate()
@@ -155,6 +156,8 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
         
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
+    
+    return nomsa, msa, shannon, esm
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
@@ -236,23 +239,26 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
 
     # Add statistical annotations
     pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
-    annotator = Annotator(ax, pairs, data=df, x='data', y='cindex', order=['PDBbind', 'davis', 'kiba'])
+    annotator = Annotator(ax, pairs, data=df, x='data', y='cindex', order=['PDBbind', 'davis', 'kiba'],
+                          verbose=verbose)
     annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
-                        line_height=0.005, verbose=False)
+                        line_height=0.005, verbose=verbose)
     annotator.apply_and_annotate()
     # Show the plot
     if show:
         plt.show()
         
     # reset stylesheet back to defaults
-    mpl.rcParams.update(mpl.rcParamsDefault)    
+    mpl.rcParams.update(mpl.rcParamsDefault)
+    
+    return binary, simple, anm, af2, af2_anm
 
 # Figure 4: violin plot with error bars for Cross-validation results to show significance among pro feats
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
                          show=True, add_labels=True, add_stats=True):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
-
+    
     # show all with fold info
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
     nomsa = filtered_df[(filtered_df['feat'] == 'nomsa')][sel_col]
@@ -260,8 +266,17 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
     shannon = filtered_df[(filtered_df['feat'] == 'shannon')][sel_col]
     esm = filtered_df[(filtered_df['feat'] == 'ESM')][sel_col]
 
+    # printing length of each feature
+    if verbose:
+        print(f'nomsa: {len(nomsa)}')
+        print(f'msa: {len(msa)}')
+        print(f'shannon: {len(shannon)}')
+        print(f'esm: {len(esm)}')
+
+
     # Get values for each node feature
-    ax = sns.violinplot(data=[nomsa, msa, shannon, esm])
+    plot_data = [nomsa, msa, shannon, esm]
+    ax = sns.violinplot(data=plot_data)
     ax.set_xticklabels(['nomsa', 'msa', 'shannon', 'esm'])
     ax.set_ylabel(sel_col)
     ax.set_xlabel('Features')
@@ -269,16 +284,18 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
     
     # Annotation for stats
     if add_stats:
-        pairs=[('nomsa', 'msa'), ('nomsa', 'shannon'), ('msa', 'shannon')]
+        pairs = [(0,1), (0,2), (1,2)]
         if len(esm) > 0: 
-            pairs += [('ESM', 'nomsa'), ('ESM', 'msa'), ('ESM', 'shannon')]
-        annotator = Annotator(ax, pairs, data=filtered_df, x='feat', y=sel_col, verbose=verbose)
+            pairs += [(0,3),(1,3), (2,3)] # add esm pairs if esm is not empty
+        annotator = Annotator(ax, pairs, data=plot_data, verbose=verbose)
         annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
                             hide_non_significant=not verbose)
         annotator.apply_and_annotate()
 
     if show:
         plt.show()
+        
+    return nomsa, msa, shannon, esm
 
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
@@ -295,22 +312,24 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
     af2 = filtered_df[filtered_df['edge'] == 'af2'][sel_col]
 
     # plot violin plot with annotations
-    ax = sns.violinplot(data=[binary, simple, anm, af2])
+    plot_data = [binary, simple, anm, af2]
+    ax = sns.violinplot(data=plot_data)
     ax.set_xticklabels(['binary', 'simple', 'anm', 'af2'])
     ax.set_ylabel(sel_col)
     ax.set_xlabel('Edge type')
     ax.set_title(f'Edge type {sel_col} for {sel_dataset}')
 
     if add_stats:
-        pairs = [('binary', 'simple'), ('binary', 'anm'), ('binary', 'af2'), 
-                ('simple', 'anm'), ('simple', 'af2'), ('anm', 'af2')]
-        annotator = Annotator(ax, pairs, data=filtered_df, x='edge', y=sel_col, verbose=verbose)
-        annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True)
+        pairs = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3)]
+        annotator = Annotator(ax, pairs, data=plot_data, verbose=verbose)
+        annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
+                            hide_non_significant=not verbose)
         annotator.apply_and_annotate()
         
     if show:
         plt.show()
-
+        
+    return binary, simple, anm, af2
 
 
 def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -> pd.DataFrame:
@@ -341,8 +360,6 @@ def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -
     df['overlap'] = df['run'].str.contains('overlap')
     
     return df
-
-
 
 
 if __name__ == '__main__':
