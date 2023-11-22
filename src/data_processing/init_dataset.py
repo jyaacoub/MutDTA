@@ -10,7 +10,7 @@ sys.path.append(PROJECT_ROOT)
 
 from src.feature_extraction.protein_nodes import create_pfm_np_files
 from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
-from src.train_test.utils import train_val_test_split, train_val_test_split_kfolds
+from src.train_test.utils import train_val_test_split, balanced_kfold_split
 
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
                     pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
@@ -70,10 +70,10 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
             dataset = PDBbindDataset(
                     save_root=f'{data_root}/PDBbindDataset/',
                     data_root=f'{data_root}/v2020-other-PL/',
-                    aln_dir=f'{data_root}/PDBbind_a3m',
+                    aln_dir=f'{data_root}/PDBbind_aln/',
                     cmap_threshold=8.0,
                     overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir='../colabfold/pdbbind_af2_out/',
+                    af_conf_dir=f'{data_root}/PDBbind_afConf/',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
@@ -100,7 +100,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
             test_split = 1 - train_split - val_split
             assert test_split > 0, f"Invalid train/val/test split: {train_split}/{val_split}/{test_split}"
             assert not pro_overlap, f"No support for overlapping proteins with k-folds rn."
-            train_loader, val_loader, test_loader = train_val_test_split_kfolds(dataset, 
+            train_loader, val_loader, test_loader = balanced_kfold_split(dataset, 
                                     k_folds=k_folds, test_split=test_split,
                                     random_seed=random_seed) # only non-overlapping splits for k-folds
             

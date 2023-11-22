@@ -14,7 +14,9 @@ def get_pfm(aln_file: str, target_seq: str=None, overwrite=False) -> Tuple[np.ar
         lines = f.readlines()
         
     # first line is target seq
-    target_seq = lines[0].strip() if target_seq is None else target_seq 
+    first_line = lines[0].strip()
+    target_seq = first_line if target_seq is None else target_seq
+    assert first_line == target_seq, f"First line doesnt match provided target sequence: {first_line}"
         
     save_p = aln_file+'.pfm.npy'
     if not overwrite and os.path.isfile(save_p):

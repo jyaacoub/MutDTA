@@ -1,21 +1,42 @@
-#%%
-from src.data_analysis.stratify_protein import check_davis_names, kinbase_to_df
-
-df = kinbase_to_df()
 # %%
-import json
-prot_dict = json.load(open('/home/jyaacoub/projects/data/davis/proteins.txt', 'r'))
-# %%
-# returns a dictionary of davis protein names (keys) and a truple of the protein name, main family, and subgroup (values)
-prots = check_davis_names(prot_dict, df)
+from src.data_analysis.figures import fig2_pro_feat, fig3_edge_feat, prepare_df, fig4_pro_feat_violin, fig5_edge_feat_violin
 
-# %% plot histogram of main families and their counts
-import seaborn as sns
+df = prepare_df('results/model_media/model_stats.csv')
+data = 'kiba'
+verbose=False
+
+pdb_f = fig4_pro_feat_violin(df, sel_col='mse', sel_dataset='PDBbind', verbose=verbose)
+kiba_e = fig5_edge_feat_violin(df, sel_col='mse', sel_dataset='kiba', verbose=verbose)
+
+# %% simplified plot for debugging
+from seaborn import violinplot
+from matplotlib import pyplot as plt
 import pandas as pd
+from statannotations.Annotator import Annotator
 
-main_families = [v[1] for v in prots.values()]
-main_families = pd.Series(main_families)
-sns.histplot(main_families)
+new_df = pd.DataFrame({'binary': kiba_e[0], 'simple': kiba_e[1], 'anm': kiba_e[2], 'af2': kiba_e[3]})
+new_df
+
+#%%
+ax = violinplot(data=kiba_e)
+ax.set_xticklabels(['binary', 'simple', 'anm', 'a2'])
+
+pairs = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3)]
+annotator = Annotator(ax, pairs, data=kiba_e, verbose=verbose)
+annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
+                    hide_non_significant=not verbose)
+annotator.apply_and_annotate()
+
 
 
 # %%
+fig4_pro_feat_violin(df, sel_col='cindex', sel_dataset=data, verbose=verbose)
+fig4_pro_feat_violin(df, sel_col='mse', sel_dataset=data, verbose=verbose)
+
+#%%
+fig5_edge_feat_violin(df, sel_col='cindex', sel_dataset=data, verbose=verbose)
+fig5_edge_feat_violin(df, sel_col='mse', sel_dataset=data, verbose=verbose)
+
+# %%
+fig2_pro_feat(df, sel_col='pearson')
+fig3_edge_feat(df, exclude=['af2-anm'], sel_col='pearson')

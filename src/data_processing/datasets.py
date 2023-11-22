@@ -191,16 +191,16 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     @property
     def ligands(self):
-        # returns unique ligands in dataset
+        """returns unique ligands in dataset"""
         return self.df['SMILE'].unique()
     
     @property
     def proteins(self):
-        # returns unique proteins in dataset
+        """returns unique proteins in dataset"""
         return self.df['prot_id'].unique()
     
     def get_protein_counts(self) -> Counter:
-        # returns dict of protein counts
+        """returns dict of protein counts from `collections.Counter` object"""
         return Counter(self.df['prot_id'])
     
     @staticmethod
@@ -430,6 +430,13 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
+        
+    def af_conf_files(self, code) -> list[str]:
+        # removing () from string since file names cannot include them and localcolabfold replaces them with _
+        code = re.sub(r'[()]', '_', code)
+        # localcolabfold has 'unrelaxed' as the first part after the code/ID.
+        # output must be in out directory
+        return glob(f'{self.af_conf_dir}/{code}_model*.pdb')
     
     def pdb_p(self, code):
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
@@ -443,9 +450,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             # dont use aln if none provided (will set to zeros)
             return None
         # aln_dir has a3m files.
-        return os.path.join(os.path.join(os.path.dirname(self.aln_dir), 
-                                                           'PDBbind_aln'), 
-                            f'{code}.aln') #TODO: fix this so '.msa' is not neccessary
+        return os.path.join(os.path.dirname(self.aln_dir), f'{code}.aln')
         
     # for data augmentation override the transform method
     @property
@@ -510,8 +515,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             #                                                'PDBbind_aln'),
             #                                   silent=False)
             
-            valid_codes =  [c for c in pdb_codes if os.path.isfile(self.aln_p(c))]
-            # filters out those that do not have aln file
+            # filters out those that do not have aln file and empty files
+            valid_codes = [c for c in pdb_codes if (os.path.isfile(self.aln_p(c)) and \
+                                                    os.stat(self.aln_p(c)).st_size > 50)]
             print(f'Number of codes with aln files: {len(valid_codes)} out of {len(pdb_codes)}')
         else: # check if exists
             valid_codes = [c for c in pdb_codes if os.path.isfile(self.pdb_p(c))]

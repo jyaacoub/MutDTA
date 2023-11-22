@@ -88,6 +88,7 @@ get_metrics(actual, pred,
 
 
 # %% renaming checkpoint to remove _tmp specification
-if (not os.path.isfile(model_p) and  # ensuring no overwrite
-    os.path.isfile(model_p_tmp)):
+if (not args.no_rename and           # Only rename if not specified, default is to rename
+    not os.path.isfile(model_p) and  # ensuring no overwrite of existing model
+    os.path.isfile(model_p_tmp)):    # ensuring _tmp model exists
     os.rename(model_p_tmp, model_p)
