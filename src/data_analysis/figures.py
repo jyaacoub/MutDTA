@@ -78,9 +78,9 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) 
                      & (df['fold'] != '') & (df['lig_feat'].isna())]
     
-    # Get mean values for each node feature group
-    plot_df = filtered_df.groupby(['data', 'feat'])[sel_col].mean().reset_index()
-    
+    # get only data, feat, and sel_col columns
+    plot_df = filtered_df[['data', 'feat', sel_col]]
+        
     hue_order = ['nomsa', 'msa', 'shannon', 'ESM']
     for f in exclude:
         plot_df = plot_df[plot_df['feat'] != f]
@@ -91,14 +91,18 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     plt.figure(figsize=(14, 7))
     sns.set(style="darkgrid")
     sns.set_context('poster')
-    ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='feat',
-                     palette='deep', hue_order=hue_order)
-    legend = ax.get_legend()
-    legend.set_title('')
+    ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='feat', palette='deep', estimator=np.mean,
+                     order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order, errcolor='gray', errwidth=2)
+    sns.stripplot(data=plot_df, x='data', y=sel_col, hue='feat', palette='deep',
+                  order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order,
+                  size=4, jitter=True, dodge=True, alpha=0.8, ax=ax)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[len(hue_order):], labels[len(hue_order):], 
+              title='', loc='upper right')
     
     if add_labels:
         for i in ax.containers: 
-            ax.bar_label(i, fmt='%.3f', fontsize=13)
+            ax.bar_label(i, fmt='%.3f', fontsize=13, label_type='center')
             
     # Set the title
     ax.set_title(f'Node feature performance ({"concordance index" if sel_col == "cindex" else sel_col})')
@@ -110,13 +114,13 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     
     # Add statistical annotations
     
-    # pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
-    # annotator = Annotator(ax, pairs, data=df, 
-    #                       x='data', y='cindex', order=['PDBbind', 'davis', 'kiba'], #NOTE: this needs to be fixed
-    #                       verbose=verbose)
-    # annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
-    #                     line_height=0.005, verbose=verbose)
-    # annotator.apply_and_annotate()
+    pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
+    annotator = Annotator(ax, pairs, data=plot_df, 
+                          x='data', y=sel_col, order=['PDBbind', 'davis', 'kiba'], #NOTE: this needs to be fixed
+                          verbose=verbose)
+    annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
+                        line_height=0.005, verbose=verbose)
+    annotator.apply_and_annotate()
     
     # Show the plot
     if show:
@@ -125,7 +129,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
     
-    return plot_df
+    return plot_df, filtered_df
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
@@ -137,9 +141,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
     #   Taking the max cindex value for each dataset will give us the best model for each dataset
     filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) 
                      & (df['fold'] != '') & (df['lig_feat'].isna())]
-    
-   # Get mean values for each node feature group
-    plot_df = filtered_df.groupby(['data', 'edge'])[sel_col].mean().reset_index()
+    plot_df = filtered_df[['data', 'edge', sel_col]]
     
     hue_order = ['binary', 'simple', 'anm', 'af2', 'af2-anm']
     for f in exclude:
@@ -151,14 +153,18 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
     plt.figure(figsize=(14, 7))
     sns.set(style="darkgrid")
     sns.set_context('poster')
-    ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='edge',
-                     palette='deep', hue_order=hue_order)
-    legend = ax.get_legend()
-    legend.set_title('')
+    ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='edge', palette='deep', estimator=np.mean,
+                     order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order, errcolor='gray', errwidth=2)
+    sns.stripplot(data=plot_df, x='data', y=sel_col, hue='edge', palette='deep',
+                  order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order,
+                  size=4, jitter=True, dodge=True, alpha=0.8, ax=ax)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[len(hue_order):], labels[len(hue_order):], 
+              title='', loc='upper right')
     
     if add_labels:
         for i in ax.containers: 
-            ax.bar_label(i, fmt='%.3f', fontsize=13)
+            ax.bar_label(i, fmt='%.3f', fontsize=13, label_type='center')
             
     # Set the title
     ax.set_title(f'Edge type performance ({"concordance index" if sel_col == "cindex" else sel_col})')
@@ -169,13 +175,13 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
         ax.set_ylim([0.5, 1])  # 0.5 is the worst cindex value
         
     # Add statistical annotations
-    # pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
-    # annotator = Annotator(ax, pairs, data=df, 
-    #                       x='data', y='cindex', order=['PDBbind', 'davis', 'kiba'], #NOTE: this needs to be fixed
-    #                       verbose=verbose)
-    # annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
-    #                     line_height=0.005, verbose=verbose)
-    # annotator.apply_and_annotate()
+    pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
+    annotator = Annotator(ax, pairs, data=filtered_df,  # Use the original filtered DataFrame
+                          x='data', y=sel_col, order=['PDBbind', 'davis', 'kiba'],
+                          verbose=verbose)
+    annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
+                        line_height=0.005, verbose=verbose)
+    annotator.apply_and_annotate()
     # Show the plot
     if show:
         plt.show()

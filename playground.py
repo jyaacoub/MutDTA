@@ -6,7 +6,7 @@ data = 'davis'
 verbose=False
 
 fig2 = fig2_pro_feat(df, sel_col='cindex', verbose=verbose)
-fig3 = fig3_edge_feat(df, sel_col='cindex', exclude=['af2-anm'], verbose=verbose)
+fig3 = fizg3_edge_feat(df, sel_col='cindex', exclude=['af2-anm'], verbose=verbose)
 
 #%%
 pdb_f = fig4_pro_feat_violin(df, sel_col='cindex', sel_dataset='davis', verbose=verbose)
