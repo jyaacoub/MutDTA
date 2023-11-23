@@ -267,3 +267,76 @@ class EsmDTA(BaseModel):
         model_summary = summary(self, lig, prot)
 
         return main_str + '\n\n' + model_summary
+    
+    
+class SaProtDTA(EsmDTA):
+    def __init__(self, esm_head: str = 'westlake-repl/SaProt_35M_AF2', 
+                 num_features_pro=480, 
+                 pro_emb_dim=512, 
+                 num_features_mol=78, 
+                 output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary'):
+        super().__init__(esm_head, num_features_pro, pro_emb_dim, num_features_mol, output_dim, dropout, pro_feat, edge_weight_opt)
+    
+    # overwrite the forward_pro pass to account for new saprot model    
+    def forward_pro(self, data):
+        #### ESM emb ####
+        # cls and sep tokens are added to the sequence by the tokenizer
+        seq_tok = self.esm_tok(data.pro_seq, 
+                               return_tensors='pt', 
+                               padding=True) # [B, L_max+2]
+        seq_tok['input_ids'] = seq_tok['input_ids'].to(data.x.device)
+        seq_tok['attention_mask'] = seq_tok['attention_mask'].to(data.x.device)
+
+        esm_emb = self.esm_mdl(**seq_tok).last_hidden_state # [B, L_max+2, emb_dim]
+
+        # mask tokens dont make it through to the final output 
+        # thus the final output is the same length as if we were to run it through the original ESM
+
+        #%% removing <cls> token
+        esm_emb = esm_emb[:,1:,:] # [B, L_max+1, emb_dim]
+
+        # %% removing <sep>/<eos> and <pad> token by applying mask
+        # for saProt token 2 == <eos>
+        L_max = esm_emb.shape[1] # L_max+1
+        mask = torch.arange(L_max)[None, :] < torch.tensor([len(seq)/2 #NOTE: this is the main difference from normal ESM since the input sequence includes SA tokens
+            for seq in data.pro_seq])[:, None]
+        mask = mask.flatten(0,1) # [B*L_max+1]
+        
+        # flatten from [B, L_max+1, emb_dim] 
+        esm_emb = esm_emb.flatten(0,1) # to [B*L_max+1, emb_dim]
+        esm_emb = esm_emb[mask] # [SUM_sInSeqs(len(s)), emb_dim]
+        
+        if self.esm_only:
+            target_x = esm_emb # [B*L, emb_dim]
+        else:
+            # append esm embeddings to protein input
+            target_x = torch.cat((esm_emb, data.x), axis=1)
+            #  ->> [B*L, emb_dim+feat_dim]
+
+        #### Graph NN ####
+        ei = data.edge_index
+        ew = data.edge_weight if (self.edge_weight is not None and 
+                                  self.edge_weight != 'binary') else None
+
+        # if edge_weight doesnt exist no error is thrown it just passes it as None
+        xt = self.pro_conv1(target_x, ei, ew)
+        xt = self.relu(xt)
+
+        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
+        xt = self.pro_conv2(xt, ei, ew)
+        xt = self.relu(xt)
+
+        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
+        xt = self.pro_conv3(xt, ei, ew)
+        xt = self.relu(xt)
+
+        # xt = self.pro_conv4(xt, target_edge_index)
+        # xt = self.relu(xt)
+        xt = gep(xt, data.batch)  # global pooling
+
+        # flatten
+        xt = self.relu(self.pro_fc_g1(xt))
+        xt = self.dropout(xt)
+        xt = self.pro_fc_g2(xt)
+        xt = self.dropout(xt)
+        return xt

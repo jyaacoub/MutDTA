@@ -4,8 +4,9 @@ from typing import Iterable
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
+from src.models.utils import BaseModel
 from src.models.lig_mod import ChemDTA, ChemEsmDTA
-from src.models.pro_mod import EsmDTA, EsmAttentionDTA
+from src.models.pro_mod import EsmDTA, EsmAttentionDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
@@ -53,7 +54,7 @@ class Loader():
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float, 
-                   ligand_feature:str=None, ligand_edge:str=None):
+                   ligand_feature:str=None, ligand_edge:str=None) -> BaseModel:
         # node and edge features that dont change architecture are changed at the dataset level and not model level (e.g.: nomsa)
         # here they are only used to set the input dimensions:
         num_feat_pro = 34 if pro_feature == 'shannon' else 54
@@ -87,8 +88,8 @@ class Loader():
                         edge_weight_opt=pro_edge)
         elif model == 'SPD':
             #SaProt
-            model = EsmDTA(esm_head='westlake-repl/SaProt_35M_AF2',
-                        num_features_pro=320,
+            model = SaProtDTA(esm_head='westlake-repl/SaProt_35M_AF2',
+                        num_features_pro=480,
                         pro_emb_dim=512, # increase embedding size
                         dropout=dropout,
                         pro_feat='esm_only',
@@ -191,12 +192,14 @@ class Loader():
     @staticmethod
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def load_DataLoaders(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT, 
-                      batch_train:int=64, datasets:Iterable[str]=['train', 'test', 'val'],
+    def load_DataLoaders(data:str=None, pro_feature:str=None, edge_opt:str=None, path:str=cfg.DATA_ROOT, 
+                      datasets:Iterable[str]=['train', 'test', 'val'],
                       training_fold:int=None, # for cross-val. None for no cross-val
                       protein_overlap:bool=False, 
                       ligand_feature:str=None, ligand_edge:str=None,
-                      loaded_datasets=None):
+                      # NOTE:  if loaded_dataset is provided batch_train is the only real argument
+                      loaded_datasets:dict=None,
+                      batch_train:int=64):
         # loaded_datasets is used to avoid loading the same dataset multiple times when we just want 
         # to create a new dataloader (e.g.: for testing with different batch size)
         if loaded_datasets is None:
