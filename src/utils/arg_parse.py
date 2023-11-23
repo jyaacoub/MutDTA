@@ -46,7 +46,12 @@ def add_model_args(parser: argparse.ArgumentParser):
     parser.add_argument('-D',
         '--debug',
         action='store_true',
-        help='Enters debug mode, no training is done, just model initialization.'
+        help='Enters debug mode, no training is done, just model initialization and batch input.'
+    )
+    parser.add_argument('-nr',
+        '--no_rename',
+        action='store_true',
+        help='Dont rename the model to remove "_tmp" postfix, used for test.py'
     )
     
     # Arguments for ligand options
