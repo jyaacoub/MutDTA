@@ -35,7 +35,7 @@ def kinbase_to_df(fasta_fp:str=f'{cfg.DATA_ROOT}/misc/Human_kinase_domain.fasta'
         for i in range(len(lines)):
             line = lines[i]
             if line[0] == '>': # header
-                seq = lines[i+1]
+                seq = lines[i+1].strip()
                 name = re.search(r'^>(.+?)_Hsap', line).group(1)
                 # all in the fasta has a protein family discriptor with at least 2 elements
                 protein_family = re.search(r'\((.*)\)', line).group(1)
@@ -74,7 +74,7 @@ def check_davis_names(davis_prots:dict, df:pd.DataFrame) -> list:
     
     df = kinbase_to_df() if df is None else df
     
-    greek = {'alpha', 'beta', 'gamma', 'delta'} # for checking if protein name has greek letter
+    greek = {'alpha', 'beta', 'gamma', 'delta', 'epsilon'} # for checking if protein name has greek letter
     
     found_prots = {}
     for k in davis_prots.keys():

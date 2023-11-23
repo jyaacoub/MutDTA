@@ -242,7 +242,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return len(self.df)
     
     def __getitem__(self, idx) -> dict:
-        row = self.df.iloc[idx]
+        row = self.df.iloc[idx] #WARNING: idx must be a list in future versions on pandas since it is deprecated
         code = row.name
         prot_id = row['prot_id']
         lig_seq = row['SMILE']
