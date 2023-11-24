@@ -5,75 +5,49 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 from statannotations.Annotator import Annotator
+from src.utils import config as cfg
 
 # Figure 1 - Protein overlap cindex difference (nomsa)
-def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=True):
-    grouped_df = df[(df['feat'] == 'nomsa') 
+def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=True, context='paper'):
+    filtered_df = df[(df['feat'] == 'nomsa') 
                     & (df['batch_size'] == '64') 
                     & (df['edge'] == 'binary')
                     & (~df['ddp'])              
-                    & (~df['improved'])].groupby(['data'])
+                    & (~df['improved'])]
     
-    # each group is a dataset with 2 bars (overlap and no overlap)
-    for group_name, group_data in grouped_df:
-        if verbose: print(f"\nGroup Name: {group_name}")
-        if verbose: print(group_data[['cindex', 'mse', 'overlap']])
-
-    # these groups are spaced by the data type, physically grouping bars of the same dataset together.
-    # Initialize lists to store cindex values for each dataset type
-    t_overlap = []
-    f_overlap = []
-    dataset_types = []
-
-    for dataset, group in grouped_df:
-        if verbose: print('')
-        if verbose: print(group[['cindex', 'mse', 'overlap', 'data']])
-        
-        # overlap
-        col = group[group['overlap']][sel_col]
-        t_overlap_val = col.mean()
-        if np.isnan(t_overlap_val):
-            t_overlap_val = 0
-        t_overlap.append(t_overlap_val)
-        
-        # no overlap
-        col = group[~group['overlap']][sel_col]
-        f_overlap_val = col.mean()
-        if np.isnan(f_overlap_val):
-            f_overlap_val = 0
-        f_overlap.append(f_overlap_val)
-        dataset_types.append(dataset[0])
-
-    # Create an array of x positions for the bars
-    x = np.arange(len(dataset_types))
-
-    # Set the width of the bars
-    width = 0.35
-
-    # Create a bar plot with two bars for each dataset type
-    fig, ax = plt.subplots()
-    bar2 = ax.bar(x - width/2, t_overlap, width, label='With Overlap')
-    bar1 = ax.bar(x + width/2, f_overlap, width, label='No Overlap')
-
-    # Set the x-axis labels
-    ax.set_xticks(x)
-    ax.set_xticklabels(dataset_types)
-
+    #
+    plot_df = filtered_df[['data', 'overlap', sel_col]]
+    if context == 'poster':
+        scale = 1
+        plt.figure(figsize=(14, 7))
+    else:
+        scale = 0.8
+        plt.figure(figsize=(10, 5))
+    
+    sns.set(style="darkgrid")
+    sns.set_context(context)
+    hue_order = [True, False]
+    ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='overlap', palette='deep', estimator=np.mean,
+                     order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order, errwidth=0)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles, labels, title='Overlap', loc='upper right', prop={'size': 14*scale})
+    
     # Set the y-axis label
     ax.set_ylabel(sel_col)
     if sel_col == 'cindex':
         ax.set_ylim([0.5, 1]) # 0.5 is the worst cindex value
-
+    ax.set_xlabel('Dataset')
     # Set the title and legend
-    ax.set_title(f'Protein Overlap {sel_col} Difference (nomsa)')
-    ax.legend()
+    ax.set_title(f'Protein Overlap {sel_col} Difference (DGraphDTA)',
+                 fontsize=16*scale)
 
     # Show the plot
     if show: plt.show()
 
 # Figure 2 - node feature cindex difference
 # Features -> nomsa, msa, shannon, and esm
-def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True):
+def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True,
+                  context='poster'):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) 
                      & (df['fold'] != '') & (df['lig_feat'].isna())]
@@ -88,38 +62,47 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
             hue_order.remove(f)   
     
     # Create a bar plot using Seaborn
-    plt.figure(figsize=(14, 7))
+    if context == 'poster':
+        scale = 1
+        plt.figure(figsize=(14, 7))
+    else:
+        scale = 0.8
+        plt.figure(figsize=(10, 5))
+
     sns.set(style="darkgrid")
-    sns.set_context('poster')
+    sns.set_context(context)
     ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='feat', palette='deep', estimator=np.mean,
                      order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order, errcolor='gray', errwidth=2)
     sns.stripplot(data=plot_df, x='data', y=sel_col, hue='feat', palette='deep',
                   order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order,
-                  size=4, jitter=True, dodge=True, alpha=0.8, ax=ax)
+                  size=6*scale, jitter=True, dodge=True, alpha=0.7, ax=ax)
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles[len(hue_order):], labels[len(hue_order):], 
-              title='', loc='upper right')
+              title='', loc='upper right', prop={'size': 14*scale})
     
     if add_labels:
         for i in ax.containers: 
-            ax.bar_label(i, fmt='%.3f', fontsize=13, label_type='center')
+            ax.bar_label(i, fmt='%.3f', fontsize=13*scale, 
+                         label_type='center')
             
     # Set the title
-    ax.set_title(f'Node feature performance ({"concordance index" if sel_col == "cindex" else sel_col})')
+    ax.set_title(f'Node feature performance ({"concordance index" if sel_col == "cindex" else sel_col})',
+                 fontsize=16*scale)
     
     # Set the y-axis label and limit
     ax.set_ylabel(sel_col)
     if sel_col == 'cindex':
         ax.set_ylim([0.5, 1])  # 0.5 is the worst cindex value
+    if sel_col == 'pearson':
+        ax.set_ylim([0, 1])
     
     # Add statistical annotations
-    
     pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
     annotator = Annotator(ax, pairs, data=plot_df, 
                           x='data', y=sel_col, order=['PDBbind', 'davis', 'kiba'], #NOTE: this needs to be fixed
                           verbose=verbose)
     annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
-                        line_height=0.005, verbose=verbose)
+                        verbose=verbose)
     annotator.apply_and_annotate()
     
     # Show the plot
@@ -129,11 +112,12 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
     
-    return plot_df, filtered_df
+    return plot_df
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
-def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True):
+def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], show=True, add_labels=True,
+                   context='poster'):
     # comparing nomsa, msa, shannon, and esm
     # group by data type
     
@@ -150,37 +134,45 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
             hue_order.remove(f)    
     
     # Create a bar plot using Seaborn
-    plt.figure(figsize=(14, 7))
+    scale = 0.8 if context == 'paper' else 1
+    if context == 'poster':
+        plt.figure(figsize=(14, 7))
+    else:
+        plt.figure(figsize=(10, 5))
+        
     sns.set(style="darkgrid")
-    sns.set_context('poster')
+    sns.set_context(context)
     ax = sns.barplot(data=plot_df, x='data', y=sel_col, hue='edge', palette='deep', estimator=np.mean,
                      order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order, errcolor='gray', errwidth=2)
     sns.stripplot(data=plot_df, x='data', y=sel_col, hue='edge', palette='deep',
                   order=['PDBbind', 'davis', 'kiba'], hue_order=hue_order,
-                  size=4, jitter=True, dodge=True, alpha=0.8, ax=ax)
+                  size=6*scale, jitter=True, dodge=True, alpha=0.7, ax=ax)
     handles, labels = ax.get_legend_handles_labels()
-    ax.legend(handles[len(hue_order):], labels[len(hue_order):], 
+    ax.legend(handles[len(hue_order):], labels[len(hue_order):], prop={'size': 14*scale},
               title='', loc='upper right')
     
     if add_labels:
         for i in ax.containers: 
-            ax.bar_label(i, fmt='%.3f', fontsize=13, label_type='center')
+            ax.bar_label(i, fmt='%.3f', fontsize=13*scale, label_type='center')
             
     # Set the title
-    ax.set_title(f'Edge type performance ({"concordance index" if sel_col == "cindex" else sel_col})')
+    ax.set_title(f'Edge type performance ({"concordance index" if sel_col == "cindex" else sel_col})',
+                 fontsize=16*scale)
 
     # Set the y-axis label and limit
     ax.set_ylabel(sel_col)
     if sel_col == 'cindex':
         ax.set_ylim([0.5, 1])  # 0.5 is the worst cindex value
+    if sel_col == 'pearson':
+        ax.set_ylim([0, 1])
         
     # Add statistical annotations
     pairs=[("PDBbind", "kiba"), ("PDBbind", "davis"), ("davis", "kiba")]
-    annotator = Annotator(ax, pairs, data=filtered_df,  # Use the original filtered DataFrame
+    annotator = Annotator(ax, pairs, data=plot_df, 
                           x='data', y=sel_col, order=['PDBbind', 'davis', 'kiba'],
                           verbose=verbose)
     annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', hide_non_significant=True,
-                        line_height=0.005, verbose=verbose)
+                        verbose=verbose)
     annotator.apply_and_annotate()
     # Show the plot
     if show:
@@ -189,7 +181,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, a
     # reset stylesheet back to defaults
     mpl.rcParams.update(mpl.rcParamsDefault)
     
-    return filtered_df
+    return plot_df
 
 # Figure 4: violin plot with error bars for Cross-validation results to show significance among pro feats
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
@@ -270,10 +262,34 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
     return binary, simple, anm, af2
 
 
-def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -> pd.DataFrame:
+def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
+    """
+    Prepares a dataframe from the model stats csv file.
+
+    Parameters
+    ----------
+    `csv_p` : str, optional
+        Path to the model stats csv file, by default cfg.MODEL_STATS_CSV
+    `old_csv_p` : str, optional
+        Optional path to alternate csv file to merge stats with (e.g.: 
+        "results/model_media/old_model_stats.csv"), by default None
+
+    Returns
+    -------
+    pd.DataFrame
+        - output dataframe with additional columns for easier filtering:
+            - `data`: dataset type (davis, kiba, PDBbind)
+            - `fold`: fold number if available
+            - `feat`: node feature type (nomsa, msa, shannon, ESM)
+            - `edge`: edge type (binary, simple, anm, af2, af2-anm)
+            - `ddp`: whether or not the model was trained with DDP
+            - `improved`: whether or not the model was trained with improved training
+            - `batch_size`: batch size used for training
+            - `overlap`: whether or not the model was trained with protein overlap 
+    """
     df = pd.read_csv(csv_p)
     
-    if os.path.isfile(old_csv_p):
+    if old_csv_p is not None and os.path.isfile(old_csv_p):
         df = pd.concat([df, pd.read_csv(old_csv_p)]) # concat with old model results since we get the max value anyways...
 
     # create data, feat, and overlap columns for easier filtering.
@@ -301,10 +317,43 @@ def prepare_df(csv_p:str, old_csv_p='results/model_media/old_model_stats.csv') -
 
 
 if __name__ == '__main__':
-    df = prepare_df('results/model_media/model_stats.csv')
+    # %%
+    import matplotlib.pyplot as plt
+    import seaborn as sns 
 
-    df[['run', 'data', 'feat', 'edge', 'batch_size', 'overlap']]
+    from src.utils import config as cfg
+    from src.data_analysis.figures import (prepare_df, fig1_pro_overlap, 
+                                        fig2_pro_feat, fig3_edge_feat, 
+                                        fig4_pro_feat_violin, fig5_edge_feat_violin)
 
-    fig1_pro_overlap(df, show=True)
-    fig2_pro_feat(df, show=True)
-    fig3_edge_feat(df, show=True)
+
+    # %%
+    df = prepare_df(csv_p=cfg.MODEL_STATS_CSV, old_csv_p="results/model_media/old_model_stats.csv")
+
+    #%% display figures
+    verbose = False
+
+    #%% dataset comparisons
+    for col in ['cindex', 'pearson']:
+        fig1_pro_overlap(df, sel_col=col, verbose=verbose, show=False)
+        plt.savefig(f"results/figures/fig1_pro_overlap_{col}.png", dpi=300, bbox_inches='tight')
+        plt.clf()
+        fig2_pro_feat(df, sel_col=col, verbose=verbose, context='paper', add_labels=False, show=False)
+        plt.savefig(f"results/figures/fig2_pro_feat_{col}.png", dpi=300, bbox_inches='tight')
+        plt.clf()
+        fig3_edge_feat(df, sel_col=col, exclude=['af2-anm'], verbose=verbose, context='paper', add_labels=False, show=False)
+        plt.savefig(f"results/figures/fig3_edge_feat_{col}.png", dpi=300, bbox_inches='tight')
+        plt.clf()
+
+    # %% Davis violin plots
+    sns.set(style="darkgrid")
+    for dataset in ['davis', 'kiba', 'PDBbind']:
+        for col in ['cindex', 'mse']:
+            fig4_pro_feat_violin(df, sel_col=col, sel_dataset=dataset, verbose=verbose, show=False)
+            plt.savefig(f"results/figures/fig4_pro_feat_violin_{dataset}_{col}.png", dpi=300, bbox_inches='tight')
+            plt.clf()
+            fig5_edge_feat_violin(df, sel_col=col, sel_dataset=dataset, exclude=['af2-anm'], verbose=verbose, show=False)
+            plt.savefig(f"results/figures/fig5_edge_feat_violin_{dataset}_{col}.png", dpi=300, bbox_inches='tight')
+            plt.clf()
+
+    # %%
