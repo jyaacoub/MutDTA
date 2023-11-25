@@ -6,9 +6,10 @@ import numpy as np
 import seaborn as sns
 from statannotations.Annotator import Annotator
 from src.utils import config as cfg
+from src.utils.loader import Loader
 
 # Figure 1 - Protein overlap cindex difference (nomsa)
-def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=True, context='paper'):
+def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=False, context='paper'):
     filtered_df = df[(df['feat'] == 'nomsa') 
                     & (df['batch_size'] == '64') 
                     & (df['edge'] == 'binary')
@@ -46,7 +47,7 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=True, context='pa
 
 # Figure 2 - node feature cindex difference
 # Features -> nomsa, msa, shannon, and esm
-def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, add_labels=True,
+def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=False, add_labels=True,
                   context='poster'):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) 
@@ -116,7 +117,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=True, ad
 
 # Figure 3 - Edge type cindex difference
 # Edges -> binary, simple, anm, af2
-def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], show=True, add_labels=True,
+def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], show=False, add_labels=True,
                    context='poster'):
     # comparing nomsa, msa, shannon, and esm
     # group by data type
@@ -185,7 +186,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], sho
 
 # Figure 4: violin plot with error bars for Cross-validation results to show significance among pro feats
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
-                         show=True, add_labels=True, add_stats=True):
+                         show=False, add_labels=True, add_stats=True):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
     
@@ -229,7 +230,7 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
 
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
-                            show=True, add_labels=True, add_stats=True):
+                            show=False, add_labels=True, add_stats=True):
     filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'].isna())]
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
 
@@ -261,6 +262,26 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
         
     return binary, simple, anm, af2
 
+def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
+    # Create a subplot with 3 rows and 1 column
+    fig, axs = plt.subplots(len(datasets), 1, figsize=(10, 5*len(datasets)))
+
+    for i, data in enumerate(datasets):
+        # Load the dataset
+        dataset = Loader.load_dataset(data=data, pro_feature='nomsa', edge_opt='binary', subset='full')
+
+        # Get counts for each protein in the dataset
+        cntr = dataset.get_protein_counts()
+
+        # Plot as histogram
+        axs[i].hist(cntr.values(), bins=100)
+        axs[i].set_title(f'Frequency of Protein Appearance in {data} Dataset')
+        axs[i].set_xlabel('Binned protein appearance count')
+        axs[i].set_ylabel('Frequency')
+    # Adjust layout to prevent clipping of titles
+    plt.tight_layout()
+    
+    if show: plt.show()
 
 def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
     """
