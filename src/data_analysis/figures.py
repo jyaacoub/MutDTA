@@ -272,12 +272,15 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
 
         # Get counts for each protein in the dataset
         cntr = dataset.get_protein_counts()
-
+        
         # Plot as histogram
         axs[i].hist(cntr.values(), bins=100)
+        
+        axs[i].set_yscale('log')
+                
         axs[i].set_title(f'Frequency of Protein Appearance in {data} Dataset')
         axs[i].set_xlabel('Binned protein appearance count')
-        axs[i].set_ylabel('Frequency')
+        axs[i].set_ylabel('Frequency (log scale)')
     # Adjust layout to prevent clipping of titles
     plt.tight_layout()
     
