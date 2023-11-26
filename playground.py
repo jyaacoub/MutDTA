@@ -14,12 +14,12 @@ df = prepare_df(csv_p=cfg.MODEL_STATS_CSV, old_csv_p="results/model_media/old_mo
 #%% display figures
 verbose = False
 sns.set(style="darkgrid")
-fig_combined(df, fig_callable=fig4_pro_feat_violin, verbose=verbose)
-plt.savefig("results/figures/fig_combined_proViolin_CI-MSE.png", dpi=300)
+fig_combined(df, fig_callable=fig4_pro_feat_violin, metrics=['cindex', 'mse', 'pearson'])
+plt.savefig("results/figures/fig_combined_proViolin_CI-MSE-Pearson.png", dpi=300)
 
 #%%
-fig_combined(df, fig_callable=fig5_edge_feat_violin, verbose=verbose)
-plt.savefig("results/figures/fig_combined_edgeViolin_CI-MSE.png", dpi=300)
+fig_combined(df, fig_callable=fig5_edge_feat_violin, metrics=['cindex', 'mse', 'pearson'])
+plt.savefig("results/figures/fig_combined_edgeViolin_CI-MSE-Pearson.png", dpi=300)
 
 
 # %%

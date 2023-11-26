@@ -288,9 +288,9 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
     
     if show: plt.show()
     
-def fig_combined(df, datasets=['davis', 'kiba', 'PDBbind'], metrics=['cindex', 'mse'], 
-                  fig_callable=fig4_pro_feat_violin, 
-                  verbose=False, show=False, **kwargs):    
+def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], 
+                  fig_callable=fig4_pro_feat_violin,
+                  show=False, **kwargs):    
     # Create subplots with datasets as columns and cols as rows
     fig, axes = plt.subplots(len(metrics), len(datasets), 
                              figsize=(5*len(datasets), 4*len(metrics)))
@@ -300,13 +300,18 @@ def fig_combined(df, datasets=['davis', 'kiba', 'PDBbind'], metrics=['cindex', '
             ax = axes[j, i]
 
             fig_callable(df, sel_col=metric, sel_dataset=dataset, show=False, 
-                         ax=ax, verbose=False, **kwargs)
+                         ax=ax, **kwargs)
+                        
             # Add titles only to the top row and left column
             if j == 0:
                 ax.set_title(f'{dataset}')
                 ax.set_xlabel('')
                 ax.set_xticklabels([])
-            else:
+            elif j < len(metrics)-1: # middle row
+                ax.set_xlabel('')
+                ax.set_xticklabels([])
+                ax.set_title('')
+            else: # bottom row
                 ax.set_title('')
             
             if i == 0:
