@@ -44,6 +44,8 @@ def fig1_pro_overlap(df, sel_col='cindex', verbose=False, show=False, context='p
 
     # Show the plot
     if show: plt.show()
+    
+    return plot_df
 
 # Figure 2 - node feature cindex difference
 # Features -> nomsa, msa, shannon, and esm
@@ -186,7 +188,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], sho
 
 # Figure 4: violin plot with error bars for Cross-validation results to show significance among pro feats
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
-                         show=False, add_labels=True, add_stats=True):
+                         show=False, add_labels=True, add_stats=True, ax=None):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
     
@@ -207,7 +209,7 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
 
     # Get values for each node feature
     plot_data = [nomsa, msa, shannon, esm]
-    ax = sns.violinplot(data=plot_data)
+    ax = sns.violinplot(data=plot_data, ax=ax)
     ax.set_xticklabels(['nomsa', 'msa', 'shannon', 'esm'])
     ax.set_ylabel(sel_col)
     ax.set_xlabel('Features')
@@ -230,7 +232,7 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
 
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
-                            show=False, add_labels=True, add_stats=True):
+                            show=False, add_labels=True, add_stats=True, ax=None):
     filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'].isna())]
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
 
@@ -244,7 +246,7 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
 
     # plot violin plot with annotations
     plot_data = [binary, simple, anm, af2]
-    ax = sns.violinplot(data=plot_data)
+    ax = sns.violinplot(data=plot_data, ax=ax)
     ax.set_xticklabels(['binary', 'simple', 'anm', 'af2'])
     ax.set_ylabel(sel_col)
     ax.set_xlabel('Edge type')
@@ -285,6 +287,36 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
     plt.tight_layout()
     
     if show: plt.show()
+    
+def fig_combined(df, datasets=['davis', 'kiba', 'PDBbind'], metrics=['cindex', 'mse'], 
+                  fig_callable=fig4_pro_feat_violin, 
+                  verbose=False, show=False, **kwargs):    
+    # Create subplots with datasets as columns and cols as rows
+    fig, axes = plt.subplots(len(metrics), len(datasets), 
+                             figsize=(5*len(datasets), 4*len(metrics)))
+    for i, dataset in enumerate(datasets):
+        for j, metric in enumerate(metrics):
+            # Set current subplot
+            ax = axes[j, i]
+
+            fig_callable(df, sel_col=metric, sel_dataset=dataset, show=False, 
+                         ax=ax, verbose=False, **kwargs)
+            # Add titles only to the top row and left column
+            if j == 0:
+                ax.set_title(f'{dataset}')
+                ax.set_xlabel('')
+                ax.set_xticklabels([])
+            else:
+                ax.set_title('')
+            
+            if i == 0:
+                ax.set_ylabel(metric)
+            else:
+                ax.set_ylabel('')
+                
+    plt.tight_layout() # Adjust layout to prevent clipping of titles
+    if show: plt.show()
+    return fig, axes
 
 def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
     """
@@ -380,4 +412,9 @@ if __name__ == '__main__':
             plt.savefig(f"results/figures/fig5_edge_feat_violin_{dataset}_{col}.png", dpi=300, bbox_inches='tight')
             plt.clf()
 
-    # %%
+    #%% dataset comparisons
+    plot_df = fig1_pro_overlap(df, sel_col='mse', verbose=verbose, show=False)
+
+    # performance drop values:
+    grp = plot_df.groupby(['data', 'overlap']).mean()
+    grp[grp.index.get_level_values(1)].values - grp[~grp.index.get_level_values(1)].values
