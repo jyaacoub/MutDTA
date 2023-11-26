@@ -20,7 +20,7 @@ from src.data_processing.datasets import DavisKibaDataset, BaseDataset
 
 
 # Creating data indices for training and validation splits:
-def train_val_test_split(dataset: InMemoryDataset, 
+def train_val_test_split(dataset: BaseDataset, 
                          train_split=.8, val_split=.1, 
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128, use_refined=False, 
@@ -30,7 +30,7 @@ def train_val_test_split(dataset: InMemoryDataset,
 
     Parameters
     ----------
-    `dataset` : InMemoryDataset
+    `dataset` : BaseDataset
         The dataset to split
     `train_split` : float, optional
         How much goes to just training, by default .8
