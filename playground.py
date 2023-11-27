@@ -1,11 +1,11 @@
+# %%
+from matplotlib import pyplot as plt
+from src.data_analysis.figures import fig0_dataPro_overlap
+
+
 #%%
-import matplotlib.pyplot as plt
-import seaborn as sns
-from src.data_analysis.figures import fig6_protein_appearance
-
-
-sns.set(style="darkgrid")
-fig6_protein_appearance()
-plt.savefig('results/figures/fig6_protein_appearance_dataset.png', dpi=300)
-
+for data in ['kiba', 'davis']:
+    fig0_dataPro_overlap(data=data)
+    plt.savefig(f'results/figures/fig0_pro_overlap_{data}.png', dpi=300, bbox_inches='tight')
+    plt.clf()
 # %%
