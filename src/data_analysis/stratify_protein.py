@@ -93,11 +93,25 @@ def check_davis_names(davis_prots:dict, df:pd.DataFrame) -> list:
             if alpha_name in greek:
                 name += f'{alpha_name[0]}{alpha_num}'
             
-        # checking if name is in the dataframe
-        if name in df.index:
+        # checking if name is in the dataframe ignoring case
+        matches = df.index[df.index.str.lower() == name.lower()]
+        if len(matches) > 0:
+            name = matches[0] # with proper case
             found_prots[k] = (name, df.loc[name, 'main_family'], df.loc[name, 'subgroup'])
         else:
-            print(f'MISSING: {k}-{name}')
+            # check if name is from a subgroup
+            matches = df.index[df.subgroup.str.lower() == name.lower()]
+            if len(matches) > 0:
+                name = matches[0]
+                found_prots[k] = (name, df.loc[name, 'main_family'], df.loc[name, 'subgroup'])
+            else:
+                # check if name is from a main family
+                matches = df.index[df.main_family.str.lower() == name.lower()]
+                if len(matches) > 0:
+                    name = matches[0]
+                    found_prots[k] = (name, df.loc[name, 'main_family'], df.loc[name, 'subgroup'])
+                else:
+                    print(f'MISSING: {k}-{name}')
             
     return found_prots
             
