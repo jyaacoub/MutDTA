@@ -159,34 +159,34 @@ class Loader():
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_datasets(data:str, pro_feature:str, edge_opt:str, path:str=cfg.DATA_ROOT,
-                      datasets:Iterable[str]=['train', 'test', 'val'],
+                      subsets:Iterable[str]=['train', 'test', 'val'],
                       training_fold:int=None, # for cross-val. None for no cross-val
                       protein_overlap:bool=False, 
                       ligand_feature:str=None, ligand_edge:str=None):
         # no overlap or cross-val
-        subsets = datasets
+        subsets_cv = subsets
         
         # training folds are identified by train1, train2, etc. 
         # (see model_key fn above)
         if training_fold is not None:
-            subsets = [d+str(training_fold) for d in subsets]
+            subsets_cv = [d+str(training_fold) for d in subsets_cv]
             try:
                 # making sure test set is not renamed
-                subsets[datasets.index('test')] = 'test'
+                subsets_cv[subsets.index('test')] = 'test'
             except ValueError:
                 pass
             
         # Overlap is identified by adding '-overlap' to the subset name (after cross-val)
         if protein_overlap:
-            subsets = [d+'-overlap' for d in subsets]
+            subsets_cv = [d+'-overlap' for d in subsets_cv]
         
         loaded_datasets = {}
-        for d, s in zip(datasets, subsets):
+        for k, s in zip(subsets, subsets_cv):
             dataset = Loader.load_dataset(data, pro_feature, edge_opt, 
                                           subset=s, path=path, 
                                           ligand_feature=ligand_feature, 
                                           ligand_edge=ligand_edge)                
-            loaded_datasets[d] = dataset
+            loaded_datasets[k] = dataset
         return loaded_datasets
     
     @staticmethod
@@ -204,7 +204,7 @@ class Loader():
         # to create a new dataloader (e.g.: for testing with different batch size)
         if loaded_datasets is None:
             loaded_datasets = Loader.load_datasets(data=data, pro_feature=pro_feature, edge_opt=edge_opt, 
-                                               path=path, datasets=datasets, training_fold=training_fold, 
+                                               path=path, subsets=datasets, training_fold=training_fold, 
                                                protein_overlap=protein_overlap, ligand_feature=ligand_feature, 
                                                ligand_edge=ligand_edge)
         
@@ -233,7 +233,7 @@ class Loader():
                                      num_workers:int=4):
         
         loaded_datasets = Loader.load_datasets(data=data, pro_feature=pro_feature, edge_opt=edge_opt, 
-                                               path=path, datasets=datasets, training_fold=training_fold, 
+                                               path=path, subsets=datasets, training_fold=training_fold, 
                                                protein_overlap=protein_overlap, ligand_feature=ligand_feature, 
                                                ligand_edge=ligand_edge)
         
