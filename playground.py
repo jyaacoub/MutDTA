@@ -164,7 +164,7 @@ missing_prots = {
     'TSSK1B':   'TSSK1',    # https://www.ncbi.nlm.nih.gov/gene/83942
     'VEGFR2':   'KDR',      # https://www.ncbi.nlm.nih.gov/gene/3791
     'WEE2':     'Wee1B',    # https://www.ncbi.nlm.nih.gov/gene/494551
-    'YSK4':     'MAP3K1',  # https://www.ncbi.nlm.nih.gov/gene/80122 ** FAILED TO FIND ALIAS
+    'YSK4':     'MAP3K1',   # https://www.ncbi.nlm.nih.gov/gene/80122 ** FAILED TO FIND ALIAS
 }
 
 # %% merging missing proteins with main df
@@ -195,10 +195,10 @@ prots = check_davis_names(prot_dict, df)
 
 # %% plot histogram of main families and their counts
 main_families = [v[1] for v in prots.values()]
-main_families = pd.Series(main_families)
+main_families = pd.Series(main_families).value_counts().sort_values(ascending=False)
 sns.set_theme(style='darkgrid')
 plt.figure(figsize=(10, 5))
-sns.histplot(main_families)
+sns.barplot(x=main_families.index, y=main_families.values, color='b')
 plt.xlabel('Protein Kinase Family')
 plt.title('Distribution of Protein Kinase Families in Davis Dataset')
 plt.ylabel('Count (442 total proteins)')
