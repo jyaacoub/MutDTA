@@ -472,6 +472,23 @@ if __name__ == '__main__':
             fig5_edge_feat_violin(df, sel_col=col, sel_dataset=dataset, exclude=['af2-anm'], verbose=verbose, show=False)
             plt.savefig(f"results/figures/fig5_edge_feat_violin_{dataset}_{col}.png", dpi=300, bbox_inches='tight')
             plt.clf()
+            
+            
+    # %% Combined violin plots
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], fig_callable=fig4_pro_feat_violin)
+    plt.savefig(f'results/figures/fig_combined_proViolin_CI-MSE.png', dpi=300, bbox_inches='tight')
+    plt.clf()
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse', 'pearson'], fig_callable=fig4_pro_feat_violin)
+    plt.savefig(f'results/figures/fig_combined_proViolin_CI-MSE-Pearson.png', dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], fig_callable=fig5_edge_feat_violin)
+    plt.savefig(f"results/figures/fig_combined_edgeViolin_CI-MSE.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse', 'pearson'], fig_callable=fig5_edge_feat_violin)
+    plt.savefig(f"results/figures/fig_combined_edgeViolin_CI-MSE-Pearson.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
 
     #%% dataset comparisons
     plot_df = fig1_pro_overlap(df, sel_col='mse', verbose=verbose, show=False)
