@@ -71,7 +71,10 @@ if args.save_predictions:
     # get codes from test loader
     codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1 for test set!
     df = pd.DataFrame({'pred': pred, 'actual': actual}, index=codes)
-    df.to_csv(f'{cfg.MEDIA_SAVE_DIR}/test_set_pred/{MODEL_KEY}_testPred.csv')
+    out_dir = f'{cfg.MEDIA_SAVE_DIR}/test_set_pred/'
+    os.makedirs(out_dir, exist_ok=True)
+    df.index.name = 'name'
+    df.to_csv(f'{out_dir}/{MODEL_KEY}_testPred.csv')
 
 print(f'# Test loss: {loss}')
 get_metrics(actual, pred,
