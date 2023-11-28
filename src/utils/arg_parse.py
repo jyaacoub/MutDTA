@@ -146,6 +146,13 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         action='store', type=int, default=0,
         help='Fold selection (default: 0 - first fold)'
     )
+    
+    # for test.py:
+    parser.add_argument('-sp', # default is not to save predictions
+        '--save_predictions',
+        action='store_true',
+        help='Save predictions of model on test set to csv file.'
+    )
     return parser
 
 def add_slurm_dist_args(parser: argparse.ArgumentParser):

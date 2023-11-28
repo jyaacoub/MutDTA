@@ -1,8 +1,8 @@
 #%%
 from src.utils import config as cfg
-import torch
 import os
-from torch_geometric.loader import DataLoader
+import torch
+import pandas as pd
 
 from src.data_analysis.metrics import get_metrics
 from src.train_test.training import test
@@ -66,6 +66,13 @@ loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGE,
 
 #%% Run model on test set
 loss, pred, actual = test(model, loaders['test'], device)
+if args.save_predictions:
+    # saving as csv with columns code, pred, actual
+    # get codes from test loader
+    codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1 for test set!
+    df = pd.DataFrame({'pred': pred, 'actual': actual}, index=codes)
+    df.to_csv(f'{cfg.MEDIA_SAVE_DIR}/test_set_pred/{MODEL_KEY}_testPred.csv')
+
 print(f'# Test loss: {loss}')
 get_metrics(actual, pred,
             save_figs=False,
