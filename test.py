@@ -55,10 +55,11 @@ model.safe_load_state_dict(mdl_dict)
 model.to(device)
 
 # %% load test and val data
+subsets = ['test', 'val', 'train'] if args.save_train else ['test', 'val']
 loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGE,
-                                  datasets=['test', 'val'],
+                                  datasets=subsets,
                                   path=cfg.DATA_ROOT,
-                                  batch_train=1, # batch size is irrelevant for eval
+                                  batch_train=1, # MUST BE 1 FOR TRAIN SET
                                   protein_overlap=args.protein_overlap,
                                   training_fold=args.fold_selection,
                                   ligand_feature=LIG_FEATURE,
@@ -69,7 +70,7 @@ loss, pred, actual = test(model, loaders['test'], device)
 if args.save_predictions:
     # saving as csv with columns code, pred, actual
     # get codes from test loader
-    codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1 for test set!
+    codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1
     df = pd.DataFrame({'pred': pred, 'actual': actual}, index=codes)
     out_dir = f'{cfg.MEDIA_SAVE_DIR}/test_set_pred/'
     os.makedirs(out_dir, exist_ok=True)
@@ -96,6 +97,20 @@ get_metrics(actual, pred,
             show=False,
             )
 
+#%% Run model on train set
+if args.save_train:
+    loss, pred, actual = test(model, loaders['train'], device)
+    print(f'# Train loss: {loss}')
+    # save as csv with columns code, pred, actual
+    # get codes from test loader
+    codes = [b['code'][0] for b in loaders['train']] # NOTE: batch size is 1
+    df = pd.DataFrame({'pred': pred, 'actual': actual}, index=codes)
+    out_dir = f'{cfg.MEDIA_SAVE_DIR}/train_set_pred/'
+    os.makedirs(out_dir, exist_ok=True)
+    df.index.name = 'name'
+    df.to_csv(f'{out_dir}/{MODEL_KEY}_trainPred.csv')
+    
+    # getting metrics is not needed for training set...
 
 # %% renaming checkpoint to remove _tmp specification
 if (not args.no_rename and           # Only rename if not specified, default is to rename
