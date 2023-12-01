@@ -127,7 +127,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if subset != 'full':
             data_p = os.path.join(save_root, subset)
             if not os.path.isdir(data_p):
-                DatasetNotFound(f"{data_p} Subset does not exist, please create subset before initialization.")
+                raise DatasetNotFound(f"{data_p} Subset does not exist, please create (using split) before initialization.")
         self.subset = subset
         
         # checking af2 conf dir if we are creating the dataset from scratch
