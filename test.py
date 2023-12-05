@@ -55,7 +55,7 @@ model.safe_load_state_dict(mdl_dict)
 model.to(device)
 
 # %% load test and val data
-subsets = ['test', 'val', 'train'] if args.save_train else ['test', 'val']
+subsets = ['test', 'val', 'train'] if args.save_pred_train else ['test', 'val']
 loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGE,
                                   datasets=subsets,
                                   path=cfg.DATA_ROOT,
