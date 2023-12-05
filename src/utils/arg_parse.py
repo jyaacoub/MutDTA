@@ -148,13 +148,13 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     )
     
     # for test.py:
-    parser.add_argument('-sp', # default is not to save predictions
-        '--save_predictions',
+    parser.add_argument('-spte', # default is not to save predictions
+        '--save_pred_test',
         action='store_true',
         help='Save predictions of model on test set to csv file.'
     )
-    parser.add_argument('-str', 
-        '--save_train',
+    parser.add_argument('-sptr', 
+        '--save_pred_train',
         action='store_true', # default is not to save predictions
         help='Save predictions of model on training set to csv file.'
     )

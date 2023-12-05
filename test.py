@@ -67,7 +67,7 @@ loaders = Loader.load_DataLoaders(DATA, FEATURE, EDGE,
 
 #%% Run model on test set
 loss, pred, actual = test(model, loaders['test'], device)
-if args.save_predictions:
+if args.save_pred_test:
     # saving as csv with columns code, pred, actual
     # get codes from test loader
     codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1
@@ -98,7 +98,7 @@ get_metrics(actual, pred,
             )
 
 #%% Run model on train set
-if args.save_train:
+if args.save_pred_train:
     loss, pred, actual = test(model, loaders['train'], device)
     print(f'# Train loss: {loss}')
     # save as csv with columns code, pred, actual
