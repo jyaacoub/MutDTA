@@ -1,12 +1,41 @@
+# %%
+from src.utils.mmseq2 import MMseq2Runner
+import pandas as pd 
+
+tsvp = '../data/misc/davis_clustering//tsvs/davisDB_4sens_198clust.tsv'
+# read tsv
+df = pd.read_csv(tsvp, sep='\t', header=None)
+# rename cols
+df.columns = ['rep', 'member']
+
+clusters = df.groupby('rep')['member'].apply(list).to_dict()
+len(clusters)
+
+# %% group clusters with less than 5 members into one cluster (cluster 0)
+clusters_new = {}
+for k in clusters.keys():
+    if len(clusters[k]) < 5:
+        continue
+        #clusters_new[0] = clusters_new.get(0, []) + clusters[k]
+    else:
+        clusters_new[k] = clusters[k]
+        
+
+for k in clusters_new.keys():
+    print(len(clusters_new[k]))
+    
+clusters = clusters_new
+
+#%% Rename clusters keys to be ints 
+clusters = {i: set(clusters[k]) for i, k in enumerate(clusters)}
+
+
 #%%
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from src.data_analysis.stratify_protein import map_davis_to_kinbase
 
-# Get kinbase data to map to family names
-kin_df = pd.read_csv('../data/misc/kinase_base_updated.csv', index_col='name')
 sns.set_style('darkgrid')
 
 # %%
@@ -16,86 +45,108 @@ df_full = pd.read_csv('../data/DavisKibaDataset/davis/nomsa_binary_original_bina
                       index_col='code')
 
 prot_counts = df_full.index.value_counts()
-kb_dict = map_davis_to_kinbase(df_full.index.unique(), 
-                               df=kin_df) # should be the same for all folds (same test set)
-kb_df = pd.DataFrame.from_dict(kb_dict, orient='index', 
-                               columns=['kinbase', 'main_family', 'subgroup'])
 
-subgroup_counts = {} # {subgroup: count, ...}
+
+cluster_counts = {} # {cluster: count, ...}
 for idx in df_full.index:
-    subgrp = kb_df.loc[idx, 'subgroup']
-    subgroup_counts[subgrp] = subgroup_counts.get(subgrp, 0) + 1
+    for k in clusters.keys():
+        if idx in clusters[k]:
+            cluster_counts[k] = cluster_counts.get(k, 0) + 1
+            break
+    
 
 # %% get subgroup mse
-model_type = 'DG'
-for model_type in ['EDI', 'DG']:
+# subset = 'test' #'test'
+# for model_type in ['EDI']:
+#     if model_type == 'EDI':
+#         model_path = lambda x: f'results/model_media/{subset}_set_pred/EDIM_davis{x}D_nomsaF_binaryE_48B_0.0001LR_0.4D_2000E_{subset}Pred.csv'
+#     elif model_type == 'DG':
+#         model_path = lambda x: f'results/model_media/{subset}_set_pred/DGM_davis{x}D_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E_{subset}Pred.csv'
+
+#     data_clust = {} # {cluster: [mse1, mse2, ...], ...}
+#     for fold in range(5):
+#         pred = pd.read_csv(model_path(fold), index_col='name')
+        
+#         for k in clusters.keys():
+#             # get mse for cluster
+#             matched = pred[pred.index.isin(clusters[k])]
+#             mse = ((matched.pred - matched.actual)**2).mean()
+        
+#             # add main mse to dict
+#             data_clust[k] = data_clust.get(k, []) + [mse]
+
+#     # merge counts with mse
+#     x = []
+#     y = []
+#     z = []
+#     for k in data_clust.keys():
+#         # check for nan
+#         if np.isnan(data_clust[k]).any():
+#             continue
+#         x += [cluster_counts[k]] * len(data_clust[k])
+#         y += data_clust[k]
+#         z += [k] * len(data_clust[k])
+
+#     # scatter plot with x axis as count and y axis as mse
+#     plt.figure(figsize=(10, 5))
+#     ax = sns.scatterplot(x=x, y=y, hue=z)
+#     # line of best fit
+#     m, b = np.polyfit(x, y, 1)
+#     plt.plot(x, m*np.array(x) + b, color='black', linestyle='dotted', label=f'y={m*10000:.2f}e-4x+{b:.2f}', linewidth=2)
+
+#     # correlation
+#     corr = np.corrcoef(x, y)[0, 1]
+#     print(f'Correlation: {corr}')
+    
+#     plt.xlabel('Number of Proteins in cluster')
+#     plt.ylabel('MSE')
+#     plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+#     plt.title(f'Subgroup Size vs {subset} MSE ({model_type} Model)')
+#     plt.show()
+#     plt.clf()
+
+# %% plot mse vs protein sequence length
+# df_full has prot_seq columns
+df_full.reset_index(inplace=True)
+#%%
+df_prolen = df_full.iloc[df_full.code.drop_duplicates().index]
+df_prolen = df_prolen[['code', 'prot_seq']]
+df_prolen['prot_len'] = df_prolen.prot_seq.str.len()
+
+#%%
+subset = 'train' #'test'
+prolen_mse = None
+for model_type in ['EDI']:
     if model_type == 'EDI':
-        model_path = lambda x: f'results/model_media/test_set_pred/EDIM_davis{x}D_nomsaF_binaryE_48B_0.0001LR_0.4D_2000E_testPred.csv'
+        model_path = lambda x: f'results/model_media/{subset}_set_pred/EDIM_davis{x}D_nomsaF_binaryE_48B_0.0001LR_0.4D_2000E_{subset}Pred.csv'
     elif model_type == 'DG':
-        model_path = lambda x: f'results/model_media/test_set_pred/DGM_davis{x}D_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E_testPred.csv'
+        model_path = lambda x: f'results/model_media/{subset}_set_pred/DGM_davis{x}D_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E_{subset}Pred.csv'
 
 
-    # Do the same but this time with error bars by using cross validation
-    # data will be a dict of {main_family: [mse1, mse2, ...], ...}
-    data_main = {}
-    data_subgroups = {} # {main_family: {subgroup: [mse1, mse2, ...], ...}, ...}
-
+    data = [] # [(mse, prot_len), ...]
     for fold in range(5):
         pred = pd.read_csv(model_path(fold), index_col='name')
+        pred.index.name = 'code'
+        pred = pd.merge(pred, df_prolen, on='code', how='left')
         
-        # returns a dict of {davis_name: (kinbase_name, main_family, subgroup)}
-        kb_dict = map_davis_to_kinbase(pred.index.unique(), df=kin_df) # should be the same for all folds (same test set)
+        prolen_mse = pred if prolen_mse is None else pd.concat([prolen_mse, pred], axis=0)
         
-        # update pred to have kinbase info
-        pred['kinbase_name'] = pred.index.map(lambda x: kb_dict[x][0])
-        pred['main_family'] = pred.index.map(lambda x: kb_dict[x][1])
-        pred['subgroup'] = pred.index.map(lambda x: kb_dict[x][2])
-        
-        for f in pred.main_family.unique():
-            matched = pred[pred.main_family == f]
-            mse = ((matched.pred - matched.actual)**2).mean()
-            
-            # add main family mse to dict
-            data_main[f] = data_main.get(f, []) + [mse]
-            
-            # add main_family subgroup mse to dict
-            data_subgroups[f] = data_subgroups.get(f, {})
-            
-            for g in matched.subgroup.unique():
-                g_matched = matched[matched.subgroup == g]
-                mse = ((g_matched.pred - g_matched.actual)**2).mean()
-                data_subgroups[f][g] = data_subgroups[f].get(g, []) + [mse]
-
-    subgroup_mse = {} # {subgroup: [mse1, mse2, ...], ...}
-    for k in data_subgroups.keys():
-        for k2 in data_subgroups[k].keys():
-            subgroup_mse[k2] = subgroup_mse.get(k2, []) + data_subgroups[k][k2]
-
-    # merge counts with mse
-    x = []
-    y = []
-    z = []
-    for k in subgroup_mse.keys():
-        # check for nan
-        if np.isnan(subgroup_mse[k]).any():
-            continue
-        x += [subgroup_counts[k]] * len(subgroup_mse[k])
-        y += subgroup_mse[k]
-        z += [k] * len(subgroup_mse[k])
-
-    # scatter plot with x axis as count and y axis as mse
-    plt.figure(figsize=(10, 5))
-    ax = sns.scatterplot(x=x, y=y, hue=z)
-    # line of best fit
-    m, b = np.polyfit(x, y, 1)
-    plt.plot(x, m*np.array(x) + b, color='black', linestyle='dotted', label=f'y={m*10000:.2f}e-4x+{b:.2f}', linewidth=2)
-
-    plt.xlabel('Number of Proteins in Subgroup')
-    plt.ylabel('MSE')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.title(f'Subgroup Size vs Test MSE ({model_type} Model)')
-    plt.show()
-    plt.clf()
 
 
-    # %%
+#%% group by prot_len
+plot_data = prolen_mse.groupby('prot_len').apply(lambda x: ((x.pred - x.actual)**2).mean())
+
+sns.scatterplot(x=plot_data.index, y=plot_data.values)
+m, b = np.polyfit(plot_data.index, plot_data.values, 1)
+plt.plot(plot_data.index, m*np.array(plot_data.index) + b, color='black', linestyle='dotted', label=f'y={m*10000:.2f}e-4x+{b:.2f}', linewidth=2)
+
+# correlation
+corr = np.corrcoef(plot_data.index, plot_data.values)[0, 1]
+print(f'Correlation: {corr}')
+
+plt.title('Protein Length vs MSE')
+plt.xlabel('Protein Length')
+plt.ylabel('MSE')
+plt.legend()
+plt.show()
+# %%
