@@ -47,7 +47,6 @@ def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer,
 
             # Compute loss
             loss = CRITERION(predictions, labels)
-            train_loss += loss.item()
 
             # Backward pass and optimization
             optimizer.zero_grad()
