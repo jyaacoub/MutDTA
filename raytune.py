@@ -5,8 +5,7 @@ import torch
 from ray.air import session
 from ray.train.torch import TorchCheckpoint
 from ray import tune
-from ray.tune.search import ConcurrencyLimiter
-from ray.tune.search.bayesopt import BayesOptSearch
+from ray.tune.search.optuna import OptunaSearch
 
 
 from src.utils.loader import Loader
@@ -45,7 +44,7 @@ def objective(config):
         # Report metrics (and possibly a checkpoint) to Tune
         session.report({"mean_loss": loss}, checkpoint=checkpoint)
 
-algo = BayesOptSearch(utility_kwargs={"kind": "ucb", "kappa": 2.5, "xi": 0.0})
+algo = OptunaSearch()
 # algo = ConcurrencyLimiter(algo, max_concurrent=4)
 search_space = {
     # constants:
