@@ -35,7 +35,8 @@ def objective(config):
         simple_train(model, optimizer, loaders['train'], 
                      device=device, 
                      epochs=1)  # Train the model
-        loss = simple_test(model, loaders['test'])  # Compute test accuracy
+        loss = simple_test(model, loaders['val'], 
+                           device=device)  # Compute test accuracy
         
         checkpoint = None
         if save_checkpoint:
@@ -52,7 +53,7 @@ search_space = {
     "model": "DG",
     "dataset": "davis",
     "feature_opt": "nomsa",
-    "edge_opt": "nomsa",
+    "edge_opt": "binary",
     "fold_selection": 0,
     "save_checkpoint": False,
     
@@ -63,7 +64,7 @@ search_space = {
 }
 
 tuner = tune.Tuner(
-    tune.with_resources(objective, resources={"cpu": 4, "gpu": 1}),
+    tune.with_resources(objective, resources={"cpu": 6, "gpu": 1}), # NOTE: must match SBATCH directives
     tune_config=tune.TuneConfig(
         metric="mean_loss",
         mode="min",
