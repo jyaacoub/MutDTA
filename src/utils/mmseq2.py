@@ -22,11 +22,10 @@ class MMseq2Runner:
     def run_simple_clustering(fasta_in:str, out_dir:str, tmp_dir:str=None, 
                               force_overwrite:bool=False, verbose:bool=False):
         # --------------------------------------------
-        # mmseqs createdb XY.fasta davisDB
-        # mmseqs cluster davisDB davisDB_clu tmp/
-        # mmseqs createtsv davisDB davisDB davisDB_clu davisDB.tsv
+        # mmseqs createdb XY.fasta davisDB/DB
+        # mmseqs cluster -s 16.0 --cov-mode 5 -c 0.6 davisDB/DB clu/DB tmp/
+        # mmseqs createtsv davisDB/DB davisDB/DB clu/DB tsvs/davisDB_10sens_6c_5cov.tsv
         # --------------------------------------------
-        
         
         # runs mmseq2 simple clustering on a fasta file
         # fasta_in: path to fasta file
