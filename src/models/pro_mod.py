@@ -6,7 +6,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch_geometric.nn import (GCNConv, GATConv, 
                                 global_max_pool as gmp, 
                                 global_mean_pool as gep)
-from torch_geometric.utils import dropout_adj
+from torch_geometric.utils import dropout_edge, dropout_node
 
 from torch_geometric.nn import summary
 from torch_geometric import data as geo_data
@@ -110,7 +110,8 @@ class EsmAttentionDTA(BaseModel):
 class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
-                 output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary'):
+                 output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary',
+                 dropout_prot_p=0.0, extra_profc_layer=False):
         
         super(EsmDTA, self).__init__(pro_feat, edge_weight_opt)
 
@@ -120,11 +121,20 @@ class EsmDTA(BaseModel):
         self.mol_fc_g1 = nn.Linear(num_features_mol * 4, 1024)
         self.mol_fc_g2 = nn.Linear(1024, output_dim)
 
+        # Protein graph:
         self.pro_conv1 = GCNConv(num_features_pro, pro_emb_dim)
         self.pro_conv2 = GCNConv(pro_emb_dim, pro_emb_dim * 2)
         self.pro_conv3 = GCNConv(pro_emb_dim * 2, pro_emb_dim * 4)
-        self.pro_fc_g1 = nn.Linear(pro_emb_dim * 4, 1024)
+        
+        if not extra_profc_layer:
+            self.pro_fc_g1 = nn.Linear(pro_emb_dim * 4, 1024)
+        else:
+            self.pro_fc_g1 = nn.Linear(pro_emb_dim * 4, pro_emb_dim * 2)
+            self.pro_fc_g1b = nn.Linear(pro_emb_dim * 2, 1024)
+            
+        self.extra_profc_layer = extra_profc_layer           
         self.pro_fc_g2 = nn.Linear(1024, output_dim)
+            
         
         # this will raise a warning since lm head is missing but that is okay since we are not using it:
         logging.set_verbosity(logging.CRITICAL)
@@ -134,6 +144,8 @@ class EsmDTA(BaseModel):
 
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
+        # note that dropout for edge and nodes is handled by torch_geometric in forward pass
+        self.dropout_prot_p = dropout_prot_p
 
         # combined layers
         self.fc1 = nn.Linear(2 * output_dim, 1024)
@@ -178,23 +190,33 @@ class EsmDTA(BaseModel):
         # if edge_weight doesnt exist no error is thrown it just passes it as None
         xt = self.pro_conv1(target_x, ei, ew)
         xt = self.relu(xt)
+        xt = dropout_node(xt, p=self.dropout_prot_p, training=self.training)
 
-        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
         xt = self.pro_conv2(xt, ei, ew)
         xt = self.relu(xt)
+        xt = dropout_node(xt, p=self.dropout_prot_p, training=self.training)
 
-        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
         xt = self.pro_conv3(xt, ei, ew)
         xt = self.relu(xt)
+        xt = dropout_node(xt, p=self.dropout_prot_p, training=self.training)
 
-        # xt = self.pro_conv4(xt, target_edge_index)
-        # xt = self.relu(xt)
+        # flatten/pool
         xt = gep(xt, data.batch)  # global pooling
+        xt = self.relu(xt)
+        xt = self.dropout(xt)
 
         # flatten
-        xt = self.relu(self.pro_fc_g1(xt))
+        xt = self.pro_fc_g1(xt)
+        xt = self.relu(xt)
         xt = self.dropout(xt)
+        
+        if self.extra_profc_layer:
+            xt = self.pro_fc_g1b(xt)
+            xt = self.relu(xt)
+            xt = self.dropout(xt)
+        
         xt = self.pro_fc_g2(xt)
+        xt = self.relu(xt)
         xt = self.dropout(xt)
         return xt
     
