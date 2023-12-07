@@ -184,28 +184,34 @@ class EsmDTA(BaseModel):
 
         #### Graph NN ####
         ei = data.edge_index
+        # if edge_weight doesnt exist no error is thrown it just passes it as None
         ew = data.edge_weight if (self.edge_weight is not None and 
                                   self.edge_weight != 'binary') else None
-
-        # if edge_weight doesnt exist no error is thrown it just passes it as None
-        xt = self.pro_conv1(target_x, ei, ew)
+        
+        target_x = self.relu(target_x)
+        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+                                        training=self.training)
+        
+        # conv1
+        xt = self.pro_conv1(target_x, ei_drp, ew)
         xt = self.relu(xt)
-        xt = dropout_node(xt, p=self.dropout_prot_p, training=self.training)
-
-        xt = self.pro_conv2(xt, ei, ew)
+        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+                                        training=self.training)
+        # conv2
+        xt = self.pro_conv2(xt, ei_drp, ew)
         xt = self.relu(xt)
-        xt = dropout_node(xt, p=self.dropout_prot_p, training=self.training)
-
-        xt = self.pro_conv3(xt, ei, ew)
+        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+                                        training=self.training)
+        # conv3
+        xt = self.pro_conv3(xt, ei_drp, ew)
         xt = self.relu(xt)
-        xt = dropout_node(xt, p=self.dropout_prot_p, training=self.training)
 
         # flatten/pool
         xt = gep(xt, data.batch)  # global pooling
         xt = self.relu(xt)
         xt = self.dropout(xt)
 
-        # flatten
+        #### FC layers ####
         xt = self.pro_fc_g1(xt)
         xt = self.relu(xt)
         xt = self.dropout(xt)
