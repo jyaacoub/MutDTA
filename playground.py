@@ -1,21 +1,24 @@
 # %%
+import pprint
 from src.utils.mmseq2 import MMseq2Runner
+from src.data_analysis.stratify_protein import map_davis_to_kinbase
 import pandas as pd 
 
 # tsvp = '../data/misc/davis_clustering//tsvs/davisDB_4sens_198clust.tsv'
-tsvp = '../data/misc/davis_clustering/tsvs/davisDB_4sens_5cov_9c.tsv'
+# tsvp = '../data/misc/davis_clustering/tsvs/davisDB_4sens_5cov_9c.tsv' # 49 clusters
+tsvp = '../data/misc/davis_clustering/tsvs/davisDB_4sens_9c_5cov.tsv'
 # read tsv
 df = pd.read_csv(tsvp, sep='\t', header=None)
 # rename cols
 df.columns = ['rep', 'member']
 
 clusters = df.groupby('rep')['member'].apply(list).to_dict()
-len(clusters)
+print(len(clusters), 'clusters')
 
 # %% group clusters with less than 5 members into one cluster (cluster 0)
 clusters_new = {}
 for k in clusters.keys():
-    if len(clusters[k]) < 1: # remove outlier clusters
+    if len(clusters[k]) == 0: # remove outlier clusters
         continue
         #clusters_new[0] = clusters_new.get(0, []) + clusters[k]
     else:
@@ -55,10 +58,36 @@ for idx in df_full.index:
             cluster_counts[k] = cluster_counts.get(k, 0) + 1
             break
     
+# %% Map davis to kinbase:
+kin_df = pd.read_csv('../data/misc/kinase_base_updated.csv', index_col='name')
+pred_kb = map_davis_to_kinbase(df_full.index.unique(), kin_df)
 
 # %% get subgroup mse
+
+def get_cluster_details(clust):
+    # get subgroups
+    subgroups = {}
+    for prot in clust:
+        fam = pred_kb[prot][1]
+        sg = pred_kb[prot][2]
+        
+        if fam in subgroups:
+            subgroups[fam].add(sg)
+        else:
+            subgroups[fam] = {sg}
+    pp = pprint.PrettyPrinter(indent=4)
+    pp.pprint(subgroups)
+    # print(clust) # protids
+    print('\npkd stats (higher is stronger):')
+    print(df_full.loc[clust, 'pkd'].describe()[['min', 'mean', 'max', 'std']]) # pkd stats
+
+    # print sequence length stats
+    print('\nprot seq stats:')
+    print(df_full.loc[clust, 'prot_seq'].str.len().describe()[['min', 'mean', 'max', 'std']])
+    
+    
 subset = 'test' #'test'
-for model_type in ['DG', 'EDI']:
+for model_type in ['EDI']:
     if model_type == 'EDI':
         model_path = lambda x: f'results/model_media/{subset}_set_pred/EDIM_davis{x}D_nomsaF_binaryE_48B_0.0001LR_0.4D_2000E_{subset}Pred.csv'
     elif model_type == 'DG':
@@ -103,8 +132,31 @@ for model_type in ['DG', 'EDI']:
     plt.title(f'Subgroup Size vs {subset} MSE ({model_type} Model)')
     plt.show()
     plt.clf()
+        
+    
+    # print worse performers
+    print('WORST PERFORMERS')
+    for k in data_clust.keys():
+        if np.mean(data_clust[k]) > 0.5:
+            print(f'\n\n### Cluster {k} has {len(data_clust[k])} proteins and mean mse of {np.mean(data_clust[k]):.3f} '
+                    f'with std {np.std(data_clust[k]):.3f}')
+            clust = list(clusters[k])
+            get_cluster_details(clust)
+                
+                
+            
+    # print best performers
+    print('')
+    print('#'*50)
+    print('BEST PERFORMERS')
+    for k in data_clust.keys():
+        if np.mean(data_clust[k]) < 0.15:
+            print(f'\n\n### Cluster {k} has {len(data_clust[k])} proteins and mean mse of {np.mean(data_clust[k]):.3f} '
+                    f'with std {np.std(data_clust[k]):.3f}')
+            clust = list(clusters[k])
+            get_cluster_details(clust)
 
-
+# %% Cluster 43 is an outlier with the worse performance:
 
 
 
