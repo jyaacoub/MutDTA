@@ -54,7 +54,7 @@ def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer,
             optimizer.step()
 
 
-def simple_test(model:BaseModel, test_loader:DataLoader, device:torch.device, 
+def simple_eval(model:BaseModel, data_loader:DataLoader, device:torch.device, 
                 CRITERION:torch.nn.Module=None) -> float:
     """
     Run inference on the test set.
@@ -81,7 +81,7 @@ def simple_test(model:BaseModel, test_loader:DataLoader, device:torch.device,
     CRITERION = CRITERION or torch.nn.MSELoss()
     
     with torch.no_grad():
-        for data in test_loader:
+        for data in data_loader:
             batch_pro = data['protein'].to(device)
             batch_mol = data['ligand'].to(device)
             labels = data['y'].reshape(-1,1).to(device)
@@ -94,6 +94,6 @@ def simple_test(model:BaseModel, test_loader:DataLoader, device:torch.device,
             test_loss += loss.item()
 
         # Compute average test loss
-        test_loss /= len(test_loader)
+        test_loss /= len(data_loader)
     
     return test_loss

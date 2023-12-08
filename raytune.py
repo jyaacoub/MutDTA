@@ -9,9 +9,10 @@ from ray.tune.search.optuna import OptunaSearch
 
 
 from src.utils.loader import Loader
-from src.train_test.tune import simple_train, simple_test
+from src.train_test.tune import simple_train, simple_eval
 from src.utils import config as cfg
 
+resources = {"cpu":6, "gpu": 4} # NOTE: must match SBATCH directives
 
 def objective(config):
     save_checkpoint = config.get("save_checkpoint", False)
@@ -35,7 +36,7 @@ def objective(config):
         simple_train(model, optimizer, loaders['train'], 
                      device=device, 
                      epochs=1)  # Train the model
-        loss = simple_test(model, loaders['val'], 
+        loss = simple_eval(model, loaders['val'], 
                            device=device)  # Compute test accuracy
         
         checkpoint = None
@@ -46,7 +47,6 @@ def objective(config):
         session.report({"mean_loss": loss}, checkpoint=checkpoint)
 
 algo = OptunaSearch()
-# algo = ConcurrencyLimiter(algo, max_concurrent=4)
 search_space = {
     # constants:
     "epochs": 15, # 15 epochs
@@ -64,7 +64,7 @@ search_space = {
 }
 
 tuner = tune.Tuner(
-    tune.with_resources(objective, resources={"cpu": 6, "gpu": 1}), # NOTE: must match SBATCH directives
+    tune.with_resources(objective, resources=resources), 
     tune_config=tune.TuneConfig(
         metric="mean_loss",
         mode="min",
