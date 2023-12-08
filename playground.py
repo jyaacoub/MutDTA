@@ -65,6 +65,7 @@ pred_kb = map_davis_to_kinbase(df_full.index.unique(), kin_df)
 # %% get subgroup mse
 
 def get_cluster_details(clust):
+    print(clust) 
     # get subgroups
     subgroups = {}
     for prot in clust:
@@ -138,12 +139,10 @@ for model_type in ['EDI']:
     print('WORST PERFORMERS')
     for k in data_clust.keys():
         if np.mean(data_clust[k]) > 0.5:
-            print(f'\n\n### Cluster {k} has {len(data_clust[k])} proteins and mean mse of {np.mean(data_clust[k]):.3f} '
-                    f'with std {np.std(data_clust[k]):.3f}')
             clust = list(clusters[k])
+            print(f'\n\n### Cluster {k} has {len(clust)} proteins and mean mse of {np.mean(data_clust[k]):.3f} '
+                    f'with std {np.std(data_clust[k]):.3f}')
             get_cluster_details(clust)
-                
-                
             
     # print best performers
     print('')
@@ -151,16 +150,16 @@ for model_type in ['EDI']:
     print('BEST PERFORMERS')
     for k in data_clust.keys():
         if np.mean(data_clust[k]) < 0.15:
-            print(f'\n\n### Cluster {k} has {len(data_clust[k])} proteins and mean mse of {np.mean(data_clust[k]):.3f} '
-                    f'with std {np.std(data_clust[k]):.3f}')
             clust = list(clusters[k])
+            print(f'\n\n### Cluster {k} has {len(clust)} proteins and mean mse of {np.mean(data_clust[k]):.3f} '
+                    f'with std {np.std(data_clust[k]):.3f}')
             get_cluster_details(clust)
 
 # %% Cluster 43 is an outlier with the worse performance:
 
+exit() 
 
-
-#--------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------
 #--------------------------------------------------------------------------------
 # %% plot mse vs protein sequence length
