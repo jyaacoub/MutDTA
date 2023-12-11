@@ -416,7 +416,10 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2-anm)E_', expand=False)
     df['ddp'] = df['run'].str.contains('DDP-')
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
-    df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False)
+    df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False).astype(int)
+    
+    df['lr'] = df['run'].str.extract(r'_(\d+\.?\d*)LR_', expand=False).astype(float)
+    df['dropout'] = df['run'].str.extract(r'_(\d+\.?\d*)D_', expand=False).astype(float)
     
     # ESM models
     df.loc[df['run'].str.contains('EDM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
