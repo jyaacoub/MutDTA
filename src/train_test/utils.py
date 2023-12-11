@@ -421,16 +421,8 @@ def debug(model: BaseModel, data_loader:DataLoader,
         return train, eval
 
 ## ==================== Distributed Training ==================== ##
-def handle_sigusr1(signum, frame):
-    # requeues the job
-    os.system(f'scontrol requeue {os.getenv("SLURM_JOB_ID")}')
-    exit()    
-
 def init_node(args):    
     args.ngpus_per_node = torch.cuda.device_count()
-
-    # requeue job on SLURM preemption
-    signal.signal(signal.SIGUSR1, handle_sigusr1)
 
     # find the common host name on all nodes
     cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
