@@ -22,9 +22,7 @@ from src.utils.loader import Loader
 from src.train_test.simple import simple_train, simple_eval
 from src.utils import config as cfg
 
-def main(rank, world_size, config):
-    print(f'Rank: {rank}, World size: {world_size}')
-    time.sleep(10)
+def main(rank, world_size, config): # define this inside objective??
     # ============= Set up DDP environment =====================
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = config['port']
@@ -60,8 +58,8 @@ def main(rank, world_size, config):
     
     # ============ Init Model ==============
     model = Loader.init_model(model=config["model"], pro_feature=config["feature_opt"],
-                              pro_edge=config["edge_opt"], dropout=config["dropout"]
-                              ).to(device)
+                            pro_edge=config["edge_opt"], dropout=config["dropout"]
+                            ).to(device)
         
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
     model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
@@ -75,8 +73,8 @@ def main(rank, world_size, config):
     for _ in range(config["epochs"]):
         torch.distributed.barrier()
         simple_train(model, optimizer, loaders['train'], 
-                     device=device, 
-                     epochs=1)  # one epoch
+                    device=device, 
+                    epochs=1)  # one epoch
         
         torch.distributed.barrier()
         loss = simple_eval(model, loaders['val'], device)  # Compute validation accuracy
@@ -122,15 +120,15 @@ if __name__ == "__main__":
 
     ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
 
-    tuner = tune.Tuner(
-        tune.with_resources(objective_DDP, resources={"cpu": 4, "gpu": 1}),
-        param_space=search_space,
-        tune_config=tune.TuneConfig(
-            metric="mean_loss",
-            mode="min",
-            search_alg=OptunaSearch(),
-            num_samples=50,
-        ),
-    )
+tuner = tune.Tuner(
+    tune.with_resources(objective_DDP, resources={"cpu": 6, "gpu": 2}),
+    param_space=search_space,
+    tune_config=tune.TuneConfig(
+        metric="mean_loss",
+        mode="min",
+        search_alg=algo,
+        num_samples=50,
+    ),
+)
 
-    results = tuner.fit()
+results = tuner.fit()

@@ -12,7 +12,7 @@ from src.utils.loader import Loader
 from src.train_test.simple import simple_train, simple_eval
 from src.utils import config as cfg
 
-resources = {"cpu":6, "gpu": 4} # NOTE: must match SBATCH directives
+resources = {"cpu":6, "gpu": 2} # NOTE: must match SBATCH directives
 
 def objective(config):
     save_checkpoint = config.get("save_checkpoint", False)
