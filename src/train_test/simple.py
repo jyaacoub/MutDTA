@@ -8,7 +8,7 @@ from src.models.utils import BaseModel
 
 
 def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer, 
-                 train_loader:DataLoader, device: torch.device,
+                 train_loader:DataLoader, device: torch.device=None,
                  epochs=10) -> dict:
     """
     simple training loop without any checkpointing, lr scheduling, early stopping, 
@@ -38,9 +38,14 @@ def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer,
     for _ in range(epochs):
         # Training loop
         for data in train_loader:
-            batch_pro = data['protein'].to(device)
-            batch_mol = data['ligand'].to(device)
-            labels = data['y'].reshape(-1,1).to(device)
+            batch_pro = data['protein']
+            batch_mol = data['ligand']
+            labels = data['y'].reshape(-1,1)
+            
+            if device is not None:
+                batch_pro = batch_pro.to(device)
+                batch_mol = batch_mol.to(device)
+                labels = labels.to(device)
             
             # Forward pass
             predictions = model(batch_pro, batch_mol)
@@ -54,7 +59,7 @@ def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer,
             optimizer.step()
 
 
-def simple_eval(model:BaseModel, data_loader:DataLoader, device:torch.device, 
+def simple_eval(model:BaseModel, data_loader:DataLoader, device:torch.device=None, 
                 CRITERION:torch.nn.Module=None) -> float:
     """
     Run inference on the test set.
@@ -82,9 +87,14 @@ def simple_eval(model:BaseModel, data_loader:DataLoader, device:torch.device,
     
     with torch.no_grad():
         for data in data_loader:
-            batch_pro = data['protein'].to(device)
-            batch_mol = data['ligand'].to(device)
-            labels = data['y'].reshape(-1,1).to(device)
+            batch_pro = data['protein']
+            batch_mol = data['ligand']
+            labels = data['y'].reshape(-1,1)
+            
+            if device is not None:
+                batch_pro = batch_pro.to(device)
+                batch_mol = batch_mol.to(device)
+                labels = labels.to(device)
             
             # Forward pass
             predictions = model(batch_pro, batch_mol)

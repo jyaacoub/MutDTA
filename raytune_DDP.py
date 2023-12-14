@@ -1,7 +1,7 @@
 # This is a simple tuning script for the raytune library.
 # no support for distributed training in this file.
 
-import random, os, socket
+import random, os, socket, time
 import torch
 
 from torch import nn
@@ -19,10 +19,12 @@ from ray.tune.search.optuna import OptunaSearch
 
 
 from src.utils.loader import Loader
-from src.train_test.tune import simple_train, simple_eval
+from src.train_test.simple import simple_train, simple_eval
 from src.utils import config as cfg
 
 def main(rank, world_size, config):
+    print(f'Rank: {rank}, World size: {world_size}')
+    time.sleep(10)
     # ============= Set up DDP environment =====================
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = config['port']
@@ -92,41 +94,43 @@ def main(rank, world_size, config):
 def objective_DDP(config): # NO inter-node distribution due to communication difficulties
     world_size = torch.cuda.device_count()
     # device is also inserted as the first arg to main()
+    print(f'World size: {world_size}')
     mp.spawn(main, args=(world_size, config,), nprocs=world_size)
     
     
-algo = OptunaSearch()
+if __name__ == "__main__":    
+    search_space = {
+        # constants:
+        "epochs": 10, # 15 epochs
+        "model": "DG",
+        "dataset": "davis",
+        "feature_opt": "nomsa",
+        "edge_opt": "binary",
+        "fold_selection": 0,
+        "save_checkpoint": False,
+        
+        # DDP specific constants:
+        "port": random.randint(49152,65535),
+        
+        # hyperparameters to tune:
+        "lr": tune.loguniform(1e-4, 1e-2),
+        "dropout": tune.uniform(0, 0.5),
+        "embedding_dim": tune.choice([64, 128, 256]),
+        
+        "global_batch_size": tune.choice([16, 32, 48]), # global batch size is divided by ngpus/world_size
+    }
 
-search_space = {
-    # constants:
-    "epochs": 10, # 15 epochs
-    "model": "DG",
-    "dataset": "davis",
-    "feature_opt": "nomsa",
-    "edge_opt": "binary",
-    "fold_selection": 0,
-    "save_checkpoint": False,
-    
-    # DDP specific constants:
-    "port": random.randint(49152,65535),
-    
-    # hyperparameters to tune:
-    "lr": tune.loguniform(1e-4, 1e-2),
-    "dropout": tune.uniform(0, 0.5),
-    "embedding_dim": tune.choice([64, 128, 256]),
-    
-    "global_batch_size": tune.choice([16, 32, 48]), # global batch size is divided by ngpus/world_size
-}
+    ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
 
-tuner = tune.Tuner(
-    tune.with_resources(objective_DDP, resources={"cpu": 4, "gpu": 2}),
-    param_space=search_space,
-    tune_config=tune.TuneConfig(
-        metric="mean_loss",
-        mode="min",
-        search_alg=algo,
-        num_samples=50,
-    ),
-)
+    tuner = tune.Tuner(
+        tune.with_resources(objective_DDP, resources={"cpu": 4, "gpu": 1}),
+        param_space=search_space,
+        tune_config=tune.TuneConfig(
+            metric="mean_loss",
+            mode="min",
+            search_alg=OptunaSearch(),
+            num_samples=50,
+        ),
+    )
 
-results = tuner.fit()
+    results = tuner.fit()

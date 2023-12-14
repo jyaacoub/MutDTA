@@ -9,7 +9,7 @@ from ray.tune.search.optuna import OptunaSearch
 
 
 from src.utils.loader import Loader
-from src.train_test.tune import simple_train, simple_eval
+from src.train_test.simple import simple_train, simple_eval
 from src.utils import config as cfg
 
 resources = {"cpu":6, "gpu": 4} # NOTE: must match SBATCH directives
@@ -44,7 +44,7 @@ def objective(config):
             checkpoint = TorchCheckpoint.from_state_dict(model.state_dict())
             
         # Report metrics (and possibly a checkpoint) to Tune
-        session.report({"mean_loss": loss}, checkpoint=checkpoint)
+        session.report({"loss": loss}, checkpoint=checkpoint)
 
 algo = OptunaSearch()
 search_space = {
@@ -66,7 +66,7 @@ search_space = {
 tuner = tune.Tuner(
     tune.with_resources(objective, resources=resources), 
     tune_config=tune.TuneConfig(
-        metric="mean_loss",
+        metric="loss",
         mode="min",
         search_alg=algo,
         num_samples=50,
