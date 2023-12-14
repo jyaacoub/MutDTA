@@ -5,6 +5,7 @@ import torch
 from torch_geometric.loader import DataLoader
 
 from src.models.utils import BaseModel
+import ray
 
 
 def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer, 
@@ -34,18 +35,16 @@ def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer,
     """
     CRITERION = torch.nn.MSELoss()
     
+    if device is None:
+        device = ray.train.torch.get_device()        
+    
     model.train()
     for _ in range(epochs):
         # Training loop
         for data in train_loader:
-            batch_pro = data['protein'].device
-            batch_mol = data['ligand'].device
-            labels = data['y'].reshape(-1,1).device
-            
-            if device is not None:
-                batch_pro = batch_pro.to(device)
-                batch_mol = batch_mol.to(device)
-                labels = labels.to(device)
+            batch_pro = data['protein'].to(device)
+            batch_mol = data['ligand'].to(device)
+            labels = data['y'].reshape(-1,1).to(device)
             
             # Forward pass
             predictions = model(batch_pro, batch_mol)
@@ -85,16 +84,14 @@ def simple_eval(model:BaseModel, data_loader:DataLoader, device:torch.device=Non
     test_loss = 0.0
     CRITERION = CRITERION or torch.nn.MSELoss()
     
+    if device is None:
+        device = ray.train.torch.get_device()
+        
     with torch.no_grad():
         for data in data_loader:
-            batch_pro = data['protein'].device
-            batch_mol = data['ligand'].device
-            labels = data['y'].reshape(-1,1).device
-            
-            if device is not None:
-                batch_pro = batch_pro.to(device)
-                batch_mol = batch_mol.to(device)
-                labels = labels.to(device)
+            batch_pro = data['protein'].to(device)
+            batch_mol = data['ligand'].to(device)
+            labels = data['y'].reshape(-1,1).to(device)
             
             # Forward pass
             predictions = model(batch_pro, batch_mol)
