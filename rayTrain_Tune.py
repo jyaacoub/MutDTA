@@ -64,7 +64,7 @@ if __name__ == "__main__":
 
     ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
     
-    config_constants = {
+    search_space = {
         # constants:
         "epochs": 10,
         "model": "DG",
@@ -73,17 +73,7 @@ if __name__ == "__main__":
         "edge_opt": "binary",
         "fold_selection": 0,
         "save_checkpoint": False,
-        }
-    
-    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch
-                                   use_gpu=False,
-                                   trainer_resources={"CPU": 4, "GPU": 1},
-                                #    placement_strategy="PACK", # place workers on same node
-                                   )
-    trainer = TorchTrainer(train_func, scaling_config=scaling_config,
-                           train_loop_config=config_constants).as_trainable()
-
-    search_space = {                
+                
         # hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-4, 1e-2),
         "dropout": ray.tune.uniform(0, 0.5),
@@ -91,12 +81,18 @@ if __name__ == "__main__":
         "batch_size": ray.tune.choice([16, 32, 48]),
     }
     
-    # add run_config to search_space
-    search_space.update(config_constants)
+    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch
+                                   use_gpu=False,
+                                   trainer_resources={"CPU": 4, "GPU": 1},
+                                #    placement_strategy="PACK", # place workers on same node
+                                   )
+        
     tuner = ray.tune.Tuner(
-        trainer,
-        # ray.tune.with_resources(train_func, resources={"CPU": 4}),
-        param_space=search_space,
+        TorchTrainer(train_func),
+        param_space={
+            "train_loop_config": search_space,
+            "scaling_config": scaling_config
+            },
         tune_config=ray.tune.TuneConfig(
             metric="loss",
             mode="min",
