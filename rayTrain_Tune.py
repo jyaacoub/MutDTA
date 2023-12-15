@@ -66,7 +66,9 @@ def train_func(config):
         ray.train.report({"loss": loss},   checkpoint=checkpoint)
     
     
-if __name__ == "__main__":    
+if __name__ == "__main__":
+    print("DATA_ROOT:", cfg.DATA_ROOT)
+    print("os.environ['TRANSFORMERS_CACHE']", os.environ['TRANSFORMERS_CACHE'])
     print("Cuda support:", torch.cuda.is_available(),":", 
                             torch.cuda.device_count(), "devices")
     print("CUDA VERSION:", torch.__version__)
