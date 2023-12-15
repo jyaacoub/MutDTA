@@ -1,6 +1,7 @@
 import os
 # for huggingface models:
-os.environ['TRANSFORMERS_CACHE'] = '../hf_models/'
+
+os.environ['TRANSFORMERS_CACHE'] = os.path.abspath('../hf_models/')
 
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
@@ -20,13 +21,13 @@ LIG_EDGE_OPT = [None, 'binary']
 DATA_OPT = ['davis', 'kiba', 'PDBbind']
 
 # data save paths
-DATA_ROOT = '../data/'
+DATA_ROOT = os.path.abspath('../data/')
 
 # Model save paths
-MEDIA_SAVE_DIR = 'results/model_media/'
-MODEL_STATS_CSV = 'results/model_media/model_stats.csv'
-MODEL_STATS_CSV_VAL = 'results/model_media/model_stats_val.csv'
-MODEL_SAVE_DIR = 'results/model_checkpoints/ours'
+MEDIA_SAVE_DIR      = os.path.abspath('results/model_media/')
+MODEL_STATS_CSV     = os.path.abspath('results/model_media/model_stats.csv')
+MODEL_STATS_CSV_VAL = os.path.abspath('results/model_media/model_stats_val.csv')
+MODEL_SAVE_DIR      = os.path.abspath('results/model_checkpoints/ours')
 CHECKPOINT_SAVE_DIR = MODEL_SAVE_DIR # alias for clarity
 
 # cluster based configs:
