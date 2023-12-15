@@ -81,7 +81,7 @@ if __name__ == "__main__":
         "lr": ray.tune.loguniform(1e-4, 1e-2),
         "dropout": ray.tune.uniform(0, 0.5),
         "embedding_dim": ray.tune.choice([64, 128, 256]),
-        "batch_size": ray.tune.choice([16, 32, 48]),
+        "batch_size": ray.tune.choice([16, 32, 48]), # batch size is per GPU!
     }
      
     scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch

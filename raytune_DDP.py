@@ -120,15 +120,15 @@ if __name__ == "__main__":
 
     ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
 
-tuner = tune.Tuner(
-    tune.with_resources(objective_DDP, resources={"cpu": 6, "gpu": 2}),
-    param_space=search_space,
-    tune_config=tune.TuneConfig(
-        metric="mean_loss",
-        mode="min",
-        search_alg=algo,
-        num_samples=50,
-    ),
-)
+    tuner = tune.Tuner(
+        tune.with_resources(objective_DDP, resources={"cpu": 6, "gpu": 2}),
+        param_space=search_space,
+        tune_config=tune.TuneConfig(
+            metric="mean_loss",
+            mode="min",
+            search_alg=OptunaSearch(),
+            num_samples=50,
+        ),
+    )
 
-results = tuner.fit()
+    results = tuner.fit()
