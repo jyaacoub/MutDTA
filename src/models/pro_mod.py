@@ -111,7 +111,7 @@ class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
                  output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary',
-                 dropout_prot_p=0.0, extra_profc_layer=False):
+                 dropout_prot=0.0, extra_profc_layer=False):
         
         super(EsmDTA, self).__init__(pro_feat, edge_weight_opt)
 
@@ -145,7 +145,7 @@ class EsmDTA(BaseModel):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         # note that dropout for edge and nodes is handled by torch_geometric in forward pass
-        self.dropout_prot_p = dropout_prot_p
+        self.dropout_prot_p = dropout_prot
 
         # combined layers
         self.fc1 = nn.Linear(2 * output_dim, 1024)
@@ -302,8 +302,11 @@ class SaProtDTA(EsmDTA):
                  num_features_pro=480, 
                  pro_emb_dim=512, 
                  num_features_mol=78, 
-                 output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary'):
-        super().__init__(esm_head, num_features_pro, pro_emb_dim, num_features_mol, output_dim, dropout, pro_feat, edge_weight_opt)
+                 output_dim=128, dropout=0.2, 
+                 pro_feat='esm_only', 
+                 edge_weight_opt='binary', **kwargs):
+        super().__init__(esm_head, num_features_pro, pro_emb_dim, num_features_mol, 
+                         output_dim, dropout, pro_feat, edge_weight_opt, **kwargs)
     
     # overwrite the forward_pro pass to account for new saprot model    
     def forward_pro(self, data):
@@ -320,10 +323,10 @@ class SaProtDTA(EsmDTA):
         # mask tokens dont make it through to the final output 
         # thus the final output is the same length as if we were to run it through the original ESM
 
-        #%% removing <cls> token
+        # removing <cls> token
         esm_emb = esm_emb[:,1:,:] # [B, L_max+1, emb_dim]
 
-        # %% removing <sep>/<eos> and <pad> token by applying mask
+        # removing <sep>/<eos> and <pad> token by applying mask
         # for saProt token 2 == <eos>
         L_max = esm_emb.shape[1] # L_max+1
         mask = torch.arange(L_max)[None, :] < torch.tensor([len(seq)/2 #NOTE: this is the main difference from normal ESM since the input sequence includes SA tokens
@@ -343,28 +346,44 @@ class SaProtDTA(EsmDTA):
 
         #### Graph NN ####
         ei = data.edge_index
+        # if edge_weight doesnt exist no error is thrown it just passes it as None
         ew = data.edge_weight if (self.edge_weight is not None and 
                                   self.edge_weight != 'binary') else None
-
-        # if edge_weight doesnt exist no error is thrown it just passes it as None
-        xt = self.pro_conv1(target_x, ei, ew)
+        
+        target_x = self.relu(target_x)
+        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+                                        training=self.training)
+        
+        # conv1
+        xt = self.pro_conv1(target_x, ei_drp, ew)
+        xt = self.relu(xt)
+        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+                                        training=self.training)
+        # conv2
+        xt = self.pro_conv2(xt, ei_drp, ew)
+        xt = self.relu(xt)
+        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+                                        training=self.training)
+        # conv3
+        xt = self.pro_conv3(xt, ei_drp, ew)
         xt = self.relu(xt)
 
-        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv2(xt, ei, ew)
-        xt = self.relu(xt)
-
-        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
-        xt = self.pro_conv3(xt, ei, ew)
-        xt = self.relu(xt)
-
-        # xt = self.pro_conv4(xt, target_edge_index)
-        # xt = self.relu(xt)
+        # flatten/pool
         xt = gep(xt, data.batch)  # global pooling
-
-        # flatten
-        xt = self.relu(self.pro_fc_g1(xt))
+        xt = self.relu(xt)
         xt = self.dropout(xt)
+
+        #### FC layers ####
+        xt = self.pro_fc_g1(xt)
+        xt = self.relu(xt)
+        xt = self.dropout(xt)
+        
+        if self.extra_profc_layer:
+            xt = self.pro_fc_g1b(xt)
+            xt = self.relu(xt)
+            xt = self.dropout(xt)
+        
         xt = self.pro_fc_g2(xt)
+        xt = self.relu(xt)
         xt = self.dropout(xt)
         return xt
