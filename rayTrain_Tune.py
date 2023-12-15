@@ -23,13 +23,15 @@ def train_func(config):
     model = Loader.init_model(model=config["model"], pro_feature=config["feature_opt"],
                             pro_edge=config["edge_opt"],
                             # additional kwargs send to model class to handle
-                            dropout=config["dropout"], dropout_prot=config["dropout_prot"]
-                            pro_emb_dim=config["pro_emb_dim"], extra_profc_layer=config["extra_profc_layer"])
+                            dropout=config["dropout"], 
+                            dropout_prot=config["dropout_prot"], pro_emb_dim=config["pro_emb_dim"], extra_profc_layer=config["extra_profc_layer"]
+                            )
     
     # prepare model with rayTrain (moves it to correct device and wraps it in DDP)
     model = ray.train.torch.prepare_model(model)
     
     # ============ Load dataset ==============
+    print("Loading Dataset")
     loaders = Loader.load_DataLoaders(data=config['dataset'], pro_feature=config['feature_opt'], 
                                       edge_opt=config['edge_opt'], 
                                       path=cfg.DATA_ROOT, 
@@ -73,7 +75,7 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 10,
-        "model": "SPD",
+        "model": "EDI",
         "dataset": "davis",
         "feature_opt": "nomsa",
         "edge_opt": "binary",
@@ -93,10 +95,10 @@ if __name__ == "__main__":
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
-    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=4, # number of ray actors to launch to distribute compute across
                                    use_gpu=True, # default is for each worker to have 1 GPU (overrided by resources per worker)
-                                   # resources_per_worker={"CPU": 6, "GPU": 2},
-                                   # trainer_resources={"CPU": 6, "GPU": 2},
+                                    resources_per_worker={"CPU": 2, "GPU": 1},
+                                   # trainer_resources={"CPU": 2, "GPU": 1},
                                    # placement_strategy="PACK", # place workers on same node
                                    )
     
