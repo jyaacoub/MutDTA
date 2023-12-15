@@ -21,7 +21,10 @@ from src.utils import config as cfg
 def train_func(config):
     # ============ Init Model ==============
     model = Loader.init_model(model=config["model"], pro_feature=config["feature_opt"],
-                            pro_edge=config["edge_opt"], dropout=config["dropout"])
+                            pro_edge=config["edge_opt"],
+                            # additional kwargs send to model class to handle
+                            dropout=config["dropout"], dropout_prot=config["dropout_prot"]
+                            pro_emb_dim=config["pro_emb_dim"], extra_profc_layer=config["extra_profc_layer"])
     
     # prepare model with rayTrain (moves it to correct device and wraps it in DDP)
     model = ray.train.torch.prepare_model(model)
@@ -68,28 +71,35 @@ if __name__ == "__main__":
 #    ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
     
     search_space = {
-        # constants:
+        ## constants:
         "epochs": 10,
-        "model": "DG",
+        "model": "SPD",
         "dataset": "davis",
         "feature_opt": "nomsa",
         "edge_opt": "binary",
         "fold_selection": 0,
         "save_checkpoint": False,
                 
-        # hyperparameters to tune:
+        ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-4, 1e-2),
-        "dropout": ray.tune.uniform(0, 0.5),
-        "embedding_dim": ray.tune.choice([64, 128, 256]),
-        "batch_size": ray.tune.choice([16, 32, 48]), # batch size is per GPU!
+        "batch_size": ray.tune.choice([16, 32, 48]),        # batch size is per GPU!?
+        
+        # model architecture hyperparams
+        "dropout": ray.tune.uniform(0, 0.5), # for fc layers
+        "dropout_prot": ray.tune.uniform(0, 0.5),
+        "pro_emb_dim": ray.tune.choice([480, 512, 1024]), # input from SaProt is 480 dims
+        "extra_profc_layer": ray.tune.choice([True, False])
     }
-     
-    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch
+    
+    # each worker is a node from the ray cluster.
+    # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
+    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch to distribute compute across
                                    use_gpu=True, # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    # resources_per_worker={"CPU": 6, "GPU": 2},
                                    # trainer_resources={"CPU": 6, "GPU": 2},
-                                #    placement_strategy="PACK", # place workers on same node
+                                   # placement_strategy="PACK", # place workers on same node
                                    )
+    
     print('init Tuner')     
     tuner = ray.tune.Tuner(
         TorchTrainer(train_func),
@@ -100,7 +110,9 @@ if __name__ == "__main__":
         tune_config=ray.tune.TuneConfig(
             metric="loss",
             mode="min",
-            search_alg=OptunaSearch(),
+            search_alg=OptunaSearch(), # using ray.tune.search.Repeater() could be useful to get multiple trials per set of params
+                                       # would be even better if we could set trial-wise dependencies for a certain fold.
+                                       # https://github.com/ray-project/ray/issues/33677
             num_samples=50,
         ),
     )

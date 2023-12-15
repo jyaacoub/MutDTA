@@ -36,7 +36,7 @@ def simple_train(model: BaseModel, optimizer:torch.optim.Optimizer,
     CRITERION = torch.nn.MSELoss()
     
     if device is None:
-        device = ray.train.torch.get_device()        
+        device = ray.train.torch.get_device() # WARNING: returns list if worker has multiple GPUs
     
     model.train()
     for _ in range(epochs):
@@ -85,7 +85,7 @@ def simple_eval(model:BaseModel, data_loader:DataLoader, device:torch.device=Non
     CRITERION = CRITERION or torch.nn.MSELoss()
     
     if device is None:
-        device = ray.train.torch.get_device()
+        device = ray.train.torch.get_device() # WARNING: returns list if worker has multiple GPUs
         
     with torch.no_grad():
         for data in data_loader:
