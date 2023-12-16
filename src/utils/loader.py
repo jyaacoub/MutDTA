@@ -113,6 +113,7 @@ class Loader():
                         edge_weight_opt=pro_edge,
                         **kwargs)
         elif model == 'SPD':
+            assert pro_feature == 'foldseek', 'Please load up the correct dataset! SaProt only supports foldseek features.'
             #SaProt
             model = SaProtDTA(esm_head='westlake-repl/SaProt_35M_AF2',
                         num_features_pro=480,
