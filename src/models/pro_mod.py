@@ -306,7 +306,8 @@ class SaProtDTA(EsmDTA):
                  pro_feat='esm_only', 
                  edge_weight_opt='binary', **kwargs):
         super().__init__(esm_head, num_features_pro, pro_emb_dim, num_features_mol, 
-                         output_dim, dropout, pro_feat, edge_weight_opt, **kwargs)
+                         output_dim, dropout, pro_feat, edge_weight_opt, 
+                         extra_profc_layer=True,**kwargs)
     
     # overwrite the forward_pro pass to account for new saprot model    
     def forward_pro(self, data):
