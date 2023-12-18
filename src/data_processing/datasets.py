@@ -42,6 +42,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  only_download=False,
                  ligand_feature:str='original', 
                  ligand_edge:str='binary',
+                 verbose=False,
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -88,7 +89,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         *args and **kwargs sent to superclass `torch_geometric.data.InMemoryDataset`.
         """
-        
+        self.verbose = verbose
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
         self.overwrite = overwrite
@@ -122,12 +123,12 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         # Validating subset
         subset = subset or 'full'
         save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
-        print('save_root:', save_root)
+        if self.verbose: print('save_root:', save_root)
         
         if subset != 'full':
             data_p = os.path.join(save_root, subset)
             if not os.path.isdir(data_p):
-                DatasetNotFound(f"{data_p} Subset does not exist, please create subset before initialization.")
+                raise DatasetNotFound(f"{data_p} Subset does not exist, please create (using split) before initialization.")
         self.subset = subset
         
         # checking af2 conf dir if we are creating the dataset from scratch
@@ -204,10 +205,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return Counter(self.df['prot_id'])
     
     @staticmethod
-    def filter_pro_len(df, max_seq_len) -> pd.DataFrame:
+    def filter_pro_len(df, max_seq_len, verbose=False) -> pd.DataFrame:
         df_new = df[df['prot_seq'].str.len() <= max_seq_len]
         pro_filtered = len(df) - len(df_new)
-        if pro_filtered > 0:
+        if pro_filtered > 0 and verbose:
             print(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
         return df_new
     

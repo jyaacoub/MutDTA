@@ -412,11 +412,14 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     # create data, feat, and overlap columns for easier filtering.
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
     df['fold'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)(\d*)', expand=True)[1] # fold number if available
-    df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon)F_', expand=False)
+    df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon|foldseek)F_', expand=False)
     df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2-anm)E_', expand=False)
     df['ddp'] = df['run'].str.contains('DDP-')
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
-    df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False)
+    df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False).astype(int)
+    
+    df['lr'] = df['run'].str.extract(r'_(\d+\.?\d*)LR_', expand=False).astype(float)
+    df['dropout'] = df['run'].str.extract(r'_(\d+\.?\d*)D_', expand=False).astype(float)
     
     # ESM models
     df.loc[df['run'].str.contains('EDM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
@@ -472,6 +475,23 @@ if __name__ == '__main__':
             fig5_edge_feat_violin(df, sel_col=col, sel_dataset=dataset, exclude=['af2-anm'], verbose=verbose, show=False)
             plt.savefig(f"results/figures/fig5_edge_feat_violin_{dataset}_{col}.png", dpi=300, bbox_inches='tight')
             plt.clf()
+            
+            
+    # %% Combined violin plots
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], fig_callable=fig4_pro_feat_violin)
+    plt.savefig(f'results/figures/fig_combined_proViolin_CI-MSE.png', dpi=300, bbox_inches='tight')
+    plt.clf()
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse', 'pearson'], fig_callable=fig4_pro_feat_violin)
+    plt.savefig(f'results/figures/fig_combined_proViolin_CI-MSE-Pearson.png', dpi=300, bbox_inches='tight')
+    plt.clf()
+
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], fig_callable=fig5_edge_feat_violin)
+    plt.savefig(f"results/figures/fig_combined_edgeViolin_CI-MSE.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+    fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse', 'pearson'], fig_callable=fig5_edge_feat_violin)
+    plt.savefig(f"results/figures/fig_combined_edgeViolin_CI-MSE-Pearson.png", dpi=300, bbox_inches='tight')
+    plt.clf()
+
 
     #%% dataset comparisons
     plot_df = fig1_pro_overlap(df, sel_col='mse', verbose=verbose, show=False)

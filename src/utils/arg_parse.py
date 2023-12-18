@@ -95,6 +95,17 @@ def add_hyperparam_args(parser: argparse.ArgumentParser):
         action='store', type=float, default=0.4,
         help='Dropout rate for training (default: 0.4)'
     )
+    parser.add_argument('-dop',
+        '--dropout_prot',
+        action='store', type=float, default=0.4,
+        help='Dropout rate for protein GCN branch for training (default: 0.4)'
+    )
+    parser.add_argument('-embP',
+        '--pro_emb_dim',
+        action='store', type=int, default=128,
+        help='Embedding dimension for protein GCN branch for training (default: 128)'
+    )
+    
     parser.add_argument('-ne',
         '--num_epochs',
         action='store', type=int, default=2000,
@@ -145,6 +156,18 @@ def add_dataset_args(parser: argparse.ArgumentParser):
         '--fold_selection',
         action='store', type=int, default=0,
         help='Fold selection (default: 0 - first fold)'
+    )
+    
+    # for test.py:
+    parser.add_argument('-spte', # default is not to save predictions
+        '--save_pred_test',
+        action='store_true',
+        help='Save predictions of model on test set to csv file.'
+    )
+    parser.add_argument('-sptr', 
+        '--save_pred_train',
+        action='store_true', # default is not to save predictions
+        help='Save predictions of model on training set to csv file.'
     )
     return parser
 
