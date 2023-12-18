@@ -102,7 +102,7 @@ def add_hyperparam_args(parser: argparse.ArgumentParser):
     )
     parser.add_argument('-embP',
         '--pro_emb_dim',
-        action='stor', type=int, default=128,
+        action='store', type=int, default=128,
         help='Embedding dimension for protein GCN branch for training (default: 128)'
     )
     
