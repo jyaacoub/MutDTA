@@ -95,6 +95,17 @@ def add_hyperparam_args(parser: argparse.ArgumentParser):
         action='store', type=float, default=0.4,
         help='Dropout rate for training (default: 0.4)'
     )
+    parser.add_argument('-dop',
+        '--dropout_prot',
+        action='store', type=float, default=0.4,
+        help='Dropout rate for protein GCN branch for training (default: 0.4)'
+    )
+    parser.add_argument('-embP',
+        '--pro_emb_dim',
+        action='store', type=int, default=128,
+        help='Embedding dimension for protein GCN branch for training (default: 128)'
+    )
+    
     parser.add_argument('-ne',
         '--num_epochs',
         action='store', type=int, default=2000,
