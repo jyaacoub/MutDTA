@@ -11,9 +11,10 @@ CLUST_OPTION = '4sens_9c_5cov'
 
 ## PLOTTING PARAMETERS
 GET_MEAN = True
+OVERLAY_PLOTS = True
 
 ## DATASET PARAMETERS
-for DATASET in  ['pdbbind', 'kiba', 'davis']:
+for DATASET in  ['pdbbind', 'kiba']:
 
     ## Processing for getting correct paths based on dataset:
     if DATASET == 'davis' or DATASET == 'kiba':
@@ -114,8 +115,55 @@ for DATASET in  ['pdbbind', 'kiba', 'davis']:
         # merge counts with mse
         model_cluster_mse[model_type] = data_clust.copy()
         
+    # ================ plot count vs mse
+    if OVERLAY_PLOTS:
+        fig = plt.figure(figsize=(10,5))
+        for i, model_type in enumerate(['EDI', 'DG']):
+            # merge counts with mse
+            x = []
+            y = []
+            z = []
+            for k in data_clust.keys():
+                x += [cluster_counts[k]] * len(data_clust[k])
+                y += data_clust[k]
+                z += [k] * len(data_clust[k])
 
-    # plot mse vs mse for EDI and DG
+            # scatter plot with x axis as count and y axis as mse
+            sns.scatterplot(x=x, y=y, alpha=0.5, label=model_type, )
+            plt.xlabel('Number of Proteins in cluster')
+            plt.ylabel('MSE')
+            plt.title(f'Subgroup Size vs {DATASET} {subset} MSE')
+    else:
+        fig, axes = plt.subplots(1, 2, figsize=(15,5))
+        for i, model_type in enumerate(['EDI', 'DG']):
+            ax = axes[i]
+            # merge counts with mse
+            x = []
+            y = []
+            z = []
+            for k in data_clust.keys():
+                x += [cluster_counts[k]] * len(data_clust[k])
+                y += data_clust[k]
+                z += [k] * len(data_clust[k])
+
+            # scatter plot with x axis as count and y axis as mse
+            sns.scatterplot(x=x, y=y, hue=z, palette='tab20', ax=ax)
+            # line of best fit
+            m, b = np.polyfit(x, y, 1)
+            lines = ax.plot(x, m*np.array(x) + b, color='black', linestyle='dotted', 
+                                label=f'y={m*10000:.2f}e-4x+{b:.2f}', linewidth=2)
+
+            # correlation
+            corr = np.corrcoef(x, y)[0, 1]
+            ax.set_xlabel('Number of Proteins in cluster')
+            ax.set_ylabel('MSE')
+            ax.legend(handles=[lines[0]], loc='upper left', title=f'Correlation: {corr:.3f}')
+            ax.set_title(f'Subgroup Size vs {DATASET} {subset} MSE ({model_type} Model)')
+    plt.show()
+    plt.clf()
+    
+    
+    # ============== plot mse vs mse for EDI and DG
     # verify that clusters are present in both models
     # if not, remove from both
     for k in list(model_cluster_mse['EDI'].keys()):
@@ -144,7 +192,7 @@ for DATASET in  ['pdbbind', 'kiba', 'davis']:
 
     plt.xlabel('EDI MSE')
     plt.ylabel('DG MSE')
-    plt.title(f'MSE of clusters for EDI and DG models ({DATASET} {subset} set)')
+    plt.title(f'{"Mean" if GET_MEAN else ""} MSE of clusters for EDI and DG models ({DATASET} {subset} set)')
 
     # remove legend
     plt.legend([],[], frameon=False)
