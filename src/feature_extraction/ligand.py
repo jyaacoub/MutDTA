@@ -22,20 +22,25 @@ def atom_features(atom):
         one_hot(atom.GetImplicitValence(),[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], cap=True),
         [atom.GetIsAromatic()]))
 
-# mol smile to mol graph edge index
-def smile_to_graph(smile, lig_feature:str, lig_edge:str):
+def smile_to_mol(smile):
     try:
         mol = Chem.MolFromSmiles(smile)
     except AttributeError as e:
         # adding to stack trace
         raise ValueError(f'rdkit failed to convert SMILE: {smile}') from e
+    return mol
+
+
+# mol smile to mol graph edge index
+def smile_to_graph(smile:str, lig_feature:str, lig_edge:str):
+    mol = smile_to_mol(smile)
 
     # getting node features
     atoms = mol.GetAtoms()
     features = np.zeros((len(atoms), 78))
     for i, atom in enumerate(atoms):
         feature = atom_features(atom) # 78 features
-        features[i] = feature / sum(feature) # why / sum(feature)? #WARNING: this doesnt make sense since all the values are 0 or 1 and sum(feature) always equals 5 (number of features)
+        features[i] = feature / sum(feature) # why / sum(feature)? #WARNING: this doesnt make sense since all the values are 0 or 1 and sum(feature) always equals 5 (4 one hot vectors + 1 bool)
 
     # getting bonds using rdKit
     edges = [[b.GetBeginAtomIdx(), b.GetEndAtomIdx()] for b in mol.GetBonds()]
