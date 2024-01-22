@@ -7,24 +7,27 @@ class MMseq2Runner:
     bin_path = cfg.MMSEQ2_BIN
     
     @staticmethod
-    def csv_to_FASTA(f_in:str, f_out:str):
+    def csv_to_FASTA(f_in:str, f_out:str, unique_column:str='prot_id'):
         # converts a csv of proteins with codes to a FASTA file with codes as headers
         # column of csv is codes,..., prot_seq
         df = pd.read_csv(f_in, index_col=0)
         # get unique codes
-        codes = df.index.unique()
+        codes = df[unique_column].drop_duplicates().index
         # write to fasta
         with open(f_out, 'w') as f:
             for code in codes:
-                f.write(f'>{code}\n{df.loc[code, "prot_seq"][0]}\n')
-    
+                seq = df.loc[code, "prot_seq"]
+                if not isinstance(seq, str):
+                    seq = seq[0]
+                f.write(f'>{code}\n{seq}\n')
+        
     @staticmethod
     def run_simple_clustering(fasta_in:str, out_dir:str, tmp_dir:str=None, 
                               force_overwrite:bool=False, verbose:bool=False):
         # --------------------------------------------
         # mmseqs createdb XY.fasta davisDB/DB
         # mmseqs cluster -s 16.0 --cov-mode 5 -c 0.6 davisDB/DB clu/DB tmp/
-        # mmseqs createtsv davisDB/DB davisDB/DB clu/DB tsvs/davisDB_10sens_6c_5cov.tsv
+        # mmseqs createtsv davisDB/DB davisDB/DB clu/DB tsvs/davisDB_4sens_9c_5cov.tsv
         # --------------------------------------------
         
         # runs mmseq2 simple clustering on a fasta file
