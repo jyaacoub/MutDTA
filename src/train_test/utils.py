@@ -1,22 +1,14 @@
-import signal, os, subprocess
 from typing import Tuple
-from copy import deepcopy
-
-import submitit
 
 import numpy as np
 import pandas as pd
 
-
 import torch
-from torch import nn
-import torch.distributed as dist
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch_geometric.loader import DataLoader
-from torch_geometric.data import InMemoryDataset
 
 from src.models.utils import BaseModel
-from src.data_processing.datasets import DavisKibaDataset, BaseDataset
+from src.data_processing.datasets import BaseDataset
 
 
 # Creating data indices for training and validation splits:
@@ -270,114 +262,6 @@ def balanced_kfold_split(dataset: BaseDataset,
     
     return train_loaders, val_loaders, test_loader
 
-
-class CheckpointSaver:
-    # Adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-    def __init__(self, model:BaseModel, save_path=None, train_all=True, patience=30, 
-                 min_delta=0.2, debug=False, dist_rank:int=None):
-        """
-        Early stopping and checkpoint saving class.
-
-        Parameters
-        ----------
-        `model` : BaseModel
-            The model to track.
-        `save_path` : str, optional
-            Path to save model checkpoints if None provided will save locally with name 
-            of model class in the name of the file, by default None
-        `train_all` : bool, optional
-            Overrides early stopping behavior by never stopping if true, by default False
-        `patience` : int, optional
-            Number of epochs to wait for before stopping, by default 5
-        `min_delta` : float, optional
-            The minimum change in val loss to be considered a significant degradation, 
-            by default 0.03
-        `dist_rank` : int, optional
-            Whether or not this is for a distributed run, if it is this number will indicate 
-            the rank of this particular process, by default None.
-        """
-        self.train_all = train_all 
-        self.patience = patience
-        self.min_delta = min_delta
-        self.debug = debug
-        self.dist_rank = dist_rank
-        
-        self.new_model(model, save_path)
-    
-    @property
-    def save_path(self):
-        return self._save_path or \
-            f'./{self.model.__class__.__name__}_{self.best_epoch}E.model'
-            
-    @save_path.setter
-    def save_path(self, save_path:str):
-        self._save_path = save_path
-    
-    @property
-    def model(self):
-        return self._model
-    
-    @model.setter
-    def model(self, model:BaseModel):
-        self._model = model
-        if model is not None:
-            if isinstance(model, nn.DataParallel):
-                self.best_model_dict = model.module.state_dict()
-            else:
-                self.best_model_dict = model.state_dict()
-
-    def new_model(self, model:BaseModel, save_path:str):
-        """Updates internal model and resets internal state"""
-        self.model = model
-        self.save_path = save_path
-        self.best_epoch = 0
-        self.stop_epoch = -1
-        self._counter = 0
-        self.min_val_loss = np.inf
-        
-    def early_stop(self, validation_loss, curr_epoch):
-        """Check if early stopping condition is met. Call after each epoch."""
-        if self.debug: return False
-        assert self.model is not None, 'model is None, please set model first'
-        # save model if validation loss is lower than previous best
-        if validation_loss < self.min_val_loss:
-            self.min_val_loss = validation_loss
-            self._counter = 0
-            if isinstance(self._model, nn.DataParallel):
-                self.best_model_dict = deepcopy(self._model.module.state_dict())
-            else:
-                self.best_model_dict = deepcopy(self._model.state_dict())
-            self.best_epoch = curr_epoch
-            # saves new best state dict
-            self.save(f'{self.save_path}_tmp', rm_tmp=False) 
-        
-        # early stopping if validation loss doesnt improve for `patience` epochs
-        elif (not self.train_all) and \
-            (validation_loss > (self.min_val_loss + self.min_delta)):
-            self._counter += 1
-            if self._counter >= self.patience:
-                self.stop_epoch = curr_epoch
-                return True
-        return False
-
-    def save(self, path:str=None, silent=False, rm_tmp=True):
-        # only allow the main process to save models
-        if self.dist_rank is None or self.dist_rank == 0:
-            path = path or self.save_path
-            # save model default path is model class name + best epoch
-            torch.save(self.best_model_dict, path)
-            if not silent: print(f'Model saved to: {path}')
-            if rm_tmp and os.path.isfile(f'{path}_tmp'): 
-                os.remove(f'{path}_tmp')
-        elif not silent:
-            print(f'WARNING: No saving on non-main process')
-        
-    def __repr__(self) -> str:
-        return f'save path: {self.save_path}'+ \
-               f'min val loss: {self.min_val_loss}'+ \
-               f'stop epoch: {self.stop_epoch}'+ \
-               f'best epoch: {self.best_epoch}'
-    
 def print_device_info(device:torch.device|int) -> torch.cuda.device:
     if (type(device) is int  and device == -1) or \
         (type(device) is torch.device and device.type != 'cuda'):
@@ -394,7 +278,6 @@ def print_device_info(device:torch.device|int) -> torch.cuda.device:
     print(f'\tallocated: {a/1e6:<10.3f}MB')
     
     return prop
-
 
 def debug(model: BaseModel, data_loader:DataLoader,
           device: torch.device) -> Tuple[torch.Tensor]:
@@ -419,45 +302,3 @@ def debug(model: BaseModel, data_loader:DataLoader,
         
         
         return train, eval
-
-## ==================== Distributed Training ==================== ##
-def init_node(args):    
-    args.ngpus_per_node = torch.cuda.device_count()
-
-    # find the common host name on all nodes
-    cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
-    stdout = subprocess.check_output(cmd.split())
-    host_name = stdout.decode().splitlines()[0] # first node is the host
-    args.dist_url = f'tcp://{host_name}:{args.port}'
-
-    # distributed parameters
-    args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
-    args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
-    
-def init_dist_gpu(args):
-    job_env = submitit.JobEnvironment()
-    args.gpu = job_env.local_rank
-    args.rank = job_env.global_rank
-
-    # PyTorch calls to setup gpus for distributed training
-    dist.init_process_group(backend='gloo', init_method=args.dist_url, 
-                            world_size=args.world_size, rank=args.rank)
-    
-    torch.manual_seed(0)
-    torch.cuda.manual_seed_all(0)
-    np.random.seed(0)
-    
-    torch.cuda.set_device(args.gpu)
-    # cudnn.benchmark = True # not needed since we include dropout layers
-    dist.barrier()
-
-    # # disabling printing if not master process:
-    # import builtins as __builtin__
-    # builtin_print = __builtin__.print
-
-    # def print(*args, **kwargs):
-    #     force = kwargs.pop('force', False)
-    #     if (args.rank == 0) or force:
-    #         builtin_print(*args, **kwargs)
-
-    # __builtin__.print = print

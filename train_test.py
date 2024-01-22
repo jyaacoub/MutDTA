@@ -30,8 +30,8 @@ import matplotlib.pyplot as plt
 
 from src.utils import config as cfg # sets up env vars
 
-from src.train_test.training import train, test
-from src.train_test.utils import  CheckpointSaver, print_device_info, debug
+from src.train_test.training import train, test, CheckpointSaver
+from src.train_test.utils import  print_device_info, debug
 from src.data_analysis import get_metrics
 from src.utils.loader import Loader
 
