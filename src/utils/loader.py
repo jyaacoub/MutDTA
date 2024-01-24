@@ -49,6 +49,11 @@ class Loader():
         if ligand_edge is not None:
             model_key += f'_{ligand_edge}LE'
         return model_key
+    
+    def init_test_model():
+        """ Loads original DGraphDTA model for testing """
+        
+        return Loader.init_model("DG", "nomsa", "binary", 0.5)
         
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
