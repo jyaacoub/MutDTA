@@ -17,11 +17,11 @@ from tqdm import tqdm
 from src.utils import config as cfg
 from src.utils.residue import Chain
 from src.utils.exceptions import DatasetNotFound
-from src.feature_extraction.ligand import smile_to_graph
-from src.feature_extraction.protein import create_save_cmaps, target_to_graph
-from src.feature_extraction.protein_edges import get_target_edge_weights
-from src.data_processing.processors import PDBbindProcessor, Processor
-from src.data_processing.downloaders import Downloader
+from src.data_prep.feature_extraction.ligand import smile_to_graph
+from src.data_prep.feature_extraction.protein import create_save_cmaps, target_to_graph
+from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
+from src.data_prep.processors import PDBbindProcessor, Processor
+from src.data_prep.downloaders import Downloader
 
 
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
@@ -426,7 +426,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         `feature_opt` : bool, optional
             choose from ['nomsa', 'msa', 'shannon']
             
-        *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
+        *args and **kwargs sent to superclass `src.data_prep.datasets.BaseDataset`.
         """   
         super(PDBbindDataset, self).__init__(save_root, data_root=data_root,
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
@@ -593,7 +593,7 @@ class DavisKibaDataset(BaseDataset):
             target_to_graph` for details), by default -0.5.
         `feature_opt` : bool, optional
             choose from ['nomsa', 'msa', 'shannon']
-        *args and **kwargs sent to superclass `src.data_processing.datasets.BaseDataset`.
+        *args and **kwargs sent to superclass `src.data_prep.datasets.BaseDataset`.
         """
         super(DavisKibaDataset, self).__init__(save_root, data_root=data_root,
                                                aln_dir=aln_dir, cmap_threshold=cmap_threshold,

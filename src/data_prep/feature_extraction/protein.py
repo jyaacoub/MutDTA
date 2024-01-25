@@ -7,8 +7,8 @@ import os, math
 import pandas as pd
 from src.utils import config as cfg
 from src.utils.residue import ResInfo, Chain
-from src.feature_extraction.protein_nodes import get_pfm, target_to_feature, get_foldseek_onehot, run_foldseek
-from src.feature_extraction.protein_edges import get_target_edge
+from src.data_prep.feature_extraction.protein_nodes import get_pfm, target_to_feature, get_foldseek_onehot, run_foldseek
+from src.data_prep.feature_extraction.protein_edges import get_target_edge
 
 ########################################################################
 ###################### Protein Feature Extraction ######################

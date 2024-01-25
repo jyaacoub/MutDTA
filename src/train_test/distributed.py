@@ -11,7 +11,7 @@ from torch_geometric.loader import DataLoader
 
 
 from src.utils.loader import Loader
-from src.data_analysis.metrics import get_metrics
+from src.analysis.metrics import get_metrics
 
 from src.train_test.training import train, test, CheckpointSaver
 from src.train_test.utils import print_device_info

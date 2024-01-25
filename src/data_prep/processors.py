@@ -2,7 +2,7 @@
 Processors for processing data from various sources.
 
 Primary use is for handling data at the high level if you wish to extract features,
-see `src/feature_extraction/` instead.
+see `src/data_prep/feature_extraction/` instead.
 
 e.g.: here we might want to use prep_save_data to get the X and Y csv files for training.
 
@@ -553,11 +553,11 @@ class MSARunner(Processor):
     
 
 if __name__ == '__main__':
-    from src.data_processing.processors import MSARunner
+    from src.data_prep.processors import MSARunner
     from tqdm import tqdm
     import pandas as pd
     import os
-    from src.data_processing.datasets import BaseDataset
+    from src.data_prep.datasets import BaseDataset
     csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
     df = pd.read_csv(csv, index_col=0)
     #################### Get unique proteins:

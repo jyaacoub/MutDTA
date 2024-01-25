@@ -11,9 +11,8 @@ from torch.distributed import all_reduce, ReduceOp
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch_geometric.loader import DataLoader
 
-from src.data_analysis.metrics import concordance_index
+from src.analysis.metrics import concordance_index
 from src.models.utils import BaseModel
-from src.train_test.utils import CheckpointSaver
 
 class CheckpointSaver:
     # Adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch

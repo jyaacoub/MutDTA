@@ -8,9 +8,9 @@ from src.utils import config as cfg
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_ROOT)
 
-from src.feature_extraction.protein_nodes import create_pfm_np_files
-from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
-from src.train_test.utils import train_val_test_split, balanced_kfold_split
+from src.data_prep.feature_extraction.protein_nodes import create_pfm_np_files
+from src.data_prep.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
+from src.train_test.splitting import train_val_test_split, balanced_kfold_split
 
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
                     pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 

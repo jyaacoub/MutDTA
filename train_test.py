@@ -32,7 +32,7 @@ from src.utils import config as cfg # sets up env vars
 
 from src.train_test.training import train, test, CheckpointSaver
 from src.train_test.utils import  print_device_info, debug
-from src.data_analysis import get_metrics
+from src.analysis import get_metrics
 from src.utils.loader import Loader
 
 # %%
