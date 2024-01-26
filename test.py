@@ -4,7 +4,7 @@ import os
 import torch
 import pandas as pd
 
-from src.data_analysis.metrics import get_metrics
+from src.analysis.metrics import get_metrics
 from src.train_test.training import test
 from src.utils.loader import Loader
 from src.utils.arg_parse import parse_train_test_args

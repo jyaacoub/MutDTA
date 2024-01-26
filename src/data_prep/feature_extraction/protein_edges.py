@@ -248,8 +248,8 @@ if __name__ == '__main__':
     import os, re
 
     from glob import glob
-    from src.data_processing.datasets import BaseDataset
-    from src.feature_extraction.protein_edges import get_target_edge_weights
+    from src.data_prep.datasets import BaseDataset
+    from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 
     data = 'davis'
     data_dir = '/cluster/home/t122995uhn/projects/data/'
@@ -311,8 +311,8 @@ if __name__ == '__main__':
     import os, re
 
     from glob import glob
-    from src.data_processing.datasets import BaseDataset
-    from src.feature_extraction.protein_edges import get_target_edge_weights
+    from src.data_prep.datasets import BaseDataset
+    from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 
     data = 'davis'
     edgew = 'anm'

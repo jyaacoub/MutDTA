@@ -189,7 +189,7 @@ def plot_breakdown(models_to_plot:list=['DG', 'EDI'],
             
 if __name__ == '__main__':
     import json
-    from src.data_analysis.stratify_protein import map_davis_to_kinbase, kinbase_to_df
+    from src.analysis.stratify_protein import map_davis_to_kinbase, kinbase_to_df
 
     prot_dict = json.load(open('/home/jyaacoub/projects/data/davis/proteins.txt', 'r'))
     
@@ -201,7 +201,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import seaborn as sns
     import numpy as np
-    from src.data_analysis.stratify_protein import map_davis_to_kinbase
+    from src.analysis.stratify_protein import map_davis_to_kinbase
 
     # Get kinbase data to map to family names
     kin_df = pd.read_csv('../data/misc/kinase_base_updated.csv', index_col='name')

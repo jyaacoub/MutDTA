@@ -442,7 +442,7 @@ if __name__ == '__main__':
     import seaborn as sns 
 
     from src.utils import config as cfg
-    from src.data_analysis.figures import (prepare_df, fig1_pro_overlap, 
+    from src.analysis.figures import (prepare_df, fig1_pro_overlap, 
                                         fig2_pro_feat, fig3_edge_feat, 
                                         fig4_pro_feat_violin, fig5_edge_feat_violin)
 

@@ -8,7 +8,7 @@ from src.models.utils import BaseModel
 from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.pro_mod import EsmDTA, EsmAttentionDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
-from src.data_processing.datasets import PDBbindDataset, DavisKibaDataset
+from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
 
 def validate_args(valid_options):
@@ -49,6 +49,11 @@ class Loader():
         if ligand_edge is not None:
             model_key += f'_{ligand_edge}LE'
         return model_key
+    
+    def init_test_model():
+        """ Loads original DGraphDTA model for testing """
+        
+        return Loader.init_model("DG", "nomsa", "binary", 0.5)
         
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,

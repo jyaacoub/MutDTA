@@ -24,7 +24,8 @@ def train_func(config):
                             pro_edge=config["edge_opt"],
                             # additional kwargs send to model class to handle
                             dropout=config["dropout"], 
-                            dropout_prot=config["dropout_prot"], pro_emb_dim=config["pro_emb_dim"], extra_profc_layer=config["extra_profc_layer"]
+                            dropout_prot=config["dropout_prot"], extra_profc_layer=config["extra_profc_layer"],
+                            pro_emb_dim=config["pro_emb_dim"],
                             )
     
     # prepare model with rayTrain (moves it to correct device and wraps it in DDP)
@@ -76,23 +77,23 @@ if __name__ == "__main__":
     
     search_space = {
         ## constants:
-        "epochs": 10,
-        "model": "EDI",
+        "epochs": 20,
+        "model": "SPD",
         "dataset": "davis",
-        "feature_opt": "nomsa",
+        "feature_opt": "foldseek", # NOTE: SPD requires foldseek features!!!
         "edge_opt": "binary",
         "fold_selection": 0,
         "save_checkpoint": False,
                 
         ## hyperparameters to tune:
-        "lr": ray.tune.loguniform(1e-4, 1e-2),
-        "batch_size": ray.tune.choice([16, 32, 48]),        # batch size is per GPU!?
+        "lr": ray.tune.loguniform(1e-5, 1e-3),
+        "batch_size": ray.tune.choice([12,16]),        # batch size is per GPU!?
         
         # model architecture hyperparams
-        "dropout": ray.tune.uniform(0, 0.5), # for fc layers
-        "dropout_prot": ray.tune.uniform(0, 0.5),
+        "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
+        "dropout_prot": ray.tune.uniform(0.0, 0.5),
         "pro_emb_dim": ray.tune.choice([480, 512, 1024]), # input from SaProt is 480 dims
-        "extra_profc_layer": ray.tune.choice([True, False])
+        "extra_profc_layer": True
     }
     
     # each worker is a node from the ray cluster.
@@ -117,7 +118,7 @@ if __name__ == "__main__":
             search_alg=OptunaSearch(), # using ray.tune.search.Repeater() could be useful to get multiple trials per set of params
                                        # would be even better if we could set trial-wise dependencies for a certain fold.
                                        # https://github.com/ray-project/ray/issues/33677
-            num_samples=50,
+            num_samples=200,
         ),
     )
 
