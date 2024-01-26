@@ -29,6 +29,7 @@ MODEL_STATS_CSV     = os.path.abspath('results/model_media/model_stats.csv')
 MODEL_STATS_CSV_VAL = os.path.abspath('results/model_media/model_stats_val.csv')
 MODEL_SAVE_DIR      = os.path.abspath('results/model_checkpoints/ours')
 CHECKPOINT_SAVE_DIR = MODEL_SAVE_DIR # alias for clarity
+LIT_CHECKPOINTS     = os.path.abspath('results/model_checkpoints/lightning')
 
 # cluster based configs:
 import socket
