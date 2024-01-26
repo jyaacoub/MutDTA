@@ -284,3 +284,9 @@ class AF_Clust:
         plt.tight_layout()
 
         plt.savefig(self.o+"/"+self.keyword+'_'+plot_type+'.pdf', bbox_inches='tight')
+
+if __name__ == "__main__":    
+    dir_p = f"/cluster/home/t122995uhn/projects/colabfold"
+    pid = '1a1e'
+    msa = f"{dir_p}/pdbbind_a3m/{pid}.msa.a3m"
+    af = AF_Clust(keyword="test-"+pid, input_msa=msa, output_dir=f"{dir_p}/test_af_clust/")
