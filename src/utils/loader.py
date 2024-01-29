@@ -6,7 +6,7 @@ from torch_geometric.loader import DataLoader
 
 from src.models.utils import BaseModel
 from src.models.lig_mod import ChemDTA, ChemEsmDTA
-from src.models.pro_mod import EsmDTA, EsmAttentionDTA, SaProtDTA
+from src.models.esm_models import EsmDTA, EsmAttentionDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
