@@ -1,26 +1,64 @@
 import os
 # for huggingface models:
-
 os.environ['TRANSFORMERS_CACHE'] = os.path.abspath('../hf_models/')
 
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
 
-# model and data options
-MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT', 'CD', 'CED', 'SPD']
+from src.utils.enum import CustomEnum
+#############################
+# Model and data options
+#############################
+class MODEL_OPT(CustomEnum):
+    DG = 'DG'
+    DGI = 'DGI'
+    
+    ED = 'ED'
+    EDA = 'EDA'
+    EDI = 'EDI'
+    EDAI = 'EDAI'
+    EAT = 'EAT'
+    
+    CD = 'CD'
+    CED = 'CED'
+    SPD = 'SPD'
 
-STRUCT_EDGE_OPT = ['anm', 'af2', 'af2-anm'] # edge options that require structural info (pdbs)
-EDGE_OPT = ['simple', 'binary'] + STRUCT_EDGE_OPT
+# protein options
+class EDGE_OPT(CustomEnum):
+    simple = 'simple'
+    binary = 'binary'
+    
+    anm = 'anm'
+    af2 = 'af2'
+    af2_anm = 'af2-anm'
+    
+class PRO_FEAT_OPT(CustomEnum):
+    nomsa = 'nomsa'
+    msa = 'msa'
+    shannon = 'shannon'
+    
+    foldseek = 'foldseek'
+    
+# Protein options that require PDB structure files to work
+STRUCT_EDGE_OPT = CustomEnum('struct_edge_opt', ['anm', 'af2', 'af2-anm'])
+STRUCT_PRO_FEAT_OPT = CustomEnum('struct_pro_feat_opt', ['foldseek'])
 
-STRUCT_PRO_FEAT_OPT = ['foldseek'] # requires structural info (pdbs)
-PRO_FEAT_OPT = ['nomsa', 'msa', 'shannon'] + STRUCT_PRO_FEAT_OPT
+# ligand options
+class LIG_EDGE_OPT(CustomEnum):
+    binary = 'binary'
 
-LIG_FEAT_OPT = [None, 'original']
-LIG_EDGE_OPT = [None, 'binary']
+class LIG_FEAT_OPT(CustomEnum):
+    original = 'original'
 
-DATA_OPT = ['davis', 'kiba', 'PDBbind']
+# Datasets
+class DATA_OPT(CustomEnum):
+    davis = 'davis'
+    kiba = 'kiba'
+    PDBbind = 'PDBbind'
 
-# data save paths
+#############################
+# save paths
+#############################
 DATA_ROOT = os.path.abspath('../data/')
 
 # Model save paths

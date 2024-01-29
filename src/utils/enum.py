@@ -1,4 +1,4 @@
-from enum import Enum, EnumMeta, auto
+from enum import Enum, EnumMeta
 import sys
 def _make_class_unpicklable(cls):
     """
@@ -9,7 +9,10 @@ def _make_class_unpicklable(cls):
     cls.__reduce_ex__ = _break_on_call_reduce
     cls.__module__ = '<unknown>'
     
-class StrMetaEnum(EnumMeta):
+class MetaEnum(EnumMeta):
+    def __repr__(self) -> str:
+        return str(list(map(lambda c: c.value, self)))
+    
     def __contains__(cls, item):
         return item in cls.__members__
     
@@ -70,6 +73,11 @@ class StrMetaEnum(EnumMeta):
             enum_class.__qualname__ = qualname
 
         return enum_class
+    
+    def __getitem__(self, index):
+        return self.list()[index]
 
-class CustomStrEnum(Enum, metaclass=StrMetaEnum):
-    pass
+class CustomEnum(Enum, metaclass=MetaEnum):
+    @classmethod
+    def list(cls):
+        return list(map(lambda c: c.value, cls))
