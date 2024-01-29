@@ -130,7 +130,7 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 logger = logging.getLogger()
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 # create console handler with a higher log level
 ch = logging.StreamHandler()

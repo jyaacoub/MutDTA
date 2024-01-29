@@ -4,15 +4,31 @@ Adapted from https://github.com/HWaymentSteele/AF_Cluster/blob/main/scripts/Clus
 
 import numpy as np
 from Bio import SeqIO
+import logging as log
 
 def load_fasta(fil):
-    seqs, IDs =[], []
-    with open(fil) as handle:
+    # check to see if there are '>' in file that represent a file with IDs
+    with open(fil, 'r') as f:
+        first_line = f.readline()
+        has_ids = '>' == first_line[0]
+        
+    if has_ids:
+        seqs, IDs =[], []
+        with open(fil) as handle:
             for record in SeqIO.parse(handle, "fasta"):
                 seq = ''.join([x for x in record.seq])
                 IDs.append(record.id)
                 seqs.append(seq)
-    return IDs, seqs
+        return IDs, seqs
+    
+    log.warning('MSA is not in FASTA format so assuming the file is just a list of sequences')
+    with open(fil, 'r') as f:
+        seqs = []
+        for line in f.readlines():
+            if line[0] == '>': raise SyntaxError("Invalid MSA input format, can't detect what input is.")
+            if len(line) <= 5: continue # new line or noise
+            seqs.append(line.strip()) # strip any newline or spaces
+        return list(range(len(seqs))), seqs
 
 def write_fasta(names, seqs, outfile='tmp.fasta'):
         with open(outfile,'w') as f:
@@ -77,7 +93,7 @@ class AF_Clust:
                  
                  
                  run_PCA:bool=False,
-                 run_TSNE:bool=False
+                 run_TSNE:bool=False,
                  ) -> None:
         
         self.keyword = keyword
@@ -123,8 +139,8 @@ class AF_Clust:
         self.df = self.df.loc[self.df.frac_gaps<self.gap_cutoff]
 
         new_len=len(self.df)
-        print(self.keyword)
-        print("%d seqs removed for containing more than %d%% gaps, %d remaining" % (former_len-new_len, int(self.gap_cutoff*100), new_len))
+        log.info(self.keyword)
+        log.info("%d seqs removed for containing more than %d%% gaps, %d remaining" % (former_len-new_len, int(self.gap_cutoff*100), new_len))
         ohe_seqs = encode_seqs(self.df.sequence.tolist(), max_len=L)
 
         n_clusters=[]
@@ -132,7 +148,7 @@ class AF_Clust:
         
         # PERFORM SCAN
         if self.eps_val is None: # performing scan
-            print('eps\tn_clusters\tn_not_clustered')
+            log.debug('eps\tn_clusters\tn_not_clustered')
 
             for eps in eps_test_vals:
 
@@ -140,9 +156,9 @@ class AF_Clust:
                 clustering = DBSCAN(eps=eps, min_samples=self.min_samples).fit(testset)
                 n_clust = len(set(clustering.labels_))
                 n_not_clustered = len(clustering.labels_[np.where(clustering.labels_==-1)])
-                print('%.2f\t%d\t%d' % (eps, n_clust, n_not_clustered))
+                log.debug('%.2f\t%d\t%d' % (eps, n_clust, n_not_clustered))
                 n_clusters.append(n_clust)
-                if eps>15 and n_clust==1:
+                if eps >= 15 and n_clust==1:
                     break
 
             eps_to_select = eps_test_vals[np.argmax(n_clusters)]
@@ -158,35 +174,33 @@ class AF_Clust:
             self.tsne(self.df, query_)
         
         outfile = self.o+"/"+self.keyword+'_clustering_assignments.tsv'
-        print('wrote clustering data to %s' % outfile)
+        log.info('wrote clustering data to %s' % outfile)
         self.df.to_csv(outfile,index=False, sep='\t')
 
         metad_outfile = self.o+"/"+self.keyword+'_cluster_metadata.tsv'
-        print('wrote cluster metadata to %s' % metad_outfile)
+        log.info('wrote cluster metadata to %s' % metad_outfile)
         metad_df = pd.DataFrame.from_records(cluster_metadata)
         metad_df.to_csv(metad_outfile,index=False, sep='\t')
-
-        print('Saved this output to %s.log' % self.keyword)
         
     def cluster(self, L, df, query_, ohe_seqs, eps_to_select):
         clustering = DBSCAN(eps=eps_to_select, min_samples=self.min_samples).fit(ohe_seqs)
 
-        print('Selected eps=%.2f' % eps_to_select)
+        log.info('Selected eps=%.2f' % eps_to_select)
 
-        print("%d total seqs" % len(df))
+        log.info("%d total seqs" % len(df))
 
         df['dbscan_label'] = clustering.labels_
 
         clusters = [x for x in df.dbscan_label.unique() if x>=0]
         unclustered = len(df.loc[df.dbscan_label==-1])
 
-        print('%d clusters, %d of %d not clustered (%.2f)' % (len(clusters), unclustered, len(df), unclustered/len(df)))
+        log.info('%d clusters, %d of %d not clustered (%.2f)' % (len(clusters), unclustered, len(df), unclustered/len(df)))
 
         avg_dist_to_query = np.mean([1-levenshtein(x, query_['sequence'].iloc[0])/L for x in df.loc[df.dbscan_label==-1]['sequence'].tolist()])
-        print('avg identity to query of unclustered: %.2f' % avg_dist_to_query)
+        log.info('avg identity to query of unclustered: %.2f' % avg_dist_to_query)
 
         avg_dist_to_query = np.mean([1-levenshtein(x, query_['sequence'].iloc[0])/L for x in df.loc[df.dbscan_label!=-1]['sequence'].tolist()])
-        print('avg identity to query of clustered: %.2f' % avg_dist_to_query)
+        log.info('avg identity to query of clustered: %.2f' % avg_dist_to_query)
         
         cluster_metadata=[]
         for clust in clusters:
@@ -198,12 +212,12 @@ class AF_Clust:
             avg_dist_to_query = np.mean([1-levenshtein(x,query_['sequence'].iloc[0])/L for x in tmp.sequence.tolist()])
 
             if self.verbose:
-                print('Cluster %d consensus seq, %d seqs:' % (clust, len(tmp)))
-                print(cs)
-                print('#########################################')
+                log.debug('Cluster %d consensus seq, %d seqs:' % (clust, len(tmp)))
+                log.debug(cs)
+                log.debug('#########################################')
                 for _, row in tmp.iterrows():
-                    print(row['SequenceName'], row['sequence'])
-                print('#########################################')
+                    log.debug(row['SequenceName'], row['sequence'])
+                log.debug('#########################################')
 
             tmp = pd.concat([query_, tmp], axis=0)
 
@@ -212,13 +226,13 @@ class AF_Clust:
 
             write_fasta(tmp.SequenceName.tolist(), tmp.sequence.tolist(), outfile=self.o+'/'+self.keyword+'_'+"%03d" % clust+'.a3m')
 
-        print(f'writing {self.n_controls} size-10 uniformly sampled clusters')
+        log.info(f'writing {self.n_controls} size-10 uniformly sampled clusters')
         for i in range(self.n_controls):
             tmp = df.sample(n=10)
             tmp = pd.concat([query_, tmp], axis=0)
             write_fasta(tmp.SequenceName.tolist(), tmp.sequence.tolist(), outfile=self.o+'/'+self.keyword+'_U10-'+"%03d" % i +'.a3m') 
         if len(df)>100:
-            print(f'writing {self.n_controls} size-100 uniformly sampled clusters')
+            log.info(f'writing {self.n_controls} size-100 uniformly sampled clusters')
             for i in range(self.n_controls):
                 tmp = df.sample(n=100)
                 tmp = pd.concat([query_, tmp], axis=0)
