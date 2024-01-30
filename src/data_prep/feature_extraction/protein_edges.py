@@ -236,7 +236,11 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             # NOTE: af2-anm gets run here:
             ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
             assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
-            return ew        
+            return ew
+        
+    elif edge_opt == 'ring3':
+        raise NotImplementedError("RING3 features are not yet supported.")
+      
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')
     

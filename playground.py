@@ -1,3 +1,59 @@
+# %%
+import torch
+from torch_geometric.nn import TransformerConv
+from torch_geometric import data as geo_data
+from src.models.ring_mod import Ring3DTA
+
+#%%
+
+device = torch.cuda.current_device()
+
+# NOTE setting edge_dim will require edge_attr to be passed in!
+# NOTE out_channels*heads is the final output dim -> [N_nodes, out_channels*heads]
+#      Unless concat is set to false (gets averaged instead) -> [N_nodes, out_channels]
+pro_gnn1 = TransformerConv(in_channels=320, out_channels=512, heads=5, 
+                           concat=False,
+                           dropout=0.2).to(device)
+
+N_nodes = 100
+prot_shape = (N_nodes, pro_gnn1.in_channels)
+prot = geo_data.Data(x=torch.Tensor(*prot_shape), # node feature matrix
+                    edge_index=torch.LongTensor([[0,1], [1,0]]).transpose(1, 0),
+                    y=torch.FloatTensor([1])).to(device)
+#%% 
+# without edge attr this returns a tensor of shape (N_nodes, out_channels)
+out = pro_gnn1(x=prot.x, edge_index=prot.edge_index)
+out.shape
+
+#%% with edge attr
+pro_gnn2 = TransformerConv(pro_gnn1.out_channels, 1024, edge_dim=4, dropout=0.2).to(device)
+edge_attr = torch.rand((prot.edge_index.shape[1], pro_gnn2.edge_dim)).to(device)
+# edge_attr will be of shape (num_edges, edge_dim)
+
+out2 = pro_gnn2(x=out, edge_index=prot.edge_index, edge_attr=edge_attr)
+out2
+
+#%%
+import matplotlib.pyplot as plt
+plt.matshow(out2.cpu().detach().numpy())
+
+# remove axes
+plt.xticks([])
+plt.yticks([])
+
+#%%
+device = torch.cuda.current_device()
+
+model = Ring3DTA().to(device)
+
+
+
+#%% Generating edge from ring3 output file
+
+
+
+
+
 # # %%
 # from src.utils.loader import Loader
 # from src.utils import config as cfg
