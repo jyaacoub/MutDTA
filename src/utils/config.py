@@ -9,19 +9,29 @@ from src.utils.enum import CustomEnum
 #############################
 # Model and data options
 #############################
+# Datasets
+class DATA_OPT(CustomEnum):
+    davis = 'davis'
+    kiba = 'kiba'
+    PDBbind = 'PDBbind'
+
+# Model options
 class MODEL_OPT(CustomEnum):
     DG = 'DG'
     DGI = 'DGI'
     
+    # ESM models:
     ED = 'ED'
     EDA = 'EDA'
     EDI = 'EDI'
     EDAI = 'EDAI'
-    EAT = 'EAT'
+    SPD = 'SPD' # SaProt
     
+    # ChemGPT models
     CD = 'CD'
     CED = 'CED'
-    SPD = 'SPD'
+    
+    RNG = 'RNG' # ring3DTA model
 
 # protein options
 class EDGE_OPT(CustomEnum):
@@ -38,6 +48,7 @@ class PRO_FEAT_OPT(CustomEnum):
     shannon = 'shannon'
     
     foldseek = 'foldseek'
+    ring='ring'
     
 # Protein options that require PDB structure files to work
 STRUCT_EDGE_OPT = CustomEnum('struct_edge_opt', ['anm', 'af2', 'af2-anm'])
@@ -50,11 +61,6 @@ class LIG_EDGE_OPT(CustomEnum):
 class LIG_FEAT_OPT(CustomEnum):
     original = 'original'
 
-# Datasets
-class DATA_OPT(CustomEnum):
-    davis = 'davis'
-    kiba = 'kiba'
-    PDBbind = 'PDBbind'
 
 #############################
 # save paths
