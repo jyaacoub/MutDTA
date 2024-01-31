@@ -17,13 +17,15 @@ from src.models.utils import BaseModel
 class Ring3DTA(BaseModel):
     """Model using ring3 features for protein branch with no ESM embeddings"""
     def __init__(self, pro_emb_dim=512, output_dim=250, 
-                 dropout=0.2, dropout_prot=0.2, nheads_pro=5):
+                 dropout=0.2, dropout_prot=0.2, nheads_pro=5,
+                 
+                 # Feature input sizes:
+                 num_features_mol=78,
+                 num_features_pro=320, # esm has 320d embeddings
+                 edge_dim_pro=20, # edge dim for protein branch from RING3
+                 ):
         
         super(Ring3DTA, self).__init__() 
-        num_features_mol=78
-        num_features_pro=320 # esm has 320d embeddings
-        edge_dim_pro=20 # 20 edge features for protein branch
-        
         
 
         # LIGAND BRANCH 
@@ -121,20 +123,20 @@ class Ring3DTA(BaseModel):
         x = self.mol_fc(x)
         return x
 
-    def forward(self, data_pro, data_mol):
+    def forward(self, data_pro:geo_data.data.Data, data_mol:geo_data.data.Data):
         """
         Forward pass of the model.
 
         Parameters
         ----------
-        `data_pro` : _type_
+        `data_pro` : torch_geometric.data.data.Data
             the protein data
-        `data_mol` : _type_
+        `data_mol` : torch_geometric.data.data.Data
             the ligand data
 
         Returns
         -------
-        _type_
+        Tensor
             output of the model
         """
         xm = self.forward_mol(data_mol)
