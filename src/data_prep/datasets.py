@@ -160,6 +160,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         raise NotImplementedError
     
     def edgew_p(self, code) -> str:
+        """Also includes edge_attr"""
         dirname = os.path.join(self.raw_dir, 'edge_weights', self.edge_opt)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -358,6 +359,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
                     pro_edge_weight = np.load(self.edgew_p(code))
                 else:
+                    # includes edge_attr like ring3
                     pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
                                                         edge_opt=self.edge_opt,
                                                         cmap=pro_cmap,

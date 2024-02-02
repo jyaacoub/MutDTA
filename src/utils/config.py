@@ -103,6 +103,7 @@ elif 'narval' in DOMAIN_NAME:
 from pathlib import Path
 FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
 MMSEQ2_BIN = f'{Path.home()}/lib/mmseqs/bin/mmseqs'
+RING3_BIN = f'{Path.home()}/lib/ring-3.0.0/ring/bin/ring'
 
 
 ###########################

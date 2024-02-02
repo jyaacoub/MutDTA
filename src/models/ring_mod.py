@@ -22,11 +22,10 @@ class Ring3DTA(BaseModel):
                  # Feature input sizes:
                  num_features_mol=78,
                  num_features_pro=320, # esm has 320d embeddings
-                 edge_dim_pro=20, # edge dim for protein branch from RING3
+                 edge_dim_pro=6, # edge dim for protein branch from RING3
                  ):
         
-        super(Ring3DTA, self).__init__() 
-        
+        super(Ring3DTA, self).__init__()
 
         # LIGAND BRANCH 
         # (NOTE: sequential doesnt work if we want to use dropout or edge weights):

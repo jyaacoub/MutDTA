@@ -2,7 +2,7 @@ from typing import Iterable, Tuple
 import numpy as np
 from prody import calcANM
 
-from src.utils.residue import Chain
+from src.utils.residue import Chain, Ring3Runner
 
 
 def get_target_edge(target_sequence:str, contact_map:str or np.array,
@@ -194,9 +194,12 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         'af2' this is the template path for filtering out misfolds.
         target_seq (str): Target sequence for sanity checking that the pdbs match.
         edge_opt (str): See src.utils.config.EDGE_OPT
+        
         n_modes (int, optional): ANM arg. Defaults to 5.
         n_cpu (int, optional): ANM arg. Defaults to 4.
+        
         cmap (str or np.array, optional): contact map for 'simple'. Defaults to None.
+        
         af_confs (Iterable[str], optional): configurations for af2 structs. Defaults to None.
         filter (bool, optional): Whether or not to filter misfolds in 'af2'. Defaults to False.
 
@@ -204,7 +207,7 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         ValueError: invalid edge option (See `src.utils.config.EDGE_OPT`)
 
     Returns:
-        np.array: The LxL edge weight matrix
+        np.array: The LxL edge weight matrix or None if binary, or LxLxZ if edge attributes are selected like ring3.
     """
     # edge weights should be returned as a list of Z weights
     # where Z is the number of edges (|E|)
@@ -237,9 +240,15 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
             assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
             return ew
-        
     elif edge_opt == 'ring3':
-        raise NotImplementedError("RING3 features are not yet supported.")
+        
+        # ring3 checks if file exists before overwriting
+        Ring3Runner.run(pdb_fp) # using default output to input base dir
+        
+        # Converts output files into LxLx6 matrix for the 6 ring3 edge attributes
+        
+        
+        Ring3Runner.cleanup(pdb_fp, all=True)
       
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')
