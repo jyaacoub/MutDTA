@@ -517,7 +517,52 @@ class Ring3Runner():
         """
         Returns the output directory for the given pdb file.
         """
-        return out_dir or os.path.splitext(pdb_fp)+"/ring3/"
+        return out_dir or os.path.splitext(pdb_fp)[0] + "-ring3/"
+    
+    @staticmethod
+    def _prepare_input(af_confs:list[str], pdb_fp:str=None, overwrite=False) -> str:
+        """
+        Prepares input of multiple pdb files into a single pdb file.
+        
+        Assumes simple pdb files with no Headers or extra models inside the file 
+        (i.e.: af2 outputs)
+        """
+        pdb_fp = pdb_fp or af_confs[0]
+        combined_pdb_fp = f'{os.path.splitext(pdb_fp)[0]}.pdb_af_combined'
+        
+        if os.path.exists(combined_pdb_fp) and not overwrite:
+            logging.info(f'Combined pdb file already exists at {combined_pdb_fp}, skipping...')
+            return combined_pdb_fp
+
+        def safe_write(f, lines):
+            for i, line in enumerate(lines):
+                # Removing model tags since they are added in the outer loop
+                if line.strip().split()[0] == 'MODEL' or line.strip() == 'ENDMDL':
+                    logging.debug(f'Removing {i}:{line}')
+                    continue
+                # 'END' should always be the last line or second to last
+                if line.strip() == 'END':
+                    extra_lines = len(lines)-i
+                    if extra_lines > 1: 
+                        logging.warning(f'{extra_lines} extra lines after END in {c}')
+                    break
+                f.write(line)
+                
+        with open(combined_pdb_fp, 'w') as f:
+            for i, c in enumerate(af_confs):
+                if 'af_combined' in c: 
+                    logging.debug(f'Skipping {c}')
+                    continue
+                # add MODEL tag
+                logging.info(f'Adding MODEL {os.path.basename(c).split("model_")[1].split("_seed")[0]}')
+                f.write(f'MODEL {i+1}\n')
+                with open(c, 'r') as c_f:
+                    lines = c_f.readlines()
+                    safe_write(f, lines)
+                # add ENDMDL tag
+                f.write('ENDMDL\n')
+            f.write('END\n')
+        return combined_pdb_fp
         
     @staticmethod
     def check_outputs(pdb_fp:str, out_dir:str=None) -> dict:
@@ -529,6 +574,7 @@ class Ring3Runner():
         pdb_name = os.path.splitext(os.path.basename(pdb_fp))[0]
         out_dir = Ring3Runner._get_out_dir(pdb_fp, out_dir)
         
+        # check only relevant files
         md_dir = f'{out_dir}/md/'
         files = {}
         for i in Ring3Runner.RELEVANT_INTERACTIONS:
@@ -560,20 +606,39 @@ class Ring3Runner():
                 logging.debug(f'Removed {fp}')
 
     @staticmethod
-    def run(pdb_fp:str, out_dir:str=None, chain_id:str=None,
+    def run(pdb_fp:str|list[str], out_dir:str=None, chain_id:str=None,
             verbose:bool=False, overwrite:bool=False) -> dict:
         """
         Runs RING3 on a given pdb file that contains multiple models to get 
         the residue interaction network. Forces --all_models and --md options.  
 
         Args:
-            pdb_fp (str): Input pdb file path with multiple models/confirmations.
+            pdb_fp (str or list[str]): Input pdb file path with multiple models/confirmations or list of pdb file paths.
             out_dir (str, optional): Output directory to save the results, defaults to the input directory.
             chain_id (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
             
         returns:
-            dict[str] file paths for <fileName>_gfreq_<type> for all edge types (HBOND, PIPISTACK, PICATION, IONIC, VDW)
+            dict[str] file paths for <fileName>_gfreq_<type> for relevant edge types (self.RELEVANT_INTERACTIONS)
+            
+        **Example usage of output files:**
+        ```
+            edge_fp = files['HBOND']
+            # output csv looks like this:
+            # A:7:_:ASP	HBOND	A:10:_:GLU	0.75
+            # where the columns are:
+                # 1. Residue 1
+                # 2. Interaction type
+                # 3. Residue 2
+                # 4. Frequency of interaction (0-1) out of all the conformations
+            import pandas as pd
+            df = pd.read_csv(edge_fp, sep='\t', 
+                            names=['res1', 'type', 'res2', 'freq'])
+        ```
         """
+        if isinstance(pdb_fp, list):
+            combined_pdb_fp = Ring3Runner._prepare_input(pdb_fp, pdb_fp[0], overwrite=overwrite)
+            pdb_fp = combined_pdb_fp
+        
         # check if pdb file exists
         if not os.path.exists(pdb_fp):
             raise FileNotFoundError(f'PDB file not found at {pdb_fp}')
@@ -586,7 +651,7 @@ class Ring3Runner():
         if outputs:
             if not overwrite:
                 logging.info(f'RING3 output files already exist at {out_dir}, skipping...')
-                return outputs
+                return pdb_fp, outputs
             logging.warning(f'Overwriting RING3 output files at {out_dir}...')
         
         # build cmd and run
@@ -611,4 +676,22 @@ class Ring3Runner():
             logging.error(f'RING3 failed for {pdb_fp}, output file(s) not found at {out_dir}.')
             raise FileNotFoundError(f'RING3 failed to generate outputs to {out_dir} for {pdb_name}.')
         
-        return outputs
+        return pdb_fp, outputs
+    
+    @staticmethod
+    def build_cmap(output_gfreq_fp:str, res_len:int) -> np.ndarray:
+        """Converts the output gfreq file to a contact map"""
+        cmap = np.zeros((res_len, res_len))
+        
+        # build cmap with values from csv
+        df = pd.read_csv(output_gfreq_fp, sep='\t', 
+                         names=['res1', 'type', 'res2', 'freq'])
+        
+        # fill cmap
+        for _, row in df.iterrows():
+            i = int(row['res1'].split(':')[1]) - 1 # index starts at 1
+            j = int(row['res2'].split(':')[1]) - 1 # index starts at 1
+            cmap[i, j] = row['freq']
+            cmap[j, i] = row['freq']
+        
+        return cmap
