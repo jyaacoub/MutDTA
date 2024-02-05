@@ -508,7 +508,7 @@ class Ring3Runner():
     -v             Verbose output
     """
     RING3_BIN = cfg.RING3_BIN
-    default_args = " --all_models --md"
+    default_args = " --all_models --md --relaxed" # relaxed threshold
     RELEVANT_INTERACTIONS = ['HBOND', 'PIPISTACK', 'PICATION', 'IONIC', 'VDW']
     RELEVANT_MD = 'gfreq'
     
@@ -554,7 +554,7 @@ class Ring3Runner():
                     logging.debug(f'Skipping {c}')
                     continue
                 # add MODEL tag
-                logging.info(f'Adding MODEL {os.path.basename(c).split("model_")[1].split("_seed")[0]}')
+                logging.info(f'Adding MODEL {os.path.basename(c).split("model_")[-1].split("_seed")[0]}')
                 f.write(f'MODEL {i+1}\n')
                 with open(c, 'r') as c_f:
                     lines = c_f.readlines()
@@ -679,9 +679,9 @@ class Ring3Runner():
         return pdb_fp, outputs
     
     @staticmethod
-    def build_cmap(output_gfreq_fp:str, res_len:int) -> np.ndarray:
+    def build_cmap(output_gfreq_fp:str, res_len:int, self_loop=True) -> np.ndarray:
         """Converts the output gfreq file to a contact map"""
-        cmap = np.zeros((res_len, res_len))
+        cmap = np.eye(res_len) if self_loop else np.zeros((res_len, res_len))
         
         # build cmap with values from csv
         df = pd.read_csv(output_gfreq_fp, sep='\t', 
@@ -693,5 +693,5 @@ class Ring3Runner():
             j = int(row['res2'].split(':')[1]) - 1 # index starts at 1
             cmap[i, j] = row['freq']
             cmap[j, i] = row['freq']
-        
+            
         return cmap

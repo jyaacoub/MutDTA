@@ -1,3 +1,4 @@
+import logging
 from typing import Iterable, Tuple
 import numpy as np
 from prody import calcANM
@@ -241,15 +242,30 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
             return ew
     elif edge_opt == 'ring3':
-        
-        # ring3 checks if file exists before overwriting
-        Ring3Runner.run(pdb_fp) # using default output to input base dir
-        
+        chains = [Chain(p) for p in af_confs]
+        M = np.array([c.get_contact_map() for c in chains]) < 8.0
+
+        dist_cmap = np.sum(M, axis=0) / len(M)
+
+        # ring3 edge attribute extraction
+        # Note: this will create a "combined" pdb file in the same directory as the confirmaions
+        input_pdb, files = Ring3Runner.run(af_confs, overwrite=False)
+        seq_len = len(Chain(input_pdb))
+        logging.info(f'Ring3Runner seq_len: {seq_len}')
+
         # Converts output files into LxLx6 matrix for the 6 ring3 edge attributes
+        r3_cmaps = []
+        for k, fp in files.items():
+            cmap = Ring3Runner.build_cmap(fp, seq_len)
+            r3_cmaps.append(cmap)
         
-        
-        Ring3Runner.cleanup(pdb_fp, all=True)
-      
+        # Convert to numpy array of shape (L, L, 6)
+        all_cmaps = np.array(r3_cmaps + [dist_cmap], dtype=np.float32).permute(1,2,0)
+        logging.info(f'Ring3Runner all_cmaps: {all_cmaps.shape}')
+
+        # deletes all intermediate output files, since the main LxLx6 matrix should be saved at the end
+        Ring3Runner.cleanup(input_pdb, all=True)
+        return all_cmaps
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')
     

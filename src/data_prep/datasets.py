@@ -366,7 +366,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         n_modes=5, n_cpu=4,
                                                         af_confs=af_confs)
                     np.save(self.edgew_p(code), pro_edge_weight)
-                pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
+                
+                if len(pro_edge_weight.shape) == 2:
+                    pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
+                elif len(pro_edge_weight.shape) == 3: # edge attr!
+                    pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1], :])
                 
         
             pro = torchg.data.Data(x=torch.Tensor(pro_feat),
