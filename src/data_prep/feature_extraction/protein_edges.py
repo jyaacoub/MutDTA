@@ -260,7 +260,9 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             r3_cmaps.append(cmap)
         
         # Convert to numpy array of shape (L, L, 6)
-        all_cmaps = np.array(r3_cmaps + [dist_cmap], dtype=np.float32).permute(1,2,0)
+        all_cmaps = np.array(r3_cmaps + [dist_cmap], dtype=np.float32) # [6, L, L]
+        all_cmaps = all_cmaps.transpose(1,2,0) # [L, L, 6]
+        
         logging.info(f'Ring3Runner all_cmaps: {all_cmaps.shape}')
 
         # deletes all intermediate output files, since the main LxLx6 matrix should be saved at the end
