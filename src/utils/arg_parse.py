@@ -33,7 +33,7 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
         '--edge_opt',
-        choices=cfg.EDGE_OPT.list(),
+        choices=cfg.PRO_EDGE_OPT.list(),
         nargs='+', default=['binary'], required=False,
         help=f'Protein edge option. "simple" is just taking ' + \
             'the normalized values from the protein cmap, "binary" means no edge weights'

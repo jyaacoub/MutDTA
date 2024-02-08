@@ -24,7 +24,7 @@ def validate_args(valid_options):
 
 class Loader():
     model_opt = cfg.MODEL_OPT
-    edge_opt = cfg.EDGE_OPT
+    edge_opt = cfg.PRO_EDGE_OPT
     data_opt = cfg.DATA_OPT
     pro_feature_opt = cfg.PRO_FEAT_OPT
     

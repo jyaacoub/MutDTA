@@ -7,7 +7,7 @@ class BaseModel(nn.Module):
     """
     def __init__(self, pro_feat=None, edge_weight_opt=None, *args, **kwargs) -> None:
         edge_weight_opt = edge_weight_opt or 'binary' # None -> binary
-        assert edge_weight_opt in cfg.EDGE_OPT
+        assert edge_weight_opt in cfg.PRO_EDGE_OPT
         self.edge_weight = not (edge_weight_opt == 'binary')
         self.esm_only = (pro_feat == 'esm_only') if pro_feat is not None else False
         

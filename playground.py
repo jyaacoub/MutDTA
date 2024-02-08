@@ -6,7 +6,7 @@ import logging
 logging.getLogger().setLevel(logging.DEBUG)
 
 create_datasets([cfg.DATA_OPT.PDBbind], [cfg.PRO_FEAT_OPT.nomsa], 
-                [cfg.EDGE_OPT.ring3], k_folds=5)
+                [cfg.PRO_EDGE_OPT.ring3], k_folds=5)
 
 # %%
 

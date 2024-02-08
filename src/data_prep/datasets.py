@@ -27,7 +27,7 @@ from src.data_prep.downloaders import Downloader
 # See: https://pytorch-geometric.readthedocs.io/en/latest/tutorial/create_dataset.html
 # for details on how to create a dataset
 class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
-    EDGE_OPTIONS = cfg.EDGE_OPT
+    EDGE_OPTIONS = cfg.PRO_EDGE_OPT
     FEATURE_OPTIONS = cfg.PRO_FEAT_OPT
     LIGAND_EDGE_OPTIONS = cfg.LIG_EDGE_OPT
     LIGAND_FEATURE_OPTIONS = cfg.LIG_FEAT_OPT

@@ -34,7 +34,7 @@ class MODEL_OPT(StringEnum):
     RNG = 'RNG' # ring3DTA model
 
 # protein options
-class EDGE_OPT(StringEnum):
+class PRO_EDGE_OPT(StringEnum):
     simple = 'simple'
     binary = 'binary'
     
