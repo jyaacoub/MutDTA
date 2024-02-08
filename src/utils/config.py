@@ -5,18 +5,18 @@ os.environ['TRANSFORMERS_CACHE'] = os.path.abspath('../hf_models/')
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
 
-from src.utils.enum import CustomEnum
+from src.utils.enum import StringEnum
 #############################
 # Model and data options
 #############################
 # Datasets
-class DATA_OPT(CustomEnum):
+class DATA_OPT(StringEnum):
     davis = 'davis'
     kiba = 'kiba'
     PDBbind = 'PDBbind'
 
 # Model options
-class MODEL_OPT(CustomEnum):
+class MODEL_OPT(StringEnum):
     DG = 'DG'
     DGI = 'DGI'
     
@@ -34,7 +34,7 @@ class MODEL_OPT(CustomEnum):
     RNG = 'RNG' # ring3DTA model
 
 # protein options
-class EDGE_OPT(CustomEnum):
+class EDGE_OPT(StringEnum):
     simple = 'simple'
     binary = 'binary'
     
@@ -43,7 +43,7 @@ class EDGE_OPT(CustomEnum):
     af2_anm = 'af2-anm'
     ring3 = 'ring3'
     
-class PRO_FEAT_OPT(CustomEnum):
+class PRO_FEAT_OPT(StringEnum):
     nomsa = 'nomsa'
     msa = 'msa'
     shannon = 'shannon'
@@ -51,14 +51,14 @@ class PRO_FEAT_OPT(CustomEnum):
     foldseek = 'foldseek'
     
 # Protein options that require PDB structure files to work
-STRUCT_EDGE_OPT = CustomEnum('struct_edge_opt', ['anm', 'af2', 'af2-anm'])
-STRUCT_PRO_FEAT_OPT = CustomEnum('struct_pro_feat_opt', ['foldseek'])
+STRUCT_EDGE_OPT = StringEnum('struct_edge_opt', ['anm', 'af2', 'af2-anm'])
+STRUCT_PRO_FEAT_OPT = StringEnum('struct_pro_feat_opt', ['foldseek'])
 
 # ligand options
-class LIG_EDGE_OPT(CustomEnum):
+class LIG_EDGE_OPT(StringEnum):
     binary = 'binary'
 
-class LIG_FEAT_OPT(CustomEnum):
+class LIG_FEAT_OPT(StringEnum):
     original = 'original'
 
 

@@ -90,6 +90,8 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                 ligand_feature=ligand_feature,
                 ligand_edge=ligand_edge
                 )
+        else:
+            raise ValueError(f"Invalid data type {data}, pick from {cfg.DATA_OPT.list()}.")
         
         # saving training, validation, and test sets
         if k_folds is None:

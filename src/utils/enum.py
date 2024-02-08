@@ -1,5 +1,6 @@
 from enum import Enum, EnumMeta
 import sys
+
 def _make_class_unpicklable(cls):
     """
     Make the given class un-picklable.
@@ -77,7 +78,7 @@ class MetaEnum(EnumMeta):
     def __getitem__(self, index):
         return self.list()[index]
 
-class CustomEnum(Enum, metaclass=MetaEnum):
+class StringEnum(str, Enum, metaclass=MetaEnum):
     @classmethod
     def list(cls):
         return list(map(lambda c: c.value, cls))
