@@ -160,7 +160,7 @@ class Loader():
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
-                    af_conf_dir='../colabfold/pdbbind_af2_out/out0',
+                    af_conf_dir='../colabfold/pdbbind_af2_out/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500
@@ -174,6 +174,7 @@ class Loader():
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
+                    af_conf_dir='../colabfold/davis_af2_out/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500

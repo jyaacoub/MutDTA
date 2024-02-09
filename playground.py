@@ -3,20 +3,49 @@
 from src.data_prep.init_dataset import create_datasets
 from src import config as cfg
 import logging
-logging.getLogger().setLevel(logging.DEBUG)
+logging.getLogger().setLevel(logging.ERROR)
 
 create_datasets([cfg.DATA_OPT.PDBbind], [cfg.PRO_FEAT_OPT.nomsa], 
                 [cfg.PRO_EDGE_OPT.ring3], k_folds=5)
 
 # %%
 
+import pandas as pd
+from pathlib import Path
+
+xy = f'{Path.home()}/projects/data/DavisKibaDataset/davis/nomsa_af2/full/XY.csv'
+df = pd.read_csv(xy, index_col=0)
+#%%
+from src.utils.loader import Loader
+from src import config as cfg
+
+ds = Loader.load_dataset(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.ring3,
+                         subset='full')
 
 
 
+#%%
+from tqdm import tqdm
+import re
+from glob import glob
 
+missing_conf = set()
+unique_df = ds.get_unique_prots(ds.df)
+for code in tqdm(unique_df.index,
+        desc='Filtering out proteins with missing PDB files for multiple confirmations',
+        total=len(unique_df)):
+            # removing () from string since file names cannot include them and localcolabfold replaces them with _
+    code = re.sub(r'[()]', '_', code)
+    # localcolabfold has 'unrelaxed' as the first part after the code/ID.
+    # output must be in out directory
+    glob(f'{ds.af_conf_dir}/out?/{code}*_unrelaxed_rank_*.pdb')
+    af_confs = ds.af_conf_files(code)
+    
+    # need at least 2 confimations...
+    if len(af_confs) <= 1:
+        missing_conf.add(code)
 
-
-
+#%%
 
 
 

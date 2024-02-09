@@ -51,6 +51,9 @@ class PRO_FEAT_OPT(StringEnum):
     foldseek = 'foldseek'
     
 # Protein options that require PDB structure files to work
+OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2-anm', 'ring3', 'foldseek'])
+OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2-anm', 'ring3'])
+
 STRUCT_EDGE_OPT = StringEnum('struct_edge_opt', ['anm', 'af2', 'af2-anm', 'ring3'])
 STRUCT_PRO_FEAT_OPT = StringEnum('struct_pro_feat_opt', ['foldseek'])
 

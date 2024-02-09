@@ -531,7 +531,7 @@ class Ring3Runner():
         combined_pdb_fp = f'{os.path.splitext(pdb_fp)[0]}.pdb_af_combined'
         
         if os.path.exists(combined_pdb_fp) and not overwrite:
-            logging.info(f'Combined pdb file already exists at {combined_pdb_fp}, skipping...')
+            logging.debug(f'Combined pdb file already exists at {combined_pdb_fp}, skipping...')
             return combined_pdb_fp
 
         def safe_write(f, lines):
@@ -554,7 +554,7 @@ class Ring3Runner():
                     logging.debug(f'Skipping {c}')
                     continue
                 # add MODEL tag
-                logging.info(f'Adding MODEL {os.path.basename(c).split("model_")[-1].split("_seed")[0]}')
+                logging.debug(f'Adding MODEL {os.path.basename(c).split("model_")[-1].split("_seed")[0]}')
                 f.write(f'MODEL {i+1}\n')
                 with open(c, 'r') as c_f:
                     lines = c_f.readlines()
@@ -650,7 +650,7 @@ class Ring3Runner():
         outputs = Ring3Runner.check_outputs(pdb_fp, out_dir)       
         if outputs:
             if not overwrite:
-                logging.info(f'RING3 output files already exist at {out_dir}, skipping...')
+                logging.debug(f'RING3 output files already exist at {out_dir}, skipping...')
                 return pdb_fp, outputs
             logging.warning(f'Overwriting RING3 output files at {out_dir}...')
         
@@ -661,7 +661,7 @@ class Ring3Runner():
         cmd += Ring3Runner.default_args
         cmd += " -v" if verbose else ""
         
-        logging.info(f"Running RING3 with command: {cmd}")
+        logging.debug(f"Running RING3 with command: {cmd}")
         out = subprocess.run(cmd, shell=True, capture_output=True, check=True)
         
         logging.debug(out.stdout.decode('utf-8'))
