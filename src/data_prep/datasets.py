@@ -186,7 +186,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def processed_file_names(self):
         # XY.csv cols: PDBCode,pkd,SMILE,prot_seq
         # XY is created in pre_process
-        return ['XY.csv','data_pro.pt','data_mol.pt']
+        return ['XY.csv','data_pro.pt','data_mol.pt','cleaned_XY.csv']
     
     @property
     def index(self):
@@ -205,16 +205,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def get_protein_counts(self) -> Counter:
         """returns dict of protein counts from `collections.Counter` object"""
         return Counter(self.df['prot_id'])
-    
-    @staticmethod
-    def filter_pro_len(df, max_seq_len, verbose=False) -> pd.DataFrame:
-        """Filters a pandas dataframe by protein length"""
-        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
-        pro_filtered = len(df) - len(df_new)
-        if pro_filtered > 0 and verbose:
-            logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
-        return df_new
-    
+        
     @staticmethod
     def get_unique_prots(df, verbose=True) -> pd.DataFrame:
         """Gets the unique proteins from a dataframe by their protein id"""
@@ -233,11 +224,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return unique_df
     
     def load(self): 
-        # 2149 is the max seq length in pdbbind (kiba and davis have seq lengths that are larger)
-        self.df = pd.read_csv(self.processed_paths[0], index_col=0)
-        
-        # Filter out proteins that exceed the maximum sequence length
-        self.df = self.filter_pro_len(self.df, self.max_seq_len)
+        # loading cleaned XY.csv file
+        self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         
         self._indices = self.df.index
         self._data_pro = torch.load(self.processed_paths[1])
@@ -389,6 +377,31 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if len(errors) > 0:
             logging.warning(f'{len(errors)} ligands failed to create graphs')
         return processed_ligs
+        
+    def clean_XY(self, df, max_seq_len=None):
+        max_seq_len = self.max_seq_len
+                
+        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
+        pro_filtered = len(df) - len(df_new)
+        if pro_filtered > 0 and self.verbose:
+            logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
+        
+        # Filter out proteins that are missing pdbs for confirmations
+        missing_conf = set()
+        if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
+            unique_df = self.get_unique_prots(df)
+            for code in tqdm(unique_df.index,
+                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
+                    total=len(unique_df)):
+                af_confs = self.af_conf_files(code)
+                # need at least 2 confimations...
+                if len(af_confs) <= 1:
+                    missing_conf.add(code)
+        
+        filtered_df = df[~df.index.isin(missing_conf)]    
+        logging.debug(f'Number of codes: {filtered_df}/{len(df)}')     
+        
+        return filtered_df   
                
     def process(self):
         """
@@ -402,47 +415,36 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             return
         
         ####### checking for XY.csv #######
-        if (os.path.isfile(self.processed_paths[0]) and  # file exists
-            not (os.path.getsize(self.processed_paths[0]) <= 50)):  # and is not empty
+        def file_real(fp):
+            # file exists and is not empty
+            return os.path.isfile(fp) and not (os.path.getsize(fp) <= 50)
+        
+        if file_real(self.processed_paths[3]): # cleaned_XY found
+            self.df = pd.read_csv(self.processed_paths[3], index_col=0)
+            logging.info(f'{self.processed_paths[3]} file found, using it to create the dataset')
+            
+        elif file_real(self.processed_paths[0]): # raw XY found
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             logging.info(f'{self.processed_paths[0]} file found, using it to create the dataset')
         else:
             self.df = self.pre_process()
+        
+        # creating clean_XY.csv
+        if not file_real(self.processed_paths[3]): 
+            self.df = self.clean_XY(self.df)
+            self.df.to_csv(self.processed_paths[3])
             
-        ### Final filters before creating graphs
-        self.df = self.filter_pro_len(self.df, self.max_seq_len)
-        
-        # Filter out proteins that are missing pdbs for confirmations
-        missing_conf = set()
-        if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
-            unique_df = self.get_unique_prots(self.df)
-            for code in tqdm(unique_df.index,
-                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
-                    total=len(unique_df)):
-                af_confs = self.af_conf_files(code)
-                # need at least 2 confimations...
-                if len(af_confs) <= 1:
-                    missing_conf.add(code)
-        
-        filtered_df = self.df[~self.df.index.isin(missing_conf)]    
-        logging.debug(f'Number of codes: {filtered_df}/{len(self.df)}')
         
         ###### Get Protein Graphs ######
-        processed_prots = self._create_protein_graphs(filtered_df, self.feature_opt, self.pro_edge_opt)
+        processed_prots = self._create_protein_graphs(self.df, self.feature_opt, self.pro_edge_opt)
         
         ###### Get Ligand Graphs ######
-        processed_ligs = self._create_ligand_graphs(filtered_df, self.ligand_feature, self.ligand_edge)
+        processed_ligs = self._create_ligand_graphs(self.df, self.ligand_feature, self.ligand_edge)
         
         ###### Save ######
         logging.info('Saving...')
         torch.save(processed_prots, self.processed_paths[1])
         torch.save(processed_ligs, self.processed_paths[2])
-        
-        ##### Updating df #### 
-        # we do this last since if the new df is handled incorrectly we would lose our progress
-        # from pre-process
-        self.df = filtered_df
-        self.df.to_csv(self.processed_paths[0])        
 
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory

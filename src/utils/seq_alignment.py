@@ -12,7 +12,7 @@ class MSARunner(Processor):
     hhsuite_bin_dir = '/cluster/tools/software/centos7/hhsuite/3.3.0/bin'
     bin_hhblits = f'{hhsuite_bin_dir}/hhblits'
     bin_hhfilter = f'{hhsuite_bin_dir}/hhfilter'
-    UniRef30_dir = '/cluster/projects/kumargroup/mslobody/Protein_Communities/01_MSA/databases/UniRef30_2020_06'
+    UniRef_dir = '/cluster/projects/kumargroup/mslobody/Protein_Communities/01_MSA/databases/UniRef30_2020_06'
 
     @staticmethod    
     def hhblits(f_in:str, f_out:str, n_cpus=6, n_iter:int=2,
@@ -23,7 +23,7 @@ class MSARunner(Processor):
         cmd = f"{bin_path or MSARunner.bin_hhblits}" + \
                 f" -i {f_in}" + \
                 f" -oa3m {f_out}" + \
-                f" -d {dataset or MSARunner.UniRef30_dir}" + \
+                f" -d {dataset or MSARunner.UniRef_dir}" + \
                 f" -cpu {n_cpus}" + \
                 f" -n {n_iter}"
         return subprocess.run(cmd, capture_output=True, check=True, shell=True)

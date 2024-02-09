@@ -19,7 +19,8 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     k_folds:int=None,
                     random_seed:int=0,
                     train_split:float=0.8,
-                    val_split:float=0.1,) -> None:
+                    val_split:float=0.1,
+                    overwrite=True) -> None:
     """
     Creates the datasets for the given data, feature, and edge options.
 
@@ -61,6 +62,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     aln_dir=f'{data_root}/{data}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
+                    overwrite=overwrite,
                     af_conf_dir=f'../colabfold/{data}_af2_out/', # colabfold not needed if no structure required methods are used (see config)
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
@@ -72,7 +74,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     data_root=f'{data_root}/v2020-other-PL/',
                     aln_dir=f'{data_root}/PDBbind_aln/',
                     cmap_threshold=8.0,
-                    overwrite=False, # overwrite old cmap.npy files
+                    overwrite=overwrite, # overwrite old cmap.npy files
                     af_conf_dir=f'{data_root}/PDBbind_afConf/',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
@@ -85,6 +87,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                 data_root=f'{data_root}/PlatinumDataset/raw',
                 aln_dir=None,
                 cmap_threshold=8.0,
+                overwrite=overwrite,
                 feature_opt=FEATURE,
                 edge_opt=EDGE,
                 ligand_feature=ligand_feature,
