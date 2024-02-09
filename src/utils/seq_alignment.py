@@ -16,7 +16,7 @@ class MSARunner(Processor):
 
     @staticmethod    
     def hhblits(f_in:str, f_out:str, n_cpus=6, n_iter:int=2,
-                bin_path:str=None, dataset:str=None) -> subprocess.CompletedProcess:
+                bin_path:str=None, dataset:str=None, return_cmd=False) -> subprocess.CompletedProcess:
         # hhblits works on a single sequence at once
         # can pass FASTA file
         
@@ -26,6 +26,8 @@ class MSARunner(Processor):
                 f" -d {dataset or MSARunner.UniRef_dir}" + \
                 f" -cpu {n_cpus}" + \
                 f" -n {n_iter}"
+        
+        if return_cmd: return cmd
         return subprocess.run(cmd, capture_output=True, check=True, shell=True)
 
     @staticmethod    
