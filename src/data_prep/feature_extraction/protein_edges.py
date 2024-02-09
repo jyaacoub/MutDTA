@@ -233,16 +233,21 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         
         # NOTE: if chains (no pdbs found) is empty then we treat all edges as the same
         if len(chains) == 0:
-            print(f'WARNING: no af2 pdbs for {pdb_fp}')
+            logging.warning(f'no af2 pdbs for {pdb_fp}')
             # treat all edges as the same if no confirmations are found
-            return np.ones(shape=(len(target_seq), len(target_seq))) 
-        else:
-            # NOTE: af2-anm gets run here:
-            ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
-            assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
-            return ew
+            return np.ones(shape=(len(target_seq), len(target_seq)))
+        
+        # NOTE: af2-anm gets run here:
+        ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
+        assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
+        return ew
     elif edge_opt == 'ring3':
         chains = [Chain(p) for p in af_confs]
+        if len(chains) == 0:
+            logging.warning(f'no af2 pdbs for {pdb_fp}')
+            # treat all edges as the same if no confirmations are found
+            return np.ones(shape=(len(target_seq), len(target_seq), 6)) #HACK: since we have 6 feats
+        
         M = np.array([c.get_contact_map() for c in chains]) < 8.0
 
         dist_cmap = np.sum(M, axis=0) / len(M)

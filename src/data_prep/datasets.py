@@ -108,7 +108,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         assert edge_opt in self.EDGE_OPTIONS, \
             f"Invalid edge_opt '{edge_opt}', choose from {self.EDGE_OPTIONS}"
-        self.edge_opt = edge_opt
+        self.pro_edge_opt = edge_opt
         
         # check ligand options:
         ligand_feature = ligand_feature or 'original'
@@ -122,7 +122,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         # Validating subset
         subset = subset or 'full'
-        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
+        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.pro_edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
         if self.verbose: print('save_root:', save_root)
         
         if subset != 'full':
@@ -132,8 +132,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.subset = subset
         
         # checking af2 conf dir if we are creating the dataset from scratch
-        if not os.path.isdir(save_root) and ('af2' in self.edge_opt):
-            assert af_conf_dir is not None, f"{self.edge_opt} edge selected but no af_conf_dir provided!"
+        if not os.path.isdir(save_root) and ('af2' in self.pro_edge_opt):
+            assert af_conf_dir is not None, f"{self.pro_edge_opt} edge selected but no af_conf_dir provided!"
             assert os.path.isdir(af_conf_dir), f"AF configuration dir doesnt exist, {af_conf_dir}"
         self.af_conf_dir = af_conf_dir
         
@@ -161,7 +161,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     def edgew_p(self, code) -> str:
         """Also includes edge_attr"""
-        dirname = os.path.join(self.raw_dir, 'edge_weights', self.edge_opt)
+        dirname = os.path.join(self.raw_dir, 'edge_weights', self.pro_edge_opt)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
         return os.path.join(dirname, f'{code}.npy')
@@ -348,20 +348,20 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.cat((pro_feat, torch.Tensor(extra_feat)), axis=1)
             
             # for perf we only search for them if need be
-            if 'af2' in self.edge_opt:
+            if 'af2' in self.pro_edge_opt or self.pro_edge_opt == self.EDGE_OPTIONS.ring3:
                 af_confs = self.af_conf_files(code)
             else: 
                 af_confs = None
             
             # Check to see if edge weights already generated:
             pro_edge_weight = None
-            if self.edge_opt != 'binary':
+            if self.pro_edge_opt != 'binary':
                 if os.path.isfile(self.edgew_p(code)) and not self.overwrite:
                     pro_edge_weight = np.load(self.edgew_p(code))
                 else:
                     # includes edge_attr like ring3
                     pro_edge_weight = get_target_edge_weights(self.pdb_p(code), pro_seq, 
-                                                        edge_opt=self.edge_opt,
+                                                        edge_opt=self.pro_edge_opt,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
                                                         af_confs=af_confs)
@@ -608,7 +608,7 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if (self.edge_opt not in cfg.STRUCT_EDGE_OPT) and \
+        if (self.pro_edge_opt not in cfg.STRUCT_EDGE_OPT) and \
             (self.feature_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
@@ -746,7 +746,7 @@ class DavisKibaDataset(BaseDataset):
         
         # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.edge_opt in cfg.STRUCT_EDGE_OPT or self.feature_opt in cfg.STRUCT_PRO_FEAT_OPT:
+        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.feature_opt in cfg.STRUCT_PRO_FEAT_OPT:
             if self.feature_opt == 'foldseek':
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
