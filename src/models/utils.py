@@ -5,9 +5,9 @@ class BaseModel(nn.Module):
     """
     Base model for printing summary
     """
-    def __init__(self, pro_feat, edge_weight_opt, *args, **kwargs) -> None:
+    def __init__(self, pro_feat=None, edge_weight_opt=None, *args, **kwargs) -> None:
         edge_weight_opt = edge_weight_opt or 'binary' # None -> binary
-        assert edge_weight_opt in cfg.EDGE_OPT
+        assert edge_weight_opt in cfg.PRO_EDGE_OPT
         self.edge_weight = not (edge_weight_opt == 'binary')
         self.esm_only = (pro_feat == 'esm_only') if pro_feat is not None else False
         
@@ -44,6 +44,3 @@ class BaseModel(nn.Module):
             # print("Error(s) in loading state_dict for EsmDTA")
             mdl_dict = {(k[7:] if 'module.' == k[:7] else k):v for k,v in mdl_dict.items()}
             self.load_state_dict(mdl_dict)
-        
-    
-    

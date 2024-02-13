@@ -148,7 +148,6 @@ class DGraphDTA(BaseModel):
         return main_str + '\n\n' + model_summary
     
 
-
 class DGraphDTAImproved(DGraphDTA):
     """
     My version of DGraphDTA

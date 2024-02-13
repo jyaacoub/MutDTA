@@ -1,5 +1,5 @@
 from src.models.prior_work import DGraphDTA, GraphDTA
-from src.models.pro_mod import EsmDTA
+from src.models.esm_models import EsmDTA
 from src.models.utils import BaseModel
 
 def display_models():

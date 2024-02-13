@@ -447,3 +447,251 @@ class Chain:
             plt.show()
             
         return pairwise_distances
+    
+
+import pandas as pd
+from src import config as cfg
+import os, subprocess
+import logging
+import shutil 
+
+
+class Ring3Runner():
+    """
+    RING $ -- Residue Interaction Network Generator - Version 3.0.0
+
+    Input options:
+    -i  <filename>   Input PDB/mmCif file
+    -I  <filename>   Input text file with a list of PDB/mmCif files, absolute path needs to be specified for each file in the list
+    --all_models      Calculates Ring on all models (default false)
+    -m <number>      Model number to use (default first model)
+    -c  <id>         Chain identifier to read (default all chains)
+
+    Output options:
+    --out_dir <dirname> Output node and edges to the selected dir. (default input dir)
+    --md                It generates the standard output files inside the results/ folder and create a md subdirectory with 
+                        four different types of data:
+                            <fileName>_cm_<type>, all the contact maps, one per model. The first column is the model number
+                            <fileName>_gcm_<type>, the global contact map, number of contacts across models
+                            <fileName>_gfreq_<type>, how many times each node is in contact over all models
+                            <fileName>_tdcm_<type>, how many contacts for each node (rows) and each model (columns)
+                        Where <type> is the type of interaction: HBOND, IAC, IONIC, PICATION, PIPISTACK, SSBOND, VDW
+    --write_out_repr    Writes the mmCif/PDB representation used by Ring
+
+    Network options:
+    -n <string>       Network policy to define a contact between 2 groups/residues
+                        Options: closest, lollipop, ca, cb (default closest)
+    -t <number>       Network distance threshold for the specified network type (default 5.0)
+    -g <number>       Sequence separation (gap) between residues (default 3)
+    --get_iac          Include generic Inter-Atomic Contacts (IAC) (default false)
+    --no_het           Skip calculation of hetero atoms connections (default false)
+    --water            Include water molecules (default false)
+    --no_specific      Skip calculation of bond specification (default false)
+    --energy           Calculates TAP and FRST potentials for each residue, slower. (default false)
+    --no_add_H         Skip the addition of H atoms to amino acids and nucleotides (default false)
+
+    Edges options:
+    default:           Return multiple edges for a pair of nodes, those that should be the most interesting ones.
+    --all_edges        Return all edges found for a pair of nodes. (default false)
+    --best_edge        Return only the most valuable connection between two nodes (default false)
+
+    Thresholds options:
+    --relaxed       Relax distance thresholds (default false).
+    -o <number>    Distance threshold for Salt bridges (default 4.0).
+    -s <number>    Distance threshold for Disulfide bonds (default 2.5).
+    -k <number>    Distance threshold for Pi-Pi interactions (default 6.5).
+    -a <number>    Distance threshold for Pi-Cation interactions (default 5.0).
+    -b <number>    Distance threshold for Hydrogen bonds (default 3.5).
+    -w <number>    Distance (between atom surfaces) threshold for 
+                    Van Der Waals interactions (default 0.5).
+
+    -v             Verbose output
+    """
+    RING3_BIN = cfg.RING3_BIN
+    default_args = " --all_models --md --relaxed" # relaxed threshold
+    RELEVANT_INTERACTIONS = ['HBOND', 'PIPISTACK', 'PICATION', 'IONIC', 'VDW']
+    RELEVANT_MD = 'gfreq'
+    
+    @staticmethod
+    def _get_out_dir(pdb_fp:str, out_dir:str=None) -> str:
+        """
+        Returns the output directory for the given pdb file.
+        """
+        return out_dir or os.path.splitext(pdb_fp)[0] + "-ring3/"
+    
+    @staticmethod
+    def _prepare_input(af_confs:list[str], pdb_fp:str=None, overwrite=False) -> str:
+        """
+        Prepares input of multiple pdb files into a single pdb file.
+        
+        Assumes simple pdb files with no Headers or extra models inside the file 
+        (i.e.: af2 outputs)
+        """
+        pdb_fp = pdb_fp or af_confs[0]
+        combined_pdb_fp = f'{os.path.splitext(pdb_fp)[0]}.pdb_af_combined'
+        
+        if os.path.exists(combined_pdb_fp) and not overwrite:
+            logging.debug(f'Combined pdb file already exists at {combined_pdb_fp}, skipping...')
+            return combined_pdb_fp
+
+        def safe_write(f, lines):
+            for i, line in enumerate(lines):
+                # Removing model tags since they are added in the outer loop
+                if line.strip().split()[0] == 'MODEL' or line.strip() == 'ENDMDL':
+                    logging.debug(f'Removing {i}:{line}')
+                    continue
+                # 'END' should always be the last line or second to last
+                if line.strip() == 'END':
+                    extra_lines = len(lines)-i
+                    if extra_lines > 1: 
+                        logging.warning(f'{extra_lines} extra lines after END in {c}')
+                    break
+                f.write(line)
+                
+        with open(combined_pdb_fp, 'w') as f:
+            for i, c in enumerate(af_confs):
+                if 'af_combined' in c: 
+                    logging.debug(f'Skipping {c}')
+                    continue
+                # add MODEL tag
+                logging.debug(f'Adding MODEL {os.path.basename(c).split("model_")[-1].split("_seed")[0]}')
+                f.write(f'MODEL {i+1}\n')
+                with open(c, 'r') as c_f:
+                    lines = c_f.readlines()
+                    safe_write(f, lines)
+                # add ENDMDL tag
+                f.write('ENDMDL\n')
+            f.write('END\n')
+        return combined_pdb_fp
+        
+    @staticmethod
+    def check_outputs(pdb_fp:str, out_dir:str=None) -> dict:
+        """
+        Checks to see that output files exist. If out_dir is None it uses input dirname.
+        
+        Returns a dictionary of the output files if they exist with interaction type as key.
+        """
+        pdb_name = os.path.splitext(os.path.basename(pdb_fp))[0]
+        out_dir = Ring3Runner._get_out_dir(pdb_fp, out_dir)
+        
+        # check only relevant files
+        md_dir = f'{out_dir}/md/'
+        files = {}
+        for i in Ring3Runner.RELEVANT_INTERACTIONS:
+            files[i] = f'{md_dir}{pdb_name}.{Ring3Runner.RELEVANT_MD}_{i}'
+                    
+        # all files must exist
+        for f in files.values():
+            if not os.path.exists(f):
+                logging.debug(f'Output file not found at {f}')
+                return None
+        return files
+    
+    @staticmethod
+    def cleanup(pdb_fp:str, out_dir:str=None, all=False) -> None:
+        """
+        Removes the output files generated by RING3.
+        """
+        if all:
+            out_dir = Ring3Runner._get_out_dir(pdb_fp, out_dir)
+            if os.path.exists(out_dir):
+                shutil.rmtree(out_dir)
+                logging.debug(f'Removed directory {out_dir}')
+            return
+        
+        outputs = Ring3Runner.check_outputs(pdb_fp, out_dir)
+        if outputs:
+            for fp in outputs.values():
+                os.remove(fp)
+                logging.debug(f'Removed {fp}')
+
+    @staticmethod
+    def run(pdb_fp:str|list[str], out_dir:str=None, chain_id:str=None,
+            verbose:bool=False, overwrite:bool=False) -> dict:
+        """
+        Runs RING3 on a given pdb file that contains multiple models to get 
+        the residue interaction network. Forces --all_models and --md options.  
+
+        Args:
+            pdb_fp (str or list[str]): Input pdb file path with multiple models/confirmations or list of pdb file paths.
+            out_dir (str, optional): Output directory to save the results, defaults to the input directory.
+            chain_id (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
+            
+        returns:
+            dict[str] file paths for <fileName>_gfreq_<type> for relevant edge types (self.RELEVANT_INTERACTIONS)
+            
+        **Example usage of output files:**
+        ```
+            edge_fp = files['HBOND']
+            # output csv looks like this:
+            # A:7:_:ASP	HBOND	A:10:_:GLU	0.75
+            # where the columns are:
+                # 1. Residue 1
+                # 2. Interaction type
+                # 3. Residue 2
+                # 4. Frequency of interaction (0-1) out of all the conformations
+            import pandas as pd
+            df = pd.read_csv(edge_fp, sep='\t', 
+                            names=['res1', 'type', 'res2', 'freq'])
+        ```
+        """
+        if isinstance(pdb_fp, list):
+            combined_pdb_fp = Ring3Runner._prepare_input(pdb_fp, pdb_fp[0], overwrite=overwrite)
+            pdb_fp = combined_pdb_fp
+        
+        # check if pdb file exists
+        if not os.path.exists(pdb_fp):
+            raise FileNotFoundError(f'PDB file not found at {pdb_fp}')
+        
+        out_dir = Ring3Runner._get_out_dir(pdb_fp, out_dir)
+        os.makedirs(out_dir, exist_ok=True)
+        
+        # check to see if output files already exist 
+        outputs = Ring3Runner.check_outputs(pdb_fp, out_dir)       
+        if outputs:
+            if not overwrite:
+                logging.debug(f'RING3 output files already exist at {out_dir}, skipping...')
+                return pdb_fp, outputs
+            logging.warning(f'Overwriting RING3 output files at {out_dir}...')
+        
+        # build cmd and run
+        cmd = f"{Ring3Runner.RING3_BIN} -i {pdb_fp}"
+        cmd += f" --out_dir {out_dir}" if out_dir else ""
+        cmd += f" -c {chain_id}" if chain_id else ""
+        cmd += Ring3Runner.default_args
+        cmd += " -v" if verbose else ""
+        
+        logging.debug(f"Running RING3 with command: {cmd}")
+        out = subprocess.run(cmd, shell=True, capture_output=True, check=True)
+        
+        logging.debug(out.stdout.decode('utf-8'))
+        logging.debug(out.stderr.decode('utf-8'))
+        
+        # getting output file names:
+        pdb_name = os.path.splitext(os.path.basename(pdb_fp))[0]
+        
+        # checking existence of output files
+        outputs = Ring3Runner.check_outputs(pdb_fp, out_dir)
+        if not outputs:
+            logging.error(f'RING3 failed for {pdb_fp}, output file(s) not found at {out_dir}.')
+            raise FileNotFoundError(f'RING3 failed to generate outputs to {out_dir} for {pdb_name}.')
+        
+        return pdb_fp, outputs
+    
+    @staticmethod
+    def build_cmap(output_gfreq_fp:str, res_len:int, self_loop=True) -> np.ndarray:
+        """Converts the output gfreq file to a contact map"""
+        cmap = np.eye(res_len) if self_loop else np.zeros((res_len, res_len))
+        
+        # build cmap with values from csv
+        df = pd.read_csv(output_gfreq_fp, sep='\t', 
+                         names=['res1', 'type', 'res2', 'freq'])
+        
+        # fill cmap
+        for _, row in df.iterrows():
+            i = int(row['res1'].split(':')[1]) - 1 # index starts at 1
+            j = int(row['res2'].split(':')[1]) - 1 # index starts at 1
+            cmap[i, j] = row['freq']
+            cmap[j, i] = row['freq']
+            
+        return cmap

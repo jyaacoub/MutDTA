@@ -6,7 +6,7 @@ from torch_geometric.loader import DataLoader
 
 from src.models.utils import BaseModel
 from src.models.lig_mod import ChemDTA, ChemEsmDTA
-from src.models.pro_mod import EsmDTA, EsmAttentionDTA, SaProtDTA
+from src.models.esm_models import EsmDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
@@ -24,7 +24,7 @@ def validate_args(valid_options):
 
 class Loader():
     model_opt = cfg.MODEL_OPT
-    edge_opt = cfg.EDGE_OPT
+    edge_opt = cfg.PRO_EDGE_OPT
     data_opt = cfg.DATA_OPT
     pro_feature_opt = cfg.PRO_FEAT_OPT
     
@@ -107,7 +107,7 @@ class Loader():
                         num_features_pro=320+num_feat_pro, # esm features + other features
                         pro_emb_dim=54, # inital embedding size after first GCN layer
                         dropout=dropout,
-                        pro_feat='all', # to include all feats
+                        pro_feat='all', # to include all feats (esm + 52 from DGraphDTA)
                         edge_weight_opt=pro_edge)
         elif model == 'EDI':
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
@@ -133,10 +133,6 @@ class Loader():
                         dropout=dropout,
                         pro_feat='all',
                         edge_weight_opt=pro_edge)
-        elif model == 'EAT':
-            # this model only needs protein sequence, no additional features.
-            model = EsmAttentionDTA(esm_head='facebook/esm2_t6_8M_UR50D',
-                                    dropout=dropout)
         elif model == 'CD':
             # this model only needs sequence, no additional features.
             model = ChemDTA(dropout=dropout)
@@ -164,7 +160,7 @@ class Loader():
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
-                    af_conf_dir='../colabfold/pdbbind_af2_out/out0',
+                    af_conf_dir='../colabfold/pdbbind_af2_out/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500
@@ -178,6 +174,7 @@ class Loader():
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
+                    af_conf_dir='../colabfold/davis_af2_out/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500

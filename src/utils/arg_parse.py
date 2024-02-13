@@ -17,8 +17,8 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for model_opt
     parser.add_argument('-m',
         '--model_opt',
-        choices=cfg.MODEL_OPT, nargs='+', required=True,
-        help=f'Select one or more from {cfg.MODEL_OPT} where I = "improved" and '+ \
+        choices=cfg.MODEL_OPT.list(), nargs='+', required=True,
+        help=f'Model option where I = "improved" and '+ \
             'A = "all features". For example: DG is DGraphDTA ' + \
             'DGI is DGraphDTAImproved, ED is EsmDTA with esm_only set to true, '+ \
             'and EDA is the same but with esm_only set to False. Additional options:' + \
@@ -27,15 +27,15 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Add the argument for FEATURE_opt
     parser.add_argument('-f',
         '--feature_opt',
-        choices=cfg.PRO_FEAT_OPT, nargs='+', required=True,
-        help=f'Select one or more from {cfg.PRO_FEAT_OPT}.'
+        choices=cfg.PRO_FEAT_OPT.list(), nargs='+', required=True,
+        help=f'Protein feture option'
     )
     # Add the argument for EDGE_opt
     parser.add_argument('-e',
         '--edge_opt',
-        choices=cfg.EDGE_OPT,
+        choices=cfg.PRO_EDGE_OPT.list(),
         nargs='+', default=['binary'], required=False,
-        help=f'Select one or more from {cfg.EDGE_OPT}. "simple" is just taking ' + \
+        help=f'Protein edge option. "simple" is just taking ' + \
             'the normalized values from the protein cmap, "binary" means no edge weights'
     )
     parser.add_argument('-t',
@@ -57,15 +57,15 @@ def add_model_args(parser: argparse.ArgumentParser):
     # Arguments for ligand options
     parser.add_argument('-lf',
         '--ligand_feature_opt',
-        choices=cfg.LIG_FEAT_OPT, 
+        choices=cfg.LIG_FEAT_OPT.list(), 
         nargs='+', default=[None], required=False,
-        help=f'Select one or more from {cfg.LIG_FEAT_OPT}.'
+        help=f'Ligand features option'
     )
     parser.add_argument('-le',
         '--ligand_edge_opt',
-        choices=cfg.LIG_EDGE_OPT,
+        choices=cfg.LIG_EDGE_OPT.list(),
         nargs='+', default=[None], required=False,
-        help=f'Select one or more from {cfg.LIG_EDGE_OPT}.'
+        help=f'Ligand edge option'
     )
     
     return parser
@@ -127,8 +127,8 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     # Add the argument for data_opt
     parser.add_argument('-d',
         '--data_opt',
-        choices=cfg.DATA_OPT, nargs='+',   required=True,
-        help=f'Select one of {cfg.DATA_OPT} (default: {cfg.DATA_OPT[0]}).'
+        choices=cfg.DATA_OPT.list(), nargs='+',   required=True,
+        help=f'Dataset option (default: {cfg.DATA_OPT[0]}).'
     )
     parser.add_argument('-ts',
         '--train_split',
