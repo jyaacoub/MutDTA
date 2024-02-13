@@ -169,9 +169,9 @@ class AF_Clust:
         cluster_metadata = self.cluster(L, self.df, query_, ohe_seqs, eps_to_select)
         
         if self.run_PCA:
-            self.pca(self.df, query_)
+            self.pca(self.df, query_, L)
         if self.run_TSNE:
-            self.tsne(self.df, query_)
+            self.tsne(self.df, query_, L)
         
         outfile = self.o+"/"+self.keyword+'_clustering_assignments.tsv'
         log.info('wrote clustering data to %s' % outfile)
@@ -240,7 +240,7 @@ class AF_Clust:
 
         return cluster_metadata
         
-    def pca(self, df, query_):
+    def pca(self, df, query_, L):
         from sklearn.decomposition import PCA
         print('Running PCA ...')
         ohe_vecs = encode_seqs(df.sequence.tolist(), max_len=L)
@@ -259,7 +259,7 @@ class AF_Clust:
 
         print('Saved PCA plot to '+self.o+"/"+self.keyword+'_PCA.pdf')
 
-    def tsne(self, df, query_):
+    def tsne(self, df, query_, L):
         from sklearn.manifold import TSNE
         print('Running TSNE ...')
         ohe_vecs = encode_seqs(df.sequence.tolist()+[query_.sequence.tolist()], max_len=L)
