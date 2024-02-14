@@ -139,6 +139,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.af_conf_dir = af_conf_dir
         
         self.only_download = only_download
+        self.df = None # dataframe for csv of raw strings for SMILE protein sequence and affinity
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
@@ -220,7 +221,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         df.set_index('code', inplace=True)
         unique_df = df.iloc[unique_pro.index]
         
-        if verbose: logging.info(len(unique_df), 'unique proteins')
+        if verbose: logging.info(f'{len(unique_df)} unique proteins')
         return unique_df
     
     def load(self): 
@@ -400,7 +401,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                     missing_conf.add(code)
         
         filtered_df = df[~df.index.isin(missing_conf)]    
-        logging.debug(f'Number of codes: {filtered_df}/{len(df)}')     
+        logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')     
         
         return filtered_df   
                
@@ -481,10 +482,13 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
     def pdb_p(self, code):
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
-    def cmap_p(self, code):
+    def cmap_p(self, pid):
         # cmap is saved in seperate directory under /v2020-other-PL/cmaps/
         # file names are unique protein ids...
-        return os.path.join(self.data_root, 'cmaps', f'{code}.npy')
+        # check to make sure arg is a pid
+        if self.df is not None and pid in self.df.index:
+            pid = self.df.loc[pid]['prot_id']
+        return os.path.join(self.data_root, 'cmaps', f'{pid}.npy')
     
     def aln_p(self, code):
         # see feature_extraction/process_msa.py for details on how the alignments are cleaned
@@ -532,7 +536,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         -------
         pd.DataFrame
             The XY.csv dataframe.
-        """
+        """        
         ############# Read index files to get binding and protID data #############
         # Get prot ids data:
         df_pid = PDBbindProcessor.get_name_data(self.raw_paths[1]) # _name.2020
@@ -593,7 +597,11 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         ############# FINAL MERGES #############
         df = df.merge(df_smi, on='PDBCode') # + smiles
+        idx = df.index
         df = df.merge(df_seq, on='prot_id') # + prot_seq
+
+        # maintaining same index with pdbcodes
+        df.set_index(idx, inplace=True)
         
         # changing index name to code (to match with super class):
         df.index.name = 'code'
