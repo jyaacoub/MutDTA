@@ -108,7 +108,7 @@ def target_to_graph(target_sequence:str, contact_map:str or np.array,
 ######################################################################
 #################### CONTACT MAP EXTRACTION/PREP: ####################
 ######################################################################
-def create_save_cmaps(pdbcodes: Iterable[str], 
+def create_save_cmaps(pdbcodes: Iterable[str]|Iterable[tuple[str]], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
                       overwrite:bool=False) -> dict:
@@ -121,7 +121,7 @@ def create_save_cmaps(pdbcodes: Iterable[str],
     Parameters
     ----------
     `pdbcodes` : Iterable[str]
-        list of PDBcodes to create contact maps for.
+        list of PDBcodes to create contact maps for. or tuple containing pdbcodes and protids
     `pdb_p` : Callable[[str], str]
         function to get pdb file path from pdbcode.
     `cmap_p` : Callable[[str], str]
@@ -133,37 +133,59 @@ def create_save_cmaps(pdbcodes: Iterable[str],
         dictionary of sequences for each pdbcode
     """
     seqs = {}
-    for code in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
+    for elmt in tqdm(pdbcodes, 'Getting protein seq & contact maps'):
+        if isinstance(elmt, str):
+            code = elmt
+            pid = elmt
+        else:
+            code, pid = elmt
+        
         chain = Chain(pdb_p(code))
-        seqs[code] = chain.getSequence()
+        seqs[pid] = chain.getSequence()
         # only get cmap if it doesnt exist
-        if not os.path.isfile(cmap_p(code)) or overwrite:
+        if not os.path.isfile(cmap_p(pid)) or overwrite:
             cmap = chain.get_contact_map()
-            np.save(cmap_p(code), cmap)
+            np.save(cmap_p(pid), cmap)
     return seqs
 
 def _save_cmap(args):
     pdb_f, cmap_f, overwrite = args
-    # skip if already created
-    if os.path.isfile(cmap_f) and not overwrite: return
     try:
-        cmap = Chain(pdb_f).get_contact_map()
+        chain = Chain(pdb_f)
+        seq = chain.getSequence()
     except KeyError as e:
         raise KeyError(f'Error with {pdb_f}') from e
-    np.save(cmap_f, cmap)
     
-def multi_save_cmaps(pdbcodes: Iterable[str], 
+    if os.path.isfile(cmap_f) or overwrite:
+        return seq
+        
+    # only get cmap if it doesnt exist
+    cmap = chain.get_contact_map()
+    np.save(cmap_f, cmap)
+    return seq
+    
+def multi_save_cmaps(pdbcodes: Iterable[str]|Iterable[tuple[str]], 
                       pdb_p: Callable[[str], str],
                       cmap_p: Callable[[str], str],
-                      processes=8) -> dict:
+                      overwrite:bool=False,
+                      processes=None) -> dict: 
+    # by default uses same number of processes as in system
     
-    #pdb_f, cmap_f, overwrite
-    args = [[pdb_p(code), cmap_p(code), True] for code in pdbcodes]
+    # pdb_f, cmap_f, overwrite
+    if isinstance(pdbcodes[0], str):
+        args = [[pdb_p(code), cmap_p(code), overwrite] for code in pdbcodes]
+    else:
+        args = [[pdb_p(code), cmap_p(pid), overwrite] for code, pid in pdbcodes]
+    
     with Pool(processes=processes) as pool:
-        print('Starting process')
-        list(tqdm(pool.imap(_save_cmap, args),
+        seqs = list(tqdm(pool.imap(_save_cmap, args),
                   total=len(args),
                   desc='Creating and saving cmaps'))
+    
+    # order is maintained (see https://stackoverflow.com/questions/41273960/python-3-does-pool-keep-the-original-order-of-data-passed-to-map)
+    if isinstance(pdbcodes[0], str):
+        return {code: seq for code, seq in zip(pdbcodes, seqs)}
+    return {pid: seq for (_, pid), seq in zip(pdbcodes, seqs)}
     
 
 
