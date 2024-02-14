@@ -1,132 +1,79 @@
-#%%###################
-# INIT PDBbind dataset with ring3 features:
-from src.data_prep.init_dataset import create_datasets
-from src import config as cfg
-import logging
-logging.getLogger().setLevel(logging.ERROR)
+# ###################################################
+# # %% Missing PDBbind confirmations
+# # full csv list is at data/PDBbindDataset/nomsa_ring3_original_binary/full/XY.csv
+# from src.data_prep.init_dataset import create_datasets
+# from src import config as cfg
+# import logging
+# logging.getLogger().setLevel(logging.DEBUG)
 
-create_datasets([cfg.DATA_OPT.PDBbind], [cfg.PRO_FEAT_OPT.nomsa], 
-                [cfg.PRO_EDGE_OPT.ring3], k_folds=5, overwrite=True)
+# create_datasets([cfg.DATA_OPT.PDBbind], 
+#                 [cfg.PRO_FEAT_OPT.nomsa], 
+#                 [cfg.PRO_EDGE_OPT.binary],
+#                 k_folds=5)
+
 
 # %%
-
+from src.data_prep.processors import PDBbindProcessor
+import os 
+from src.data_prep.feature_extraction.protein import multi_save_cmaps
 import pandas as pd
-from pathlib import Path
 
-xy = f'{Path.home()}/projects/data/DavisKibaDataset/davis/nomsa_af2/full/XY.csv'
-df = pd.read_csv(xy, index_col=0)
-#%%
-from src.utils.loader import Loader
-from src import config as cfg
+data_root = '/cluster/home/t122995uhn/projects/data/v2020-other-PL'
 
-ds = Loader.load_dataset(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.ring3,
-                         subset='full')
+data_fp = f'{data_root}/index/INDEX_general_PL_data.2020'
+name_fp = f'{data_root}/index/INDEX_general_PL_name.2020'
+def pdb_p(code):
+    return os.path.join(data_root, code, f'{code}_protein.pdb')
 
+def cmap_p(code):
+    # cmap is saved in seperate directory under /v2020-other-PL/cmaps/
+    # file names are unique protein ids...
+    return os.path.join(data_root, 'cmaps', f'{code}.npy')
 
+df_pid = PDBbindProcessor.get_name_data(name_fp)
+df_pid.drop(columns=['release_year','prot_name'], inplace=True)
+missing_pid = df_pid.prot_id == '------'
+df_pid[missing_pid] = df_pid[missing_pid].assign(prot_id=df_pid[missing_pid].index)
 
-#%%
-from tqdm import tqdm
-import re
-from glob import glob
-
-missing_conf = set()
-unique_df = ds.get_unique_prots(ds.df)
-for code in tqdm(unique_df.index,
-        desc='Filtering out proteins with missing PDB files for multiple confirmations',
-        total=len(unique_df)):
-            # removing () from string since file names cannot include them and localcolabfold replaces them with _
-    af_confs = ds.af_conf_files(code)
-    
-    # need at least 2 confimations...
-    if len(af_confs) <= 1:
-        missing_conf.add(code)
-
-#%%
+# Get binding data:
+df_binding = PDBbindProcessor.get_binding_data(data_fp) # _data.2020
+df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
 
 
+pdb_codes = df_binding.index # pdbcodes
+
+# merge with binding data to get unique protids that are validated:
+df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
 
 
+df_unique = df['prot_id'].drop_duplicates() # index col is the PDB code
+os.makedirs(os.path.dirname(cmap_p('')), exist_ok=True)
+seqs = multi_save_cmaps([(code, pid) for code, pid in df_unique.items()],
+                    pdb_p=pdb_p,
+                    cmap_p=cmap_p,
+                    overwrite=False)
+
+assert len(seqs) == len(df_unique), 'Some codes failed to create contact maps'
+
+df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
+df_seq.index.name = 'prot_id'
+
+#%%############# Get ligand info #############
+# Extracting SMILE strings:
+dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
+                                        dir=lambda x: f'{data_root}/{x}/{x}_ligand.sdf')
+df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
+df_smi.index.name = 'PDBCode'
+
+df_smi = df_smi[df_smi.SMILE.notna()]
+num_missing = len(pdb_codes) - len(df_smi)
+if  num_missing > 0:
+    print(f'\t{num_missing} ligands failed to get SMILEs')
+    pdb_codes = list(df_smi.index)
+
+#%%############# FINAL MERGES #############
+df = df.merge(df_smi, on='PDBCode') # + smiles
+df = df.merge(df_seq, on='prot_id') # + prot_seq
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#%%###############################################
-################# HHBLITS RUN SCRIPT #############
-##################################################
-
-from src.utils.seq_alignment import MSARunner
-from tqdm import tqdm
-import pandas as pd
-import os
-data_name = 'davis'
-data_dir = f'/cluster/home/t122995uhn/projects/data/DavisKibaDataset/{data_name}/'
-
-csv = f'{data_dir}/nomsa_binary_original_binary/full/XY.csv'
-df = pd.read_csv(csv, index_col=0)
-
-#################### Get unique proteins:
-# sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
-df['seq_len'] = df['prot_seq'].str.len()
-df = df.sort_values(by='seq_len', ascending=False)
-
-# create new numerated index col for ensuring the first unique uniprotID is fetched properly 
-df.reset_index(drop=False, inplace=True)
-unique_pro = df[['prot_id']].drop_duplicates(keep='first')
-
-# reverting index to code-based index
-df.set_index('code', inplace=True)
-unique_df = df.iloc[unique_pro.index]
-
-#%%########################## Get job partition
-num_arrays = 100
-array_idx = 0 #${SLURM_ARRAY_TASK_ID}
-partition_size = len(unique_df) / num_arrays
-start, end = int(array_idx*partition_size), int((array_idx+1)*partition_size)
-
-unique_df = unique_df[start:end]
-
-raw_dir = f'{data_dir}/raw'
-
-#%%#################################### create fastas
-fa_dir = os.path.join(raw_dir, f'{data_name}_fa')
-os.makedirs(fa_dir, exist_ok=True)
-MSARunner.csv_to_fasta_dir(csv_or_df=unique_df, out_dir=fa_dir)
-
-#%%##################################### Run hhblits
-aln_dir = os.path.join(raw_dir, f'{data_name}_aln')
-os.makedirs(aln_dir, exist_ok=True)
-
-# finally running
-for _, (prot_id, pro_seq) in tqdm(
-                unique_df[['prot_id', 'prot_seq']].iterrows(), 
-                desc='Running hhblits',
-                total=len(unique_df)):
-    in_fp = os.path.join(fa_dir, f"{prot_id}.fasta")
-    out_fp = os.path.join(aln_dir, f"{prot_id}.a3m")
-    
-    if not os.path.isfile(out_fp):
-        MSARunner.hhblits(in_fp, out_fp)
+# %%
