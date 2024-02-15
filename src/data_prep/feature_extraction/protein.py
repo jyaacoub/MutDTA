@@ -157,7 +157,7 @@ def _save_cmap(args):
     except KeyError as e:
         raise KeyError(f'Error with {pdb_f}') from e
     
-    if os.path.isfile(cmap_f) or overwrite:
+    if os.path.isfile(cmap_f) and not overwrite:
         return code, seq
         
     # only get cmap if it doesnt exist
@@ -193,9 +193,26 @@ def multi_save_cmaps(pdbcodes: Iterable[str]|Iterable[tuple[str]],
 def get_sequences(pdbcodes: Iterable[str], 
                   pdb_p:Callable[[str], str]) -> Iterable[str]:
     sequences = {}
-    for code in pdbcodes:
+    for code in tqdm(pdbcodes, 
+                     desc="Getting protein sequences"):
         sequences[code] = Chain(pdb_p(code)).sequence
     return sequences
+
+def _get_seq(args):
+    code, pdb_f = args
+    return code, Chain(pdb_f).sequence
+
+def multi_get_sequences(pdbcodes: Iterable[str],
+                        pdb_p:Callable[[str], str],
+                        processes=None) -> Iterable[str]:
+    args = [[code, pdb_p(code)] for code in pdbcodes]
+    
+    with Pool(processes=processes) as pool:
+        code_seqs = list(tqdm(pool.imap(_get_seq, args),
+                              total=len(args),
+                              desc='Getting sequences'))
+    return {code: seq for code, seq in code_seqs}
+    
 
 def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     """

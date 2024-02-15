@@ -19,7 +19,9 @@ from src.utils import config as cfg
 from src.utils.residue import Chain
 from src.utils.exceptions import DatasetNotFound
 from src.data_prep.feature_extraction.ligand import smile_to_graph
-from src.data_prep.feature_extraction.protein import multi_save_cmaps, target_to_graph, get_sequences
+from src.data_prep.feature_extraction.protein import (multi_save_cmaps, 
+                                                      multi_get_sequences, 
+                                                      target_to_graph,)
 from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 from src.data_prep.processors import PDBbindProcessor, Processor
 from src.data_prep.downloaders import Downloader
@@ -206,10 +208,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def get_protein_counts(self) -> Counter:
         """returns dict of protein counts from `collections.Counter` object"""
         return Counter(self.df['prot_id'])
-        
+    
     @staticmethod
-    def get_unique_prots(df, verbose=True) -> pd.DataFrame:
+    def get_unique_prots(df, verbose=True, keep_len=False) -> pd.DataFrame:
         """Gets the unique proteins from a dataframe by their protein id"""
+        # get index name for later
+        idx_name = df.index.name
+        
         # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
         df['seq_len'] = df['prot_seq'].str.len()
         df = df.sort_values(by='seq_len', ascending=False)
@@ -218,10 +223,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         df.reset_index(drop=False, inplace=True)
         unique_pro = df[['prot_id']].drop_duplicates(keep='first')
         # reverting index to code-based index
-        df.set_index('code', inplace=True)
+        df.set_index(idx_name, inplace=True)
         unique_df = df.iloc[unique_pro.index]
         
         if verbose: logging.info(f'{len(unique_df)} unique proteins')
+        if not keep_len: df.drop('seq_len', axis='columns', inplace=True)
         return unique_df
     
     def load(self): 
@@ -574,23 +580,25 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         # merge with binding data to get unique protids that are validated:
         df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
         
-        # ############# Getting protein seq: #############
-        # df_seqs = pd.DataFrame.from_dict(get_sequences(df.index, self.pdb_p))
+        ############# Getting protein seq: #############
+        df_seqs = pd.DataFrame.from_dict(multi_get_sequences(pdb_codes, self.pdb_p), 
+                                        orient='index',
+                                        columns=['prot_seq'])
+        df_seqs.index.name = 'PDBCode'
+
+        # merge pids with sequence to get unique prots by seq length
+        df_unique = self.get_unique_prots(df_pid.merge(df_seqs, on='PDBCode'))
+        
         ############# Getting contact maps: #############
-        # Getting unique proteins to create list of tuples -> [(code, pid)]
-        #TODO: USE get_unique_prots instead so that we are consistent with how we drop!
-        df_unique = df['prot_id'].drop_duplicates() # index col is the PDB code
         os.makedirs(os.path.dirname(self.cmap_p('')), exist_ok=True)
-        seqs = multi_save_cmaps([(code, pid) for code, pid in df_unique.items()],
-                          pdb_p=self.pdb_p,
-                          cmap_p=self.cmap_p,
-                          overwrite=self.overwrite)
+        seqs = multi_save_cmaps(
+                    [(code, pid) for code, pid in df_unique['prot_id'].items()],
+                    pdb_p=self.pdb_p,
+                    cmap_p=self.cmap_p,
+                    overwrite=self.overwrite)
         
         assert len(seqs) == len(df_unique), 'Some codes failed to create contact maps'
-        
-        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
-        df_seq.index.name = 'prot_id'
-        
+                
         ############## Get ligand info #############
         # Extracting SMILE strings:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
@@ -605,13 +613,18 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             pdb_codes = list(df_smi.index)
         
         ############# FINAL MERGES #############
-        df = df.merge(df_smi, on='PDBCode') # + smiles
-        idx = df.index
-        df = df.merge(df_seq, on='prot_id') # + prot_seq
+        ############ prot_id + pkd + prot_seq ###########
+        # prot_id + pkd
+        df = df_pid.merge(df_binding, on="PDBCode")
 
-        # maintaining same index with pdbcodes
-        df.set_index(idx, inplace=True)
+        # + prot_seq
+        idx = df.index
+        df = df.merge(df_unique, on='prot_id', how='left')
+        df.set_index(idx, inplace=True) # to maintain same "PDBCodes" index
         
+        # + SMILES
+        df = df.merge(df_smi, on='PDBCode')
+
         # changing index name to code (to match with super class):
         df.index.name = 'code'
                 
