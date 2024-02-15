@@ -538,7 +538,7 @@ class Ring3Runner():
             for i, line in enumerate(lines):
                 # Removing model tags since they are added in the outer loop
                 if line.strip().split()[0] == 'MODEL' or line.strip() == 'ENDMDL':
-                    logging.debug(f'Removing {i}:{line}')
+                    # logging.debug(f'Removing {i}:{line}')
                     continue
                 # 'END' should always be the last line or second to last
                 if line.strip() == 'END':
@@ -554,7 +554,7 @@ class Ring3Runner():
                     logging.debug(f'Skipping {c}')
                     continue
                 # add MODEL tag
-                logging.debug(f'Adding MODEL {os.path.basename(c).split("model_")[-1].split("_seed")[0]}')
+                # logging.debug(f'Adding MODEL {os.path.basename(c).split("model_")[-1].split("_seed")[0]}')
                 f.write(f'MODEL {i+1}\n')
                 with open(c, 'r') as c_f:
                     lines = c_f.readlines()
@@ -583,7 +583,7 @@ class Ring3Runner():
         # all files must exist
         for f in files.values():
             if not os.path.exists(f):
-                logging.debug(f'Output file not found at {f}')
+                # logging.debug(f'Output file not found at {f}')
                 return None
         return files
     

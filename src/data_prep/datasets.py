@@ -19,7 +19,7 @@ from src.utils import config as cfg
 from src.utils.residue import Chain
 from src.utils.exceptions import DatasetNotFound
 from src.data_prep.feature_extraction.ligand import smile_to_graph
-from src.data_prep.feature_extraction.protein import multi_save_cmaps, target_to_graph
+from src.data_prep.feature_extraction.protein import multi_save_cmaps, target_to_graph, get_sequences
 from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 from src.data_prep.processors import PDBbindProcessor, Processor
 from src.data_prep.downloaders import Downloader
@@ -309,9 +309,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
                                                                     contact_map=pro_cmap,
                                                                     threshold=self.cmap_threshold, 
-                                                                    pro_feat=node_feat,
-                                                                    aln_file=self.aln_p(code), 
-                                                                    # for foldseek feats
+                                                                    pro_feat=node_feat, 
+                                                                    aln_file=self.aln_p(code),
+                                                                    # For foldseek feats
                                                                     pdb_fp=self.pdb_p(code),
                                                                     pddlt_fp=self.pddlt_p(code))
             except Exception as e:
@@ -387,6 +387,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         pro_filtered = len(df) - len(df_new)
         if pro_filtered > 0 and self.verbose:
             logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
+        df = df_new
         
         # Filter out proteins that are missing pdbs for confirmations
         missing_conf = set()
@@ -479,6 +480,11 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
     
+    def af_conf_files(self, pid) -> list[str]:
+        if self.df is not None and pid in self.df.index:
+            pid = self.df.loc[pid]['prot_id']
+        return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
+    
     def pdb_p(self, code):
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
@@ -568,8 +574,11 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         # merge with binding data to get unique protids that are validated:
         df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
         
-        ############# Getting protein seq & contact maps: #############
+        # ############# Getting protein seq: #############
+        # df_seqs = pd.DataFrame.from_dict(get_sequences(df.index, self.pdb_p))
+        ############# Getting contact maps: #############
         # Getting unique proteins to create list of tuples -> [(code, pid)]
+        #TODO: USE get_unique_prots instead so that we are consistent with how we drop!
         df_unique = df['prot_id'].drop_duplicates() # index col is the PDB code
         os.makedirs(os.path.dirname(self.cmap_p('')), exist_ok=True)
         seqs = multi_save_cmaps([(code, pid) for code, pid in df_unique.items()],
