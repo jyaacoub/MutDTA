@@ -5,7 +5,7 @@
 # %% Checking XY.csv and regenerate mismatches
 from src.data_prep.datasets import PDBbindProcessor, BaseDataset
 import pandas as pd
-DATA_ROOT = '/cluster/home/t122995uhn/projects/data/v2020-other-PL/' 
+DATA_ROOT = '/cluster/home/t122995uhn/projects/data/pdbbind/v2020-other-PL/' 
 AF_CONF_DIR = '/cluster/home/t122995uhn/projects/data/pdbbind/PDBbind_afConf/'
 csv_fp = '/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_ring3_original_binary/full/XY.csv'
 df = pd.read_csv(csv_fp, index_col=0)
@@ -83,7 +83,7 @@ from tqdm import tqdm
 msa = lambda c: f'/cluster/projects/kumargroup/msa/output/{c}.msa.a3m'
 
 no_msa = []
-for code in df_mm.index:
+for code in df_m.index:
     if not os.path.exists(msa(code)):
         no_msa.append(code)
 

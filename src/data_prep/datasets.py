@@ -458,7 +458,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
     def __init__(self, save_root=f'{cfg.DATA_ROOT}/PDBbindDataset', 
-                 data_root=f'{cfg.DATA_ROOT}/v2020-other-PL', 
+                 data_root=f'{cfg.DATA_ROOT}/pdbbind/v2020-other-PL', 
                  aln_dir=None,
                  cmap_threshold=8.0, feature_opt='nomsa', *args, **kwargs):
         """
@@ -470,7 +470,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         `save_root` : str, optional
             Path to processed dir, by default '../data/pytorch_PDBbind/'
         `bind_root` : str, optional
-            Path to raw pdbbind files, by default '../data/v2020-other-PL'
+            Path to raw pdbbind files, by default '../data/pdbbind/v2020-other-PL'
         `aln_dir` : str, optional
             Path to sequence alignment directory with files of the name 
             '{code}_cleaned.a3m'. If set to None then no PSSM calculation is 
@@ -495,7 +495,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
     def cmap_p(self, pid):
-        # cmap is saved in seperate directory under /v2020-other-PL/cmaps/
+        # cmap is saved in seperate directory under pdbbind/v2020-other-PL/cmaps/
         # file names are unique protein ids...
         # check to make sure arg is a pid
         if self.df is not None and pid in self.df.index:
