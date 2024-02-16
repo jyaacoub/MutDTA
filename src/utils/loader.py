@@ -155,12 +155,12 @@ class Loader():
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
                     data_root=f'{path}/v2020-other-PL/',
-                    aln_dir=f'{path}/PDBbind_a3m', 
+                    aln_dir=f'{path}/pdbbind/PDBbind_a3m', 
                     cmap_threshold=8.0,
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
-                    af_conf_dir='../colabfold/pdbbind_af2_out/',
+                    af_conf_dir=f'{path}/pdbbind/pdbbind_af2_out/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500
