@@ -437,11 +437,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             logging.info(f'{self.processed_paths[0]} file found, using it to create the dataset')
         else:
             self.df = self.pre_process()
+            logging.info('Created XY.csv file')
         
         # creating clean_XY.csv
         if not file_real(self.processed_paths[3]): 
             self.df = self.clean_XY(self.df)
             self.df.to_csv(self.processed_paths[3])
+            logging.info('Created cleaned_XY.csv file')
             
         
         ###### Get Protein Graphs ######
@@ -549,7 +551,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pd.DataFrame
             The XY.csv dataframe.
         """        
-        ############# Read index files to get binding and protID data #############
+        ############## Read index files to get binding and protID data #############
         # Get prot ids data:
         df_pid = PDBbindProcessor.get_name_data(self.raw_paths[1]) # _name.2020
         df_pid.drop(columns=['release_year','prot_name'], inplace=True)
@@ -563,7 +565,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
         pdb_codes = df_binding.index # pdbcodes
         
-        ############# validating codes #############
+        ############## validating codes #############
         if self.aln_dir is not None: # create msa if 'msaF' is selected
             #NOTE: assuming MSAs are already created, since this would take a long time to do.
             
@@ -580,16 +582,16 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         # merge with binding data to get unique protids that are validated:
         df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
         
-        ############# Getting protein seq: #############
+        ############## Getting protein seq: #############
         df_seqs = pd.DataFrame.from_dict(multi_get_sequences(pdb_codes, self.pdb_p), 
                                         orient='index',
                                         columns=['prot_seq'])
         df_seqs.index.name = 'PDBCode'
-
+        df_seqs_pid = df_pid.merge(df_seqs, on='PDBCode')
         # merge pids with sequence to get unique prots by seq length
-        df_unique = self.get_unique_prots(df_pid.merge(df_seqs, on='PDBCode'))
+        df_unique = self.get_unique_prots(df_seqs_pid)
         
-        ############# Getting contact maps: #############
+        ############## Getting contact maps: #############
         os.makedirs(os.path.dirname(self.cmap_p('')), exist_ok=True)
         seqs = multi_save_cmaps(
                     [(code, pid) for code, pid in df_unique['prot_id'].items()],
@@ -612,16 +614,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             print(f'\t{num_missing} ligands failed to get SMILEs')
             pdb_codes = list(df_smi.index)
         
-        ############# FINAL MERGES #############
-        ############ prot_id + pkd + prot_seq ###########
-        # prot_id + pkd
-        df = df_pid.merge(df_binding, on="PDBCode")
-
-        # + prot_seq
-        idx = df.index
-        df = df.merge(df_unique, on='prot_id', how='left')
-        df.set_index(idx, inplace=True) # to maintain same "PDBCodes" index
-        
+        ############## FINAL MERGES #############
+        # pkd + seq + pi
+        df = df_binding.merge(df_seqs_pid, on="PDBCode")        
         # + SMILES
         df = df.merge(df_smi, on='PDBCode')
 
