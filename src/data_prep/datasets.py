@@ -104,7 +104,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         assert feature_opt in self.FEATURE_OPTIONS, \
             f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
             
-        self.feature_opt = feature_opt
+        self.pro_feat_opt = feature_opt
         self.aln_dir = None # none treats it as np.zeros
         if feature_opt in ['msa', 'shannon']:
             self.aln_dir =  aln_dir # path to sequence alignments
@@ -125,7 +125,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         # Validating subset
         subset = subset or 'full'
-        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.pro_edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
+        save_root = os.path.join(save_root, f'{self.pro_feat_opt}_{self.pro_edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
         if self.verbose: print('save_root:', save_root)
         
         if subset != 'full':
@@ -445,7 +445,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         
         ###### Get Protein Graphs ######
-        processed_prots = self._create_protein_graphs(self.df, self.feature_opt, self.pro_edge_opt)
+        processed_prots = self._create_protein_graphs(self.df, self.pro_feat_opt, self.pro_edge_opt)
         
         ###### Get Ligand Graphs ######
         processed_ligs = self._create_ligand_graphs(self.df, self.ligand_feature, self.ligand_edge)
@@ -675,7 +675,7 @@ class DavisKibaDataset(BaseDataset):
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
         if (self.pro_edge_opt not in cfg.STRUCT_EDGE_OPT) and \
-            (self.feature_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
+            (self.pro_feat_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -812,8 +812,8 @@ class DavisKibaDataset(BaseDataset):
         
         # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.feature_opt in cfg.STRUCT_PRO_FEAT_OPT:
-            if self.feature_opt == 'foldseek':
+        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.pro_feat_opt in cfg.STRUCT_PRO_FEAT_OPT:
+            if self.pro_feat_opt == 'foldseek':
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:
