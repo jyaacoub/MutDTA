@@ -160,7 +160,7 @@ class Loader():
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
-                    af_conf_dir=f'{path}/pdbbind/pdbbind_af2_out/',
+                    af_conf_dir=f'{path}/pdbbind/pdbbind_af2_out/all_ln/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500

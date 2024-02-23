@@ -75,7 +75,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     aln_dir=f'{data_root}/pdbbind/PDBbind_aln/',
                     cmap_threshold=8.0,
                     overwrite=overwrite, # overwrite old cmap.npy files
-                    af_conf_dir=f'{data_root}/pdbbind/PDBbind_afConf/',
+                    af_conf_dir=f'{data_root}/pdbbind/pdbbind_af2_out/all_ln/',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
