@@ -16,7 +16,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.utils import config as cfg
-from src.utils.residue import Chain
+from src.utils.residue import Chain, Ring3Runner
 from src.utils.exceptions import DatasetNotFound
 from src.data_prep.feature_extraction.ligand import smile_to_graph
 from src.data_prep.feature_extraction.protein import (multi_save_cmaps, 
@@ -303,6 +303,12 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         processed_prots = {}
         unique_df = self.get_unique_prots(df)
         
+        # Multiprocessed ring3 creation if chosen
+        if edge == cfg.PRO_EDGE_OPT.ring3:
+            logging.info('Getting confs list for ring3.')
+            confs = [self.af_conf_files(code) for code in unique_df.index]
+            Ring3Runner.run_multiprocess(pdb_fps=confs)
+        
         for code, (prot_id, pro_seq) in tqdm(
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
@@ -431,11 +437,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if file_real(self.processed_paths[3]): # cleaned_XY found
             self.df = pd.read_csv(self.processed_paths[3], index_col=0)
             logging.info(f'{self.processed_paths[3]} file found, using it to create the dataset')
-            
         elif file_real(self.processed_paths[0]): # raw XY found
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             logging.info(f'{self.processed_paths[0]} file found, using it to create the dataset')
         else:
+            logging.info('Creating dataset from scratch!')
             self.df = self.pre_process()
             logging.info('Created XY.csv file')
         
@@ -535,7 +541,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         """
         return ['index/INDEX_general_PL_data.2020', 
                 'index/INDEX_general_PL_name.2020']
-        
+
     def pre_process(self):
         """
         This method is used to create the processed data files for feature extraction.
@@ -550,7 +556,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         -------
         pd.DataFrame
             The XY.csv dataframe.
-        """        
+        """
+        
         ############## Read index files to get binding and protID data #############
         # Get prot ids data:
         df_pid = PDBbindProcessor.get_name_data(self.raw_paths[1]) # _name.2020

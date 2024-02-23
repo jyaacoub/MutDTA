@@ -451,10 +451,8 @@ class Chain:
 
 import pandas as pd
 from src import config as cfg
-import os, subprocess
-import logging
-import shutil 
-
+import os, subprocess, shutil, multiprocessing, logging
+from tqdm import tqdm
 
 class Ring3Runner():
     """
@@ -677,6 +675,40 @@ class Ring3Runner():
             raise FileNotFoundError(f'RING3 failed to generate outputs to {out_dir} for {pdb_name}.')
         
         return pdb_fp, outputs
+    
+    @staticmethod
+    def _run_ring3_process(pdb_fp:str|list[str], out_dir:str, verbose:bool, overwrite:bool):
+        try:
+            return Ring3Runner.run(pdb_fp, out_dir, verbose, overwrite)
+        except Exception as e:
+            logging.error(e)
+            return (pdb_fp, str(e))
+
+    @staticmethod
+    def run_multiprocess(pdb_fps:list[str]|list[list[str]], out_dir:str=None, verbose:bool=False, overwrite:bool=False):
+        """
+        Runs RING3 on multiple PDB files using multiprocessing.
+        
+        Args:
+            pdb_fps (list[str] | list[list[str]]): List of input pdb file paths.
+            out_dir (str, optional): Output directory to save the results, defaults to the input directory.
+            chain_id (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
+            verbose (bool, optional): Whether to display verbose output. Defaults to False.
+            overwrite (bool, optional): Whether to overwrite existing output files. Defaults to False.
+            
+        Returns:
+            results list[tuple[str]]: list of (PDB file paths, output file paths)
+        """
+        pool = multiprocessing.Pool()
+        results = []
+        caller = lambda args: Ring3Runner._run_ring3_process(*args)
+        args = [(pdb_fp, out_dir, verbose, overwrite) for pdb_fp in pdb_fps]
+        
+        with multiprocessing.Pool() as pool:
+            results = list(tqdm(pool.imap(caller, args),
+                           total=len(args),
+                           desc="Running multiproc. RING3"))
+        return results
     
     @staticmethod
     def build_cmap(output_gfreq_fp:str, res_len:int, self_loop=True) -> np.ndarray:
