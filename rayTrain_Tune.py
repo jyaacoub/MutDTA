@@ -78,10 +78,10 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": "SPD",
-        "dataset": "davis",
-        "feature_opt": "foldseek", # NOTE: SPD requires foldseek features!!!
-        "edge_opt": "binary",
+        "model": "RNG",
+        "dataset": "PDBbind",
+        "feature_opt": "nomsa", # NOTE: SPD requires foldseek features!!!
+        "edge_opt": "ring3",
         "fold_selection": 0,
         "save_checkpoint": False,
                 
