@@ -1,11 +1,23 @@
 # - [ ] See issue with af_confs mismatched (likely [when we renamed the af_confs](https://github.com/jyaacoub/MutDTA/issues/80#issuecomment-1944250594) we accidently overwrote previous pids)
 # 	- To solve this we need to regenerate the proper af_confs..
 # 	- [ ] Check which are mis matched from the XY.csv and re generate those as well as any missing af_confs
-# # %%
-# from src.utils.residue import Ring3Runner
+# %%
+from src.utils.loader import Loader
+from src import config as cfg
 
-# Ring3Runner.run_multiprocess(pdb_fps=[['test']])
+loaders = Loader.load_DataLoaders(cfg.DATA_OPT.PDBbind, 
+                                  cfg.PRO_FEAT_OPT.nomsa,
+                                  cfg.PRO_EDGE_OPT.ring3,
+                                  training_fold=0,
+                                  ligand_feature=cfg.LIG_FEAT_OPT.original,
+                                  ligand_edge=cfg.LIG_EDGE_OPT.binary)
 
+for b in loaders['train']: break
+#%%
+from src.models.ring_mod import Ring3DTA
+m = Ring3DTA(num_features_pro=54)
+
+out = m(b['protein'], b['ligand'])
 
 # %%
 from src.data_prep.init_dataset import create_datasets
@@ -17,6 +29,7 @@ create_datasets(
     [cfg.DATA_OPT.PDBbind],
     [cfg.PRO_FEAT_OPT.nomsa],
     [cfg.PRO_EDGE_OPT.ring3],
+    k_folds=5,
     overwrite=True
 )
 
