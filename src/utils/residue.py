@@ -677,7 +677,8 @@ class Ring3Runner():
         return pdb_fp, outputs
     
     @staticmethod
-    def _run_ring3_process(pdb_fp:str|list[str], out_dir:str, verbose:bool, overwrite:bool):
+    def _run_proc(args):
+        pdb_fp, out_dir, verbose, overwrite = args
         try:
             return Ring3Runner.run(pdb_fp, out_dir, verbose, overwrite)
         except Exception as e:
@@ -699,15 +700,12 @@ class Ring3Runner():
         Returns:
             results list[tuple[str]]: list of (PDB file paths, output file paths)
         """
-        pool = multiprocessing.Pool()
-        results = []
-        caller = lambda args: Ring3Runner._run_ring3_process(*args)
         args = [(pdb_fp, out_dir, verbose, overwrite) for pdb_fp in pdb_fps]
         
         with multiprocessing.Pool() as pool:
-            results = list(tqdm(pool.imap(caller, args),
-                           total=len(args),
-                           desc="Running multiproc. RING3"))
+            results = list(tqdm(pool.imap(Ring3Runner._run_proc, args),
+                                total=len(args),
+                                desc="Running multiproc. RING3"))
         return results
     
     @staticmethod

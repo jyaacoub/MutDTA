@@ -6,7 +6,7 @@ from prody import calcANM
 from src.utils.residue import Chain, Ring3Runner
 
 
-def get_target_edge(target_sequence:str, contact_map:str or np.array,
+def get_target_edge(target_sequence:str, contact_map:str|np.ndarray,
                           threshold=10.5) -> Tuple[np.array]:
     """
     Returns edge index for target sequence given a contact map.
@@ -26,11 +26,10 @@ def get_target_edge(target_sequence:str, contact_map:str or np.array,
         edge index, edge weight for target sequence
     """
     # loading up contact map if it is a file path
-    if type(contact_map) == str: contact_map = np.load(contact_map)
+    if type(contact_map) is str: contact_map = np.load(contact_map)
     
     target_size = len(target_sequence)
     assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
-    # its ok if it is smaller, but not larger (due to missing residues in pdb)
     assert contact_map.shape[0] == target_size, \
             f'contact map size does not match target sequence size,'+\
             f'{contact_map.shape[0]} != {target_size}'

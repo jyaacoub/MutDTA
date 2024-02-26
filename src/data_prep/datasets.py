@@ -96,7 +96,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
         self.overwrite = overwrite
-        max_seq_len = max_seq_len or 100000
+        max_seq_len = max_seq_len or 2400
         assert max_seq_len >= 100, 'max_seq_len cant be smaller than 100.'
         self.max_seq_len = max_seq_len
         
@@ -210,24 +210,28 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return Counter(self.df['prot_id'])
     
     @staticmethod
-    def get_unique_prots(df, verbose=True, keep_len=False) -> pd.DataFrame:
+    def get_unique_prots(df, keep_len=False) -> pd.DataFrame:
         """Gets the unique proteins from a dataframe by their protein id"""
-        # get index name for later
+        # sorting by sequence length to keep the longest protein sequence instead of just the first.
+        if 'sort_order' in df:
+            # ensures that the right codes are always present in unique_pro
+            df.sort_values(by='sort_order', inplace=True)
+        else:
+            df['seq_len'] = df['prot_seq'].str.len()
+            df.sort_values(by='seq_len', ascending=False, inplace=True)
+            df['sort_order'] = [i for i in range(len(df))]
+        
+        # Get unique protid codes
         idx_name = df.index.name
-        
-        # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
-        df['seq_len'] = df['prot_seq'].str.len()
-        df = df.sort_values(by='seq_len', ascending=False)
-        
-        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
         df.reset_index(drop=False, inplace=True)
         unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+        
         # reverting index to code-based index
         df.set_index(idx_name, inplace=True)
         unique_df = df.iloc[unique_pro.index]
         
-        if verbose: logging.info(f'{len(unique_df)} unique proteins')
-        if not keep_len: df.drop('seq_len', axis='columns', inplace=True)
+        logging.info(f'{len(unique_df)} unique proteins')
+        if not keep_len and 'seq_len' in df: df.drop('seq_len', axis='columns', inplace=True)
         return unique_df
     
     def load(self): 
@@ -299,6 +303,56 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.subset = subset_name
         self.load()
         
+    def clean_XY(self, df:pd.DataFrame, max_seq_len=None):
+        max_seq_len = self.max_seq_len
+        
+        # Filter proteins greater than max length
+        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
+        pro_filtered = len(df) - len(df_new)
+        if pro_filtered > 0 and self.verbose:
+            logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
+        df = df_new
+        
+        df_unique = self.get_unique_prots(df)
+        # merge sequences so that they are all the same for all matching prot_id
+        df = df.drop('prot_seq', axis=1)
+        idx_name = df.index.name
+        df.reset_index(drop=False, inplace=True)
+        df = df.merge(df_unique[['prot_id', 'prot_seq']], 
+                      on='prot_id')
+        df.set_index(idx_name, inplace=True)
+        
+        # Filter out proteins that are missing pdbs for confirmations
+        missing_conf = set()
+        if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
+            files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
+            
+            for code, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
+                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
+                    total=len(df_unique)):
+                
+                af_confs = [os.path.join(self.af_conf_dir, f) for f in files \
+                                            if f.startswith(pid)]
+                
+                # need at least 2 confimations...
+                if len(af_confs) <= 1:
+                    missing_conf.add(pid)
+                    continue
+                
+                af_seq = Chain(af_confs[0]).sequence
+                if seq != af_seq:
+                    logging.debug(f'Mismatched sequence for {pid}')
+                    missing_conf.add(pid)
+                    continue
+        
+        if len(missing_conf) > 0:
+            filtered_df = df[~df.prot_id.isin(missing_conf)]
+            logging.warning(f'{len(missing_conf)} mismatched or missing pids')
+            
+        logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
+        
+        return filtered_df
+    
     def _create_protein_graphs(self, df, node_feat, edge):
         processed_prots = {}
         unique_df = self.get_unique_prots(df)
@@ -306,7 +360,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         # Multiprocessed ring3 creation if chosen
         if edge == cfg.PRO_EDGE_OPT.ring3:
             logging.info('Getting confs list for ring3.')
-            confs = [self.af_conf_files(code) for code in unique_df.index]
+            files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
+            confs = [[os.path.join(self.af_conf_dir, f) for f in files if f.startswith(pid)] for pid in unique_df.prot_id]
             Ring3Runner.run_multiprocess(pdb_fps=confs)
         
         for code, (prot_id, pro_seq) in tqdm(
@@ -316,7 +371,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
-                pro_cmap = np.load(self.cmap_p(code))
+                pro_cmap = np.load(self.cmap_p(prot_id))
                 # updated_seq is for updated foldseek 3di combined seq
                 updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
                                                                     contact_map=pro_cmap,
@@ -391,33 +446,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             logging.warning(f'{len(errors)} ligands failed to create graphs')
         return processed_ligs
         
-    def clean_XY(self, df, max_seq_len=None):
-        max_seq_len = self.max_seq_len
-        
-        # Filter proteins greater than max length
-        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
-        pro_filtered = len(df) - len(df_new)
-        if pro_filtered > 0 and self.verbose:
-            logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
-        df = df_new
-        
-        # Filter out proteins that are missing pdbs for confirmations
-        missing_conf = set()
-        if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
-            unique_df = self.get_unique_prots(df)
-            for code in tqdm(unique_df.index,
-                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
-                    total=len(unique_df)):
-                af_confs = self.af_conf_files(code)
-                # need at least 2 confimations...
-                if len(af_confs) <= 1:
-                    missing_conf.add(code)
-        
-        filtered_df = df[~df.index.isin(missing_conf)]    
-        logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')     
-        
-        return filtered_df   
-               
     def process(self):
         """
         This method is used to create the processed data files after feature extraction.
@@ -585,9 +613,20 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             
         pdb_codes = valid_codes
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
+                
+        ############## Get ligand info #############
+        # WARNING: ORDER MATTERS SINCE LIGAND INFO REDUCED NUMBER OF PDBS DUE TO MISSING SMI...
+        # Extracting SMILE strings:
+        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
+                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
+        df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
+        df_smi.index.name = 'PDBCode'
         
-        # merge with binding data to get unique protids that are validated:
-        df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
+        df_smi = df_smi[df_smi.SMILE.notna()]
+        num_missing = len(pdb_codes) - len(df_smi)
+        if  num_missing > 0:
+            print(f'\t{num_missing} ligands failed to get SMILEs')
+            pdb_codes = list(df_smi.index)
         
         ############## Getting protein seq: #############
         df_seqs = pd.DataFrame.from_dict(multi_get_sequences(pdb_codes, self.pdb_p), 
@@ -607,19 +646,6 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                     overwrite=self.overwrite)
         
         assert len(seqs) == len(df_unique), 'Some codes failed to create contact maps'
-                
-        ############## Get ligand info #############
-        # Extracting SMILE strings:
-        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
-                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
-        df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
-        df_smi.index.name = 'PDBCode'
-        
-        df_smi = df_smi[df_smi.SMILE.notna()]
-        num_missing = len(pdb_codes) - len(df_smi)
-        if  num_missing > 0:
-            print(f'\t{num_missing} ligands failed to get SMILEs')
-            pdb_codes = list(df_smi.index)
         
         ############## FINAL MERGES #############
         # pkd + seq + pi
