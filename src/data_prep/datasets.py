@@ -16,10 +16,12 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.utils import config as cfg
-from src.utils.residue import Chain
+from src.utils.residue import Chain, Ring3Runner
 from src.utils.exceptions import DatasetNotFound
 from src.data_prep.feature_extraction.ligand import smile_to_graph
-from src.data_prep.feature_extraction.protein import multi_save_cmaps, target_to_graph
+from src.data_prep.feature_extraction.protein import (multi_save_cmaps, 
+                                                      multi_get_sequences, 
+                                                      target_to_graph,)
 from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 from src.data_prep.processors import PDBbindProcessor, Processor
 from src.data_prep.downloaders import Downloader
@@ -94,7 +96,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.data_root = data_root
         self.cmap_threshold = cmap_threshold
         self.overwrite = overwrite
-        max_seq_len = max_seq_len or 100000
+        max_seq_len = max_seq_len or 2400
         assert max_seq_len >= 100, 'max_seq_len cant be smaller than 100.'
         self.max_seq_len = max_seq_len
         
@@ -102,7 +104,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         assert feature_opt in self.FEATURE_OPTIONS, \
             f"Invalid feature_opt '{feature_opt}', choose from {self.FEATURE_OPTIONS}"
             
-        self.feature_opt = feature_opt
+        self.pro_feat_opt = feature_opt
         self.aln_dir = None # none treats it as np.zeros
         if feature_opt in ['msa', 'shannon']:
             self.aln_dir =  aln_dir # path to sequence alignments
@@ -123,7 +125,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         # Validating subset
         subset = subset or 'full'
-        save_root = os.path.join(save_root, f'{self.feature_opt}_{self.pro_edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
+        save_root = os.path.join(save_root, f'{self.pro_feat_opt}_{self.pro_edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
         if self.verbose: print('save_root:', save_root)
         
         if subset != 'full':
@@ -139,6 +141,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.af_conf_dir = af_conf_dir
         
         self.only_download = only_download
+        self.df = None # dataframe for csv of raw strings for SMILE protein sequence and affinity
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
@@ -205,22 +208,30 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def get_protein_counts(self) -> Counter:
         """returns dict of protein counts from `collections.Counter` object"""
         return Counter(self.df['prot_id'])
-        
+    
     @staticmethod
-    def get_unique_prots(df, verbose=True) -> pd.DataFrame:
+    def get_unique_prots(df, keep_len=False) -> pd.DataFrame:
         """Gets the unique proteins from a dataframe by their protein id"""
-        # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
-        df['seq_len'] = df['prot_seq'].str.len()
-        df = df.sort_values(by='seq_len', ascending=False)
+        # sorting by sequence length to keep the longest protein sequence instead of just the first.
+        if 'sort_order' in df:
+            # ensures that the right codes are always present in unique_pro
+            df.sort_values(by='sort_order', inplace=True)
+        else:
+            df['seq_len'] = df['prot_seq'].str.len()
+            df.sort_values(by='seq_len', ascending=False, inplace=True)
+            df['sort_order'] = [i for i in range(len(df))]
         
-        # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+        # Get unique protid codes
+        idx_name = df.index.name
         df.reset_index(drop=False, inplace=True)
         unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+        
         # reverting index to code-based index
-        df.set_index('code', inplace=True)
+        df.set_index(idx_name, inplace=True)
         unique_df = df.iloc[unique_pro.index]
         
-        if verbose: logging.info(len(unique_df), 'unique proteins')
+        logging.info(f'{len(unique_df)} unique proteins')
+        if not keep_len and 'seq_len' in df: df.drop('seq_len', axis='columns', inplace=True)
         return unique_df
     
     def load(self): 
@@ -261,7 +272,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         # saving to new dir
         path = os.path.join(self.root, subset_name)
         os.makedirs(path, exist_ok=True)
-        sub_df.to_csv(os.path.join(path, self.processed_file_names[0]))
+        sub_df.to_csv(os.path.join(path, self.processed_file_names[0])) # redundant save since it is not used and mainly just for tracking prots.
+        sub_df.to_csv(os.path.join(path, self.processed_file_names[3]))
         torch.save(sub_prots, os.path.join(path, self.processed_file_names[1]))
         torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
         return path
@@ -292,9 +304,66 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.subset = subset_name
         self.load()
         
+    def clean_XY(self, df:pd.DataFrame, max_seq_len=None):
+        max_seq_len = self.max_seq_len
+        
+        # Filter proteins greater than max length
+        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
+        pro_filtered = len(df) - len(df_new)
+        if pro_filtered > 0 and self.verbose:
+            logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
+        df = df_new
+        
+        df_unique = self.get_unique_prots(df)
+        # merge sequences so that they are all the same for all matching prot_id
+        df = df.drop('prot_seq', axis=1)
+        idx_name = df.index.name
+        df.reset_index(drop=False, inplace=True)
+        df = df.merge(df_unique[['prot_id', 'prot_seq']], 
+                      on='prot_id')
+        df.set_index(idx_name, inplace=True)
+        
+        # Filter out proteins that are missing pdbs for confirmations
+        missing_conf = set()
+        if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
+            files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
+            
+            for code, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
+                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
+                    total=len(df_unique)):
+                
+                af_confs = [os.path.join(self.af_conf_dir, f) for f in files \
+                                            if f.startswith(pid)]
+                
+                # need at least 2 confimations...
+                if len(af_confs) <= 1:
+                    missing_conf.add(pid)
+                    continue
+                
+                af_seq = Chain(af_confs[0]).sequence
+                if seq != af_seq:
+                    logging.debug(f'Mismatched sequence for {pid}')
+                    missing_conf.add(pid)
+                    continue
+        
+        if len(missing_conf) > 0:
+            filtered_df = df[~df.prot_id.isin(missing_conf)]
+            logging.warning(f'{len(missing_conf)} mismatched or missing pids')
+            
+        logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
+        
+        return filtered_df
+    
     def _create_protein_graphs(self, df, node_feat, edge):
         processed_prots = {}
         unique_df = self.get_unique_prots(df)
+        
+        # Multiprocessed ring3 creation if chosen
+        if edge == cfg.PRO_EDGE_OPT.ring3:
+            logging.info('Getting confs list for ring3.')
+            files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
+            confs = [[os.path.join(self.af_conf_dir, f) for f in files if f.startswith(pid)] for pid in unique_df.prot_id]
+            Ring3Runner.run_multiprocess(pdb_fps=confs)
         
         for code, (prot_id, pro_seq) in tqdm(
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
@@ -303,14 +372,14 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
-                pro_cmap = np.load(self.cmap_p(code))
+                pro_cmap = np.load(self.cmap_p(prot_id))
                 # updated_seq is for updated foldseek 3di combined seq
                 updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
                                                                     contact_map=pro_cmap,
                                                                     threshold=self.cmap_threshold, 
-                                                                    pro_feat=node_feat,
-                                                                    aln_file=self.aln_p(code), 
-                                                                    # for foldseek feats
+                                                                    pro_feat=node_feat, 
+                                                                    aln_file=self.aln_p(code),
+                                                                    # For foldseek feats
                                                                     pdb_fp=self.pdb_p(code),
                                                                     pddlt_fp=self.pddlt_p(code))
             except Exception as e:
@@ -378,32 +447,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             logging.warning(f'{len(errors)} ligands failed to create graphs')
         return processed_ligs
         
-    def clean_XY(self, df, max_seq_len=None):
-        max_seq_len = self.max_seq_len
-        
-        # Filter proteins greater than max length
-        df_new = df[df['prot_seq'].str.len() <= max_seq_len]
-        pro_filtered = len(df) - len(df_new)
-        if pro_filtered > 0 and self.verbose:
-            logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
-        
-        # Filter out proteins that are missing pdbs for confirmations
-        missing_conf = set()
-        if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
-            unique_df = self.get_unique_prots(df)
-            for code in tqdm(unique_df.index,
-                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
-                    total=len(unique_df)):
-                af_confs = self.af_conf_files(code)
-                # need at least 2 confimations...
-                if len(af_confs) <= 1:
-                    missing_conf.add(code)
-        
-        filtered_df = df[~df.index.isin(missing_conf)]    
-        logging.debug(f'Number of codes: {filtered_df}/{len(df)}')     
-        
-        return filtered_df   
-               
     def process(self):
         """
         This method is used to create the processed data files after feature extraction.
@@ -423,21 +466,23 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if file_real(self.processed_paths[3]): # cleaned_XY found
             self.df = pd.read_csv(self.processed_paths[3], index_col=0)
             logging.info(f'{self.processed_paths[3]} file found, using it to create the dataset')
-            
         elif file_real(self.processed_paths[0]): # raw XY found
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             logging.info(f'{self.processed_paths[0]} file found, using it to create the dataset')
         else:
+            logging.info('Creating dataset from scratch!')
             self.df = self.pre_process()
+            logging.info('Created XY.csv file')
         
         # creating clean_XY.csv
         if not file_real(self.processed_paths[3]): 
             self.df = self.clean_XY(self.df)
             self.df.to_csv(self.processed_paths[3])
+            logging.info('Created cleaned_XY.csv file')
             
         
         ###### Get Protein Graphs ######
-        processed_prots = self._create_protein_graphs(self.df, self.feature_opt, self.pro_edge_opt)
+        processed_prots = self._create_protein_graphs(self.df, self.pro_feat_opt, self.pro_edge_opt)
         
         ###### Get Ligand Graphs ######
         processed_ligs = self._create_ligand_graphs(self.df, self.ligand_feature, self.ligand_edge)
@@ -450,7 +495,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
 
 class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is small and can fit in CPU memory
     def __init__(self, save_root=f'{cfg.DATA_ROOT}/PDBbindDataset', 
-                 data_root=f'{cfg.DATA_ROOT}/v2020-other-PL', 
+                 data_root=f'{cfg.DATA_ROOT}/pdbbind/v2020-other-PL', 
                  aln_dir=None,
                  cmap_threshold=8.0, feature_opt='nomsa', *args, **kwargs):
         """
@@ -462,7 +507,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         `save_root` : str, optional
             Path to processed dir, by default '../data/pytorch_PDBbind/'
         `bind_root` : str, optional
-            Path to raw pdbbind files, by default '../data/v2020-other-PL'
+            Path to raw pdbbind files, by default '../data/pdbbind/v2020-other-PL'
         `aln_dir` : str, optional
             Path to sequence alignment directory with files of the name 
             '{code}_cleaned.a3m'. If set to None then no PSSM calculation is 
@@ -478,13 +523,21 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
     
+    def af_conf_files(self, pid) -> list[str]:
+        if self.df is not None and pid in self.df.index:
+            pid = self.df.loc[pid]['prot_id']
+        return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
+    
     def pdb_p(self, code):
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
-    def cmap_p(self, code):
-        # cmap is saved in seperate directory under /v2020-other-PL/cmaps/
+    def cmap_p(self, pid):
+        # cmap is saved in seperate directory under pdbbind/v2020-other-PL/cmaps/
         # file names are unique protein ids...
-        return os.path.join(self.data_root, 'cmaps', f'{code}.npy')
+        # check to make sure arg is a pid
+        if self.df is not None and pid in self.df.index:
+            pid = self.df.loc[pid]['prot_id']
+        return os.path.join(self.data_root, 'cmaps', f'{pid}.npy')
     
     def aln_p(self, code):
         # see feature_extraction/process_msa.py for details on how the alignments are cleaned
@@ -517,7 +570,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         """
         return ['index/INDEX_general_PL_data.2020', 
                 'index/INDEX_general_PL_name.2020']
-        
+
     def pre_process(self):
         """
         This method is used to create the processed data files for feature extraction.
@@ -533,7 +586,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pd.DataFrame
             The XY.csv dataframe.
         """
-        ############# Read index files to get binding and protID data #############
+        
+        ############## Read index files to get binding and protID data #############
         # Get prot ids data:
         df_pid = PDBbindProcessor.get_name_data(self.raw_paths[1]) # _name.2020
         df_pid.drop(columns=['release_year','prot_name'], inplace=True)
@@ -547,7 +601,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
         pdb_codes = df_binding.index # pdbcodes
         
-        ############# validating codes #############
+        ############## validating codes #############
         if self.aln_dir is not None: # create msa if 'msaF' is selected
             #NOTE: assuming MSAs are already created, since this would take a long time to do.
             
@@ -560,25 +614,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             
         pdb_codes = valid_codes
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
-        
-        # merge with binding data to get unique protids that are validated:
-        df = df_pid.merge(df_binding, on='PDBCode') # pids + binding
-        
-        ############# Getting protein seq & contact maps: #############
-        # Getting unique proteins to create list of tuples -> [(code, pid)]
-        df_unique = df['prot_id'].drop_duplicates() # index col is the PDB code
-        os.makedirs(os.path.dirname(self.cmap_p('')), exist_ok=True)
-        seqs = multi_save_cmaps([(code, pid) for code, pid in df_unique.items()],
-                          pdb_p=self.pdb_p,
-                          cmap_p=self.cmap_p,
-                          overwrite=self.overwrite)
-        
-        assert len(seqs) == len(df_unique), 'Some codes failed to create contact maps'
-        
-        df_seq = pd.DataFrame.from_dict(seqs, orient='index', columns=['prot_seq'])
-        df_seq.index.name = 'prot_id'
-        
+                
         ############## Get ligand info #############
+        # WARNING: ORDER MATTERS SINCE LIGAND INFO REDUCED NUMBER OF PDBS DUE TO MISSING SMI...
         # Extracting SMILE strings:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
                                               dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
@@ -591,10 +629,31 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             print(f'\t{num_missing} ligands failed to get SMILEs')
             pdb_codes = list(df_smi.index)
         
-        ############# FINAL MERGES #############
-        df = df.merge(df_smi, on='PDBCode') # + smiles
-        df = df.merge(df_seq, on='prot_id') # + prot_seq
+        ############## Getting protein seq: #############
+        df_seqs = pd.DataFrame.from_dict(multi_get_sequences(pdb_codes, self.pdb_p), 
+                                        orient='index',
+                                        columns=['prot_seq'])
+        df_seqs.index.name = 'PDBCode'
+        df_seqs_pid = df_pid.merge(df_seqs, on='PDBCode')
+        # merge pids with sequence to get unique prots by seq length
+        df_unique = self.get_unique_prots(df_seqs_pid)
         
+        ############## Getting contact maps: #############
+        os.makedirs(os.path.dirname(self.cmap_p('')), exist_ok=True)
+        seqs = multi_save_cmaps(
+                    [(code, pid) for code, pid in df_unique['prot_id'].items()],
+                    pdb_p=self.pdb_p,
+                    cmap_p=self.cmap_p,
+                    overwrite=self.overwrite)
+        
+        assert len(seqs) == len(df_unique), 'Some codes failed to create contact maps'
+        
+        ############## FINAL MERGES #############
+        # pkd + seq + pi
+        df = df_binding.merge(df_seqs_pid, on="PDBCode")        
+        # + SMILES
+        df = df.merge(df_smi, on='PDBCode')
+
         # changing index name to code (to match with super class):
         df.index.name = 'code'
                 
@@ -645,7 +704,7 @@ class DavisKibaDataset(BaseDataset):
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
         if (self.pro_edge_opt not in cfg.STRUCT_EDGE_OPT) and \
-            (self.feature_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
+            (self.pro_feat_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -782,8 +841,8 @@ class DavisKibaDataset(BaseDataset):
         
         # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.feature_opt in cfg.STRUCT_PRO_FEAT_OPT:
-            if self.feature_opt == 'foldseek':
+        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.pro_feat_opt in cfg.STRUCT_PRO_FEAT_OPT:
+            if self.pro_feat_opt == 'foldseek':
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:

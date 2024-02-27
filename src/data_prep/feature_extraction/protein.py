@@ -7,15 +7,16 @@ import os, math
 import pandas as pd
 from src.utils import config as cfg
 from src.utils.residue import ResInfo, Chain
-from src.data_prep.feature_extraction.protein_nodes import get_pfm, target_to_feature, get_foldseek_onehot, run_foldseek
+from src.data_prep.feature_extraction.protein_nodes import (get_pfm, target_to_feature, 
+                                                            get_foldseek_onehot, run_foldseek)
 from src.data_prep.feature_extraction.protein_edges import get_target_edge
 
 ########################################################################
 ###################### Protein Feature Extraction ######################
 ########################################################################
-def target_to_graph(target_sequence:str, contact_map:str or np.array, 
+def target_to_graph(target_sequence:str, contact_map:str|np.ndarray, 
                     threshold=10.5, pro_feat='nomsa', aln_file:str=None,
-                    pdb_fp:str=None, pddlt_fp:str=None) -> tuple[np.array,np.array]:
+                    pdb_fp:str=None, pddlt_fp:str=None) -> tuple[np.ndarray, np.ndarray]:
     """
     Feature extraction for protein sequence using contact map to generate
     edge index and node features.
@@ -149,20 +150,20 @@ def create_save_cmaps(pdbcodes: Iterable[str]|Iterable[tuple[str]],
     return seqs
 
 def _save_cmap(args):
-    pdb_f, cmap_f, overwrite = args
+    code, pdb_f, cmap_f, overwrite = args
     try:
         chain = Chain(pdb_f)
         seq = chain.getSequence()
     except KeyError as e:
         raise KeyError(f'Error with {pdb_f}') from e
     
-    if os.path.isfile(cmap_f) or overwrite:
-        return seq
+    if os.path.isfile(cmap_f) and not overwrite:
+        return code, seq
         
     # only get cmap if it doesnt exist
     cmap = chain.get_contact_map()
     np.save(cmap_f, cmap)
-    return seq
+    return code, seq
     
 def multi_save_cmaps(pdbcodes: Iterable[str]|Iterable[tuple[str]], 
                       pdb_p: Callable[[str], str],
@@ -173,21 +174,45 @@ def multi_save_cmaps(pdbcodes: Iterable[str]|Iterable[tuple[str]],
     
     # pdb_f, cmap_f, overwrite
     if isinstance(pdbcodes[0], str):
-        args = [[pdb_p(code), cmap_p(code), overwrite] for code in pdbcodes]
+        args = [[code, pdb_p(code), cmap_p(code), overwrite] for code in pdbcodes]
     else:
-        args = [[pdb_p(code), cmap_p(pid), overwrite] for code, pid in pdbcodes]
+        args = [[pid, pdb_p(code), cmap_p(pid), overwrite] for code, pid in pdbcodes]
     
     with Pool(processes=processes) as pool:
-        seqs = list(tqdm(pool.imap(_save_cmap, args),
+        code_seqs = list(tqdm(pool.imap(_save_cmap, args),
                   total=len(args),
                   desc='Creating and saving cmaps'))
     
     # order is maintained (see https://stackoverflow.com/questions/41273960/python-3-does-pool-keep-the-original-order-of-data-passed-to-map)
-    if isinstance(pdbcodes[0], str):
-        return {code: seq for code, seq in zip(pdbcodes, seqs)}
-    return {pid: seq for (_, pid), seq in zip(pdbcodes, seqs)}
+    # if isinstance(pdbcodes[0], str):
+    #     return {code: seq for code, seq in zip(pdbcodes, seqs)}
+    # return {pid: seq for (_, pid), seq in zip(pdbcodes, seqs)}
+    # NOTE: but i dont want to risk it
+    return {code: seq for code, seq in code_seqs}
     
+def get_sequences(pdbcodes: Iterable[str], 
+                  pdb_p:Callable[[str], str]) -> Iterable[str]:
+    sequences = {}
+    for code in tqdm(pdbcodes, 
+                     desc="Getting protein sequences"):
+        sequences[code] = Chain(pdb_p(code)).sequence
+    return sequences
 
+def _get_seq(args):
+    code, pdb_f = args
+    return code, Chain(pdb_f).sequence
+
+def multi_get_sequences(pdbcodes: Iterable[str],
+                        pdb_p:Callable[[str], str],
+                        processes=None) -> Iterable[str]:
+    args = [[code, pdb_p(code)] for code in pdbcodes]
+    
+    with Pool(processes=processes) as pool:
+        code_seqs = list(tqdm(pool.imap(_get_seq, args),
+                              total=len(args),
+                              desc='Getting sequences'))
+    return {code: seq for code, seq in code_seqs}
+    
 
 def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     """

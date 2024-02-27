@@ -21,7 +21,7 @@ class Ring3DTA(BaseModel):
                  
                  # Feature input sizes:
                  num_features_mol=78,
-                 num_features_pro=320, # esm has 320d embeddings
+                 num_features_pro=54, # esm has 320d embeddings original feats is 54
                  edge_dim_pro=6, # edge dim for protein branch from RING3
                  ):
         
@@ -92,13 +92,14 @@ class Ring3DTA(BaseModel):
     
     def forward_pro(self, data):
         ei = data.edge_index
-        edge_attr = None # TODO: get edge_attr from data
+        edge_attr = data.edge_weight
         
         #### Graph NN ####
         target_x = self.relu(data.x)
-        ei, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
-                                num_nodes=target_x.shape[0], 
-                                training=self.training)
+        # ei, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
+        #                         num_nodes=target_x.shape[0], 
+        #                         training=self.training)
+        
         # GNN layers:
         # NOTE: dropout is done to the attention coefficients in the TransformerConv
         xt = self.pro_gnn1(target_x, ei, edge_attr)
@@ -193,18 +194,19 @@ class Ring3_ESMDTA(Ring3DTA):
         
         #### Graph NN ####
         target_x = self.relu(target_x)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-                                        training=self.training)
+        # WARNING: dropout_node doesnt work if `ew` isnt also dropped out
+        # ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        #                                 training=self.training)
         # GNN layers:
-        xt = self.pro_conv1(target_x, ei_drp, ew)
+        xt = self.pro_conv1(target_x, ei, ew)
         xt = self.relu(xt)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-                                        training=self.training)
-        xt = self.pro_conv2(xt, ei_drp, ew)
+        # ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        #                                 training=self.training)
+        xt = self.pro_conv2(xt, ei, ew)
         xt = self.relu(xt)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-                                        training=self.training)
-        xt = self.pro_conv3(xt, ei_drp, ew)
+        # ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        #                                 training=self.training)
+        xt = self.pro_conv3(xt, ei, ew)
         xt = self.relu(xt)
 
         # flatten/pool

@@ -6,7 +6,7 @@ from prody import calcANM
 from src.utils.residue import Chain, Ring3Runner
 
 
-def get_target_edge(target_sequence:str, contact_map:str or np.array,
+def get_target_edge(target_sequence:str, contact_map:str|np.ndarray,
                           threshold=10.5) -> Tuple[np.array]:
     """
     Returns edge index for target sequence given a contact map.
@@ -26,11 +26,10 @@ def get_target_edge(target_sequence:str, contact_map:str or np.array,
         edge index, edge weight for target sequence
     """
     # loading up contact map if it is a file path
-    if type(contact_map) == str: contact_map = np.load(contact_map)
+    if type(contact_map) is str: contact_map = np.load(contact_map)
     
     target_size = len(target_sequence)
     assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
-    # its ok if it is smaller, but not larger (due to missing residues in pdb)
     assert contact_map.shape[0] == target_size, \
             f'contact map size does not match target sequence size,'+\
             f'{contact_map.shape[0]} != {target_size}'
@@ -153,7 +152,7 @@ def _crossCorrelations(queue, n_atoms, array, variances, indices):
 
 ####################################
 
-def get_cross_correlation(pdb:str or Chain, target_seq:str=None, n_modes=10, n_cpu=1):
+def get_cross_correlation(pdb:str|Chain, target_seq:str=None, n_modes=10, n_cpu=1):
     """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
     if isinstance(pdb, str):
         chain = Chain(pdb)
@@ -184,9 +183,9 @@ def get_af_edge_weights(chains:Iterable[Chain], anm_cc=False, n_modes=5, n_cpu=4
 
 def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
                             n_modes:int=5, n_cpu=4,
-                            cmap:str or np.array=None,
+                            cmap:str|np.ndarray=None,
                             af_confs:Iterable[str]=None,
-                            filter=False) -> np.array:
+                            filter=False) -> np.ndarray:
     """
     Returns an LxL matrix representing the edge weights of the protein
 
@@ -248,6 +247,9 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             # treat all edges as the same if no confirmations are found
             return np.ones(shape=(len(target_seq), len(target_seq), 6)) #HACK: since we have 6 feats
         
+        assert target_seq is None or chains[0].getSequence() == target_seq, \
+            f'Target seq is not chain seq for {pdb_fp} ({af_confs[0]})'
+        
         M = np.array([c.get_contact_map() for c in chains]) < 8.0
 
         dist_cmap = np.sum(M, axis=0) / len(M)
@@ -256,7 +258,6 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         # Note: this will create a "combined" pdb file in the same directory as the confirmaions
         input_pdb, files = Ring3Runner.run(af_confs, overwrite=False)
         seq_len = len(Chain(input_pdb))
-        logging.info(f'Ring3Runner seq_len: {seq_len}')
 
         # Converts output files into LxLx6 matrix for the 6 ring3 edge attributes
         r3_cmaps = []
@@ -268,10 +269,10 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         all_cmaps = np.array(r3_cmaps + [dist_cmap], dtype=np.float32) # [6, L, L]
         all_cmaps = all_cmaps.transpose(1,2,0) # [L, L, 6]
         
-        logging.info(f'Ring3Runner all_cmaps: {all_cmaps.shape}')
+        logging.debug(f'Ring3Runner all_cmaps: {all_cmaps.shape}')
 
         # deletes all intermediate output files, since the main LxLx6 matrix should be saved at the end
-        Ring3Runner.cleanup(input_pdb, all=True)
+        # Ring3Runner.cleanup(input_pdb, all=True)
         return all_cmaps
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')

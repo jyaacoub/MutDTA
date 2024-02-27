@@ -8,6 +8,7 @@ from src.models.utils import BaseModel
 from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.esm_models import EsmDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
+from src.models.ring_mod import Ring3DTA
 from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
 
@@ -143,6 +144,9 @@ class Loader():
                 dropout=dropout,
                 pro_feat='esm_only',
                 edge_weight_opt=pro_edge)
+        elif model == 'RNG':
+            model = Ring3DTA(num_features_pro=54,
+                             dropout=dropout)
         return model
     
     @staticmethod
@@ -155,12 +159,12 @@ class Loader():
         if data == 'PDBbind':
             dataset = PDBbindDataset(save_root=f'{path}/PDBbindDataset',
                     data_root=f'{path}/v2020-other-PL/',
-                    aln_dir=f'{path}/PDBbind_a3m', 
+                    aln_dir=f'{path}/pdbbind/PDBbind_a3m', 
                     cmap_threshold=8.0,
                     feature_opt=pro_feature,
                     edge_opt=edge_opt,
                     subset=subset,
-                    af_conf_dir='../colabfold/pdbbind_af2_out/',
+                    af_conf_dir=f'{path}/pdbbind/pdbbind_af2_out/all_ln/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
                     max_seq_len=1500
