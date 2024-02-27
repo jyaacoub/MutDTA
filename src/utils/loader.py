@@ -229,7 +229,7 @@ class Loader():
                       datasets:Iterable[str]=['train', 'test', 'val'],
                       training_fold:int=None, # for cross-val. None for no cross-val
                       protein_overlap:bool=False, 
-                      ligand_feature:str=None, ligand_edge:str=None,
+                      ligand_feature:str='original', ligand_edge:str='binary',
                       # NOTE:  if loaded_dataset is provided batch_train is the only real argument
                       loaded_datasets:dict=None,
                       batch_train:int=64):
