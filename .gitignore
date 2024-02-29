@@ -217,3 +217,5 @@ results/model_checkpoints/ours/*.model_tmp
 results/model_checkpoints/ours/*.model
 *.swp
 *.swo
+
+results/model_media/*/train_log/*
