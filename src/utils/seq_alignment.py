@@ -1,37 +1,33 @@
-"""
-Assuming hhblits has been run, this script will filter the MSA and convert it to FASTA format.
-then run convert to convert the MSA to FASTA format.
-
-hhfilter -id 90 -i outputs/10gs.msa.a3m -o outputs/10gs_filtered.a3m
-reformat.pl ./outputs/10gs_filtered.a3m ./outputs/10gs_filtered.fas -r # reformat is not needed!
-# just use process_msa to remove lowercase amino acids.
-"""
-#%%
 import os, subprocess
-from typing import Iterable, Tuple
-from tqdm import tqdm
 from multiprocessing import Pool
-from src.feature_extraction.protein import get_pfm
-from src.data_processing.processors import Processor
+import pandas as pd
+
+from src.utils import config as cfg
+from src.data_prep.processors import Processor
+
+from tqdm import tqdm
+
 
 class MSARunner(Processor):
     hhsuite_bin_dir = '/cluster/tools/software/centos7/hhsuite/3.3.0/bin'
     bin_hhblits = f'{hhsuite_bin_dir}/hhblits'
     bin_hhfilter = f'{hhsuite_bin_dir}/hhfilter'
-    UniRef30_dir = '/cluster/projects/kumargroup/mslobody/Protein_Communities/01_MSA/databases/UniRef30_2020_06'
+    UniRef_dir = '/cluster/projects/kumargroup/mslobody/Protein_Communities/01_MSA/databases/UniRef30_2020_06'
 
     @staticmethod    
     def hhblits(f_in:str, f_out:str, n_cpus=6, n_iter:int=2,
-                bin_path:str=None, dataset:str=None) -> subprocess.CompletedProcess:
+                bin_path:str=None, dataset:str=None, return_cmd=False) -> subprocess.CompletedProcess:
         # hhblits works on a single sequence at once
         # can pass FASTA file
         
         cmd = f"{bin_path or MSARunner.bin_hhblits}" + \
                 f" -i {f_in}" + \
                 f" -oa3m {f_out}" + \
-                f" -d {dataset or MSARunner.UniRef30_dir}" + \
+                f" -d {dataset or MSARunner.UniRef_dir}" + \
                 f" -cpu {n_cpus}" + \
                 f" -n {n_iter}"
+        
+        if return_cmd: return cmd
         return subprocess.run(cmd, capture_output=True, check=True, shell=True)
 
     @staticmethod    
@@ -136,15 +132,91 @@ class MSARunner(Processor):
             with tqdm(total=len(args_list), desc='Processing MSAs') as pbar:
                 for _ in pool.imap_unordered(MSARunner.process_msa_file, args_list):
                     pbar.update(1)
-    
 
-# %%
+class MMseq2Runner:
+    bin_path = cfg.MMSEQ2_BIN
+    
+    @staticmethod
+    def csv_to_FASTA(f_in:str, f_out:str, unique_column:str='prot_id'):
+        # converts a csv of proteins with codes to a FASTA file with codes as headers
+        # column of csv is codes,..., prot_seq
+        df = pd.read_csv(f_in, index_col=0)
+        # get unique codes
+        codes = df[unique_column].drop_duplicates().index
+        # write to fasta
+        with open(f_out, 'w') as f:
+            for code in codes:
+                seq = df.loc[code, "prot_seq"]
+                if not isinstance(seq, str):
+                    seq = seq[0]
+                f.write(f'>{code}\n{seq}\n')
+        
+    @staticmethod
+    def run_simple_clustering(fasta_in:str, out_dir:str, tmp_dir:str=None, 
+                              force_overwrite:bool=False, verbose:bool=False):
+        # --------------------------------------------
+        # mmseqs createdb XY.fasta davisDB/DB
+        # mmseqs cluster -s 16.0 --cov-mode 5 -c 0.6 davisDB/DB clu/DB tmp/
+        # mmseqs createtsv davisDB/DB davisDB/DB clu/DB tsvs/davisDB_4sens_9c_5cov.tsv
+        # --------------------------------------------
+        
+        # runs mmseq2 simple clustering on a fasta file
+        # fasta_in: path to fasta file
+        # out_dir: path to output directory
+        # tmp_dir: path to tmp directory
+        # force_overwrite: if True, will overwrite existing files
+        # verbose: if True, will print mmseq2 output
+        # returns: path to clustering results
+
+        # check if output files already exist
+        if not force_overwrite:
+            if os.path.exists(f'{fasta_in}.clu_rep.faa'):
+                print(f'Clustering results already exist for {fasta_in}. Skipping...')
+                return f'{fasta_in}.clu_rep.faa.clstr'
+        
+        # make tmp dir if it doesn't exist
+        if tmp_dir is not None:
+            os.makedirs(tmp_dir, exist_ok=True)
+            
+        # create mmseq2 database
+        cmd = f'{MMseq2Runner.bin_path} createdb {fasta_in} {fasta_in}.db'
+        if verbose:
+            print(cmd)
+        os.system(cmd)
+        
+        # run mmseqs2 clustering
+        
+        # to get fewer clusters we change the following:
+        # set --cov-mode to 1 for coverage of the target (note that 1 and 2 are the same in this case since our target is the same as the query)
+        # set --cov-mode to 5 instead? "short seq. needs to be at least x% of other sequence"
+        # decrease -c from 0.8 to 0.6 (this controls the proportion that the alignement needs to match)
+        #
+        
+        cmd = f'{MMseq2Runner.bin_path} easy-cluster {fasta_in}.db {out_dir} {tmp_dir}'
+        if verbose:
+            print(cmd)
+        os.system(cmd)
+        
+        # create tsv file
+        
+        return f'{fasta_in}.clu_rep.faa.clstr'
+    
+    @staticmethod
+    def read_clusttsv_output(tsv_path:str):
+        # reads the output of mmseq2 createtsv
+        # returns a dict of {cluster_rep: [members], ...}
+        
+        # read tsv
+        df = pd.read_csv(tsv_path, sep='\t', header=None)
+        # rename cols
+        df.columns = ['rep', 'member']
+        
+        return df.groupby('rep')['member'].apply(list).to_dict()
+    
+    
+    
 if __name__ == '__main__':
-    from src.data_processing.process_msa import MSARunner
-    from tqdm import tqdm
-    import pandas as pd
-    import os
-    from src.data_processing.datasets import BaseDataset
+    from src.data_prep.datasets import BaseDataset
     csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
     df = pd.read_csv(csv, index_col=0)
     #################### Get unique proteins:

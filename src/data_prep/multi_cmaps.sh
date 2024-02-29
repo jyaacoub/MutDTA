@@ -18,11 +18,11 @@ source /cluster/home/t122995uhn/projects/MutDTA/.venv/bin/activate
 
 python - << EOF
 import os
-from src.feature_extraction.protein import create_save_cmaps
-from src.data_processing import PDBbindProcessor, Downloader
+from src.data_prep.feature_extraction.protein import create_save_cmaps
+from src.data_prep import PDBbindProcessor, Downloader
 import pandas as pd
 
-pdb_path = '/cluster/home/t122995uhn/projects/data/v2020-other-PL/'
+pdb_path = '/cluster/home/t122995uhn/projects/data/pdbbind/v2020-other-PL/'
 
 pdb_codes = os.listdir(pdb_path)
 # filter out readme and index folders

@@ -8,9 +8,9 @@ from src.utils import config as cfg
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 sys.path.append(PROJECT_ROOT)
 
-from src.feature_extraction.protein_nodes import create_pfm_np_files
-from src.data_processing.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
-from src.train_test.utils import train_val_test_split, balanced_kfold_split
+from src.data_prep.feature_extraction.protein_nodes import create_pfm_np_files
+from src.data_prep.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
+from src.train_test.splitting import train_val_test_split, balanced_kfold_split
 
 def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
                     pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
@@ -19,7 +19,8 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     k_folds:int=None,
                     random_seed:int=0,
                     train_split:float=0.8,
-                    val_split:float=0.1,) -> None:
+                    val_split:float=0.1,
+                    overwrite=True) -> None:
     """
     Creates the datasets for the given data, feature, and edge options.
 
@@ -61,6 +62,7 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     aln_dir=f'{data_root}/{data}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
+                    overwrite=overwrite,
                     af_conf_dir=f'../colabfold/{data}_af2_out/', # colabfold not needed if no structure required methods are used (see config)
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
@@ -69,11 +71,11 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
         elif data == 'PDBbind':
             dataset = PDBbindDataset(
                     save_root=f'{data_root}/PDBbindDataset/',
-                    data_root=f'{data_root}/v2020-other-PL/',
-                    aln_dir=f'{data_root}/PDBbind_aln/',
+                    data_root=f'{data_root}/pdbbind/v2020-other-PL/',
+                    aln_dir=f'{data_root}/pdbbind/PDBbind_aln/',
                     cmap_threshold=8.0,
-                    overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir=f'{data_root}/PDBbind_afConf/',
+                    overwrite=overwrite, # overwrite old cmap.npy files
+                    af_conf_dir=f'{data_root}/pdbbind/pdbbind_af2_out/all_ln/',
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
@@ -85,11 +87,14 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                 data_root=f'{data_root}/PlatinumDataset/raw',
                 aln_dir=None,
                 cmap_threshold=8.0,
+                overwrite=overwrite,
                 feature_opt=FEATURE,
                 edge_opt=EDGE,
                 ligand_feature=ligand_feature,
                 ligand_edge=ligand_edge
                 )
+        else:
+            raise ValueError(f"Invalid data type {data}, pick from {cfg.DATA_OPT.list()}.")
         
         # saving training, validation, and test sets
         if k_folds is None:

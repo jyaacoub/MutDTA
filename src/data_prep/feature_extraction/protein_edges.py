@@ -1,11 +1,12 @@
+import logging
 from typing import Iterable, Tuple
 import numpy as np
 from prody import calcANM
 
-from src.utils.residue import Chain
+from src.utils.residue import Chain, Ring3Runner
 
 
-def get_target_edge(target_sequence:str, contact_map:str or np.array,
+def get_target_edge(target_sequence:str, contact_map:str|np.ndarray,
                           threshold=10.5) -> Tuple[np.array]:
     """
     Returns edge index for target sequence given a contact map.
@@ -25,11 +26,10 @@ def get_target_edge(target_sequence:str, contact_map:str or np.array,
         edge index, edge weight for target sequence
     """
     # loading up contact map if it is a file path
-    if type(contact_map) == str: contact_map = np.load(contact_map)
+    if type(contact_map) is str: contact_map = np.load(contact_map)
     
     target_size = len(target_sequence)
     assert contact_map.shape[0] == contact_map.shape[1], 'contact map is not square'
-    # its ok if it is smaller, but not larger (due to missing residues in pdb)
     assert contact_map.shape[0] == target_size, \
             f'contact map size does not match target sequence size,'+\
             f'{contact_map.shape[0]} != {target_size}'
@@ -152,7 +152,7 @@ def _crossCorrelations(queue, n_atoms, array, variances, indices):
 
 ####################################
 
-def get_cross_correlation(pdb:str or Chain, target_seq:str=None, n_modes=10, n_cpu=1):
+def get_cross_correlation(pdb:str|Chain, target_seq:str=None, n_modes=10, n_cpu=1):
     """Gets the cross correlation matrix after running ANM simulation w/ProDy"""
     if isinstance(pdb, str):
         chain = Chain(pdb)
@@ -183,9 +183,9 @@ def get_af_edge_weights(chains:Iterable[Chain], anm_cc=False, n_modes=5, n_cpu=4
 
 def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
                             n_modes:int=5, n_cpu=4,
-                            cmap:str or np.array=None,
+                            cmap:str|np.ndarray=None,
                             af_confs:Iterable[str]=None,
-                            filter=False) -> np.array:
+                            filter=False) -> np.ndarray:
     """
     Returns an LxL matrix representing the edge weights of the protein
 
@@ -194,9 +194,12 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         'af2' this is the template path for filtering out misfolds.
         target_seq (str): Target sequence for sanity checking that the pdbs match.
         edge_opt (str): See src.utils.config.EDGE_OPT
+        
         n_modes (int, optional): ANM arg. Defaults to 5.
         n_cpu (int, optional): ANM arg. Defaults to 4.
+        
         cmap (str or np.array, optional): contact map for 'simple'. Defaults to None.
+        
         af_confs (Iterable[str], optional): configurations for af2 structs. Defaults to None.
         filter (bool, optional): Whether or not to filter misfolds in 'af2'. Defaults to False.
 
@@ -204,7 +207,7 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         ValueError: invalid edge option (See `src.utils.config.EDGE_OPT`)
 
     Returns:
-        np.array: The LxL edge weight matrix
+        np.array: The LxL edge weight matrix or None if binary, or LxLxZ if edge attributes are selected like ring3.
     """
     # edge weights should be returned as a list of Z weights
     # where Z is the number of edges (|E|)
@@ -229,14 +232,48 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         
         # NOTE: if chains (no pdbs found) is empty then we treat all edges as the same
         if len(chains) == 0:
-            print(f'WARNING: no af2 pdbs for {pdb_fp}')
+            logging.warning(f'no af2 pdbs for {pdb_fp}')
             # treat all edges as the same if no confirmations are found
-            return np.ones(shape=(len(target_seq), len(target_seq))) 
-        else:
-            # NOTE: af2-anm gets run here:
-            ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
-            assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
-            return ew        
+            return np.ones(shape=(len(target_seq), len(target_seq)))
+        
+        # NOTE: af2-anm gets run here:
+        ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
+        assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
+        return ew
+    elif edge_opt == 'ring3':
+        chains = [Chain(p) for p in af_confs]
+        if len(chains) == 0:
+            logging.warning(f'no af2 pdbs for {pdb_fp}')
+            # treat all edges as the same if no confirmations are found
+            return np.ones(shape=(len(target_seq), len(target_seq), 6)) #HACK: since we have 6 feats
+        
+        assert target_seq is None or chains[0].getSequence() == target_seq, \
+            f'Target seq is not chain seq for {pdb_fp} ({af_confs[0]})'
+        
+        M = np.array([c.get_contact_map() for c in chains]) < 8.0
+
+        dist_cmap = np.sum(M, axis=0) / len(M)
+
+        # ring3 edge attribute extraction
+        # Note: this will create a "combined" pdb file in the same directory as the confirmaions
+        input_pdb, files = Ring3Runner.run(af_confs, overwrite=False)
+        seq_len = len(Chain(input_pdb))
+
+        # Converts output files into LxLx6 matrix for the 6 ring3 edge attributes
+        r3_cmaps = []
+        for k, fp in files.items():
+            cmap = Ring3Runner.build_cmap(fp, seq_len)
+            r3_cmaps.append(cmap)
+        
+        # Convert to numpy array of shape (L, L, 6)
+        all_cmaps = np.array(r3_cmaps + [dist_cmap], dtype=np.float32) # [6, L, L]
+        all_cmaps = all_cmaps.transpose(1,2,0) # [L, L, 6]
+        
+        logging.debug(f'Ring3Runner all_cmaps: {all_cmaps.shape}')
+
+        # deletes all intermediate output files, since the main LxLx6 matrix should be saved at the end
+        # Ring3Runner.cleanup(input_pdb, all=True)
+        return all_cmaps
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')
     
@@ -248,8 +285,8 @@ if __name__ == '__main__':
     import os, re
 
     from glob import glob
-    from src.data_processing.datasets import BaseDataset
-    from src.feature_extraction.protein_edges import get_target_edge_weights
+    from src.data_prep.datasets import BaseDataset
+    from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 
     data = 'davis'
     data_dir = '/cluster/home/t122995uhn/projects/data/'
@@ -311,8 +348,8 @@ if __name__ == '__main__':
     import os, re
 
     from glob import glob
-    from src.data_processing.datasets import BaseDataset
-    from src.feature_extraction.protein_edges import get_target_edge_weights
+    from src.data_prep.datasets import BaseDataset
+    from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 
     data = 'davis'
     edgew = 'anm'

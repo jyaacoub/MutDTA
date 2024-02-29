@@ -62,7 +62,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from tqdm import tqdm
 
-    from src.data_analysis import get_metrics, count_missing_res
+    from src.analysis import get_metrics, count_missing_res
     #%% 
     pdb_path = lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_protein.pdb'
 

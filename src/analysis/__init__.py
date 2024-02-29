@@ -1,5 +1,5 @@
-from src.data_analysis.metrics import get_metrics
-from src.data_analysis.utils import count_missing_res
+from src.analysis.metrics import get_metrics
+from src.analysis.utils import count_missing_res
 
 
 #%%
@@ -10,12 +10,13 @@ if __name__ == '__main__':
     import pandas as pd
     import numpy as np
     import random, os
-    from src.data_analysis.metrics import get_metrics
+    from src.analysis.metrics import get_metrics
 
 
     # cindex:
-    if os.path.basename(os.getcwd()) == 'data_analysis':
-        import os; os.chdir('../../') # for if running from src/data_analysis/
+    if os.path.basename(os.getcwd()) == 'analysis':
+
+        import os; os.chdir('../../') # for if running from src/analysis/
     print(os.getcwd())
 
     # CASF-2012 core dataset

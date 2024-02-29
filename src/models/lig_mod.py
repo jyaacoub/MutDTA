@@ -6,7 +6,7 @@ from transformers import AutoTokenizer, AutoModel
 from selfies import encoder
 
 from src.models.prior_work import DGraphDTA
-from src.models.pro_mod import EsmDTA
+from src.models.esm_models import EsmDTA
 
 
 class ChemDTA(DGraphDTA):

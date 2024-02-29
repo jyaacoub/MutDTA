@@ -2,21 +2,19 @@
 Processors for processing data from various sources.
 
 Primary use is for handling data at the high level if you wish to extract features,
-see `src/feature_extraction/` instead.
+see `src/data_prep/feature_extraction/` instead.
 
 e.g.: here we might want to use prep_save_data to get the X and Y csv files for training.
 
 """
+from typing import Callable, Iterable, Tuple
 
 from argparse import ArgumentError
-from typing import Callable, Iterable, Tuple
-from urllib.parse import quote
-import numpy as np
-import requests as r
-import os, re
 
+import os, re
 import pandas as pd
 from tqdm import tqdm
+
 from rdkit import Chem
 from rdkit import RDLogger
 from rdkit.Chem.PandasTools import LoadSDF
@@ -425,56 +423,4 @@ class PDBbindProcessor(Processor):
         
         return df
 
-if __name__ == '__main__':
-    # prep data from raw
-    PDBbindProcessor.prep_save_data()
     
-    exit()
-    # Exploring the data
-    csv_path='data/PDBbind/raw/P-L_refined_set_all.csv'
-    df_raw = pd.read_csv(csv_path)
-    df = df_raw[lambda x: x['protID'].fillna('').str.split().apply(lambda x: len(x)==1)]
-    df_a = df.affinity
-
-    # unify affinity metrics to be same units (uM)
-    conv = {
-        'mM': 1000,
-        'uM': 1,
-        'nM': 1e-3,
-        'pM': 1e-6,
-        'fM': 1e-9,
-    }
-    const = {
-        'Ki':[],
-        'Kd':[]
-    }
-
-    for a in df_a:
-        k, v = re.split(r'=|<=|>=', a)
-        v = float(v[:-2]) * conv[v[-2:]]
-        if 'Ki' in a:
-            const['Ki'].append(v)
-        elif 'Kd' in a:
-            const['Kd'].append(v)
-        else:
-            raise ValueError(f'Unknown affinity metric: {a}')
-
-    # removing outliers (Ki or Kd > 1e-3)
-    for k in const:
-        const[k] = [x for x in const[k] if x < 1e-3]
-
-    # plotting distribution of Ki and Kd values
-    import matplotlib.pyplot as plt
-    plt.hist(const['Ki'], bins=10, alpha=0.8, color='r')
-    plt.hist(const['Kd'], bins=10, alpha=0.8, color='g')
-
-    plt.legend(['Ki', 'Kd'])
-    print('Ki:',len(const['Ki']), 'Kd:', len(const['Kd']))
-
-    # statistical test to see if Ki and Kd are from the same distribution
-    from scipy.stats import ranksums
-    listl = const['Ki']
-    list2 = const['Kd']
-    u_stat, p_val = ranksums(listl, list2)
-    print('p-value:', p_val)
-    print('u-stat:', u_stat)
