@@ -1,208 +1,191 @@
-# - [ ] See issue with af_confs mismatched (likely [when we renamed the af_confs](https://github.com/jyaacoub/MutDTA/issues/80#issuecomment-1944250594) we accidently overwrote previous pids)
-# 	- To solve this we need to regenerate the proper af_confs..
-# 	- [ ] Check which are mis matched from the XY.csv and re generate those as well as any missing af_confs
-# %%
-from src.utils.loader import Loader
-from src import config as cfg
-
-loaders = Loader.load_DataLoaders(cfg.DATA_OPT.PDBbind, 
-                                  cfg.PRO_FEAT_OPT.nomsa,
-                                  cfg.PRO_EDGE_OPT.ring3,
-                                  training_fold=0,
-                                  ligand_feature=cfg.LIG_FEAT_OPT.original,
-                                  ligand_edge=cfg.LIG_EDGE_OPT.binary)
-
-for b in loaders['train']: break
 #%%
-from src.models.ring_mod import Ring3DTA
-m = Ring3DTA(num_features_pro=54)
+from src.utils.pdb import merge_pdb
+from glob import glob
 
-out = m(b['protein'], b['ligand'])
+files = glob("/cluster/home/t122995uhn/projects/alphaflow/test/subsampling_ref/5x79*.pdb")
+out = "/cluster/home/t122995uhn/projects/alphaflow/test/subsampling_ref/5x79_combined_5.pdb"
 
-# %%
-from src.data_prep.init_dataset import create_datasets
-from src import config as cfg
-import logging
-logging.getLogger().setLevel(logging.INFO)
+merge_pdb(files, out)
 
-create_datasets(
-    [cfg.DATA_OPT.PDBbind],
-    [cfg.PRO_FEAT_OPT.nomsa],
-    [cfg.PRO_EDGE_OPT.ring3],
-    k_folds=5,
-    overwrite=True
-)
 
-# %% Checking XY.csv and regenerate mismatches
-from src.data_prep.feature_extraction.protein import multi_get_sequences, multi_save_cmaps
-from src.data_prep.processors import PDBbindProcessor
-from src.data_prep.datasets import BaseDataset
-from tqdm import tqdm
+# %% Minimal LIME example
+from lime.lime_tabular import LimeTabularExplainer
+import torch_geometric as torchg
 import pandas as pd
-import os
+import numpy as np
+import torch
 import logging
 logging.getLogger().setLevel(logging.DEBUG)
 
-DATA_ROOT   = '/cluster/home/t122995uhn/projects/data/pdbbind/v2020-other-PL/' 
-AF_CONF_DIR = '/cluster/home/t122995uhn/projects/data/pdbbind/PDBbind_afConf/'
-csv_dir     = '/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_ring3_original_binary/full/'
-csv_clean   = f'{csv_dir}/cleaned_XY.csv'
-csv_fp      = f'{csv_dir}/XY.csv'
-pdb_p = lambda code: os.path.join(DATA_ROOT, code, f'{code}_protein.pdb')
-def cmap_p(pid):
-    # cmap is saved in seperate directory under pdbbind/v2020-other-PL/cmaps/
-    # file names are unique protein ids...
-    # check to make sure arg is a pid
-    if df is not None and pid in df.index:
-        pid = df.loc[pid]['prot_id']
-    return os.path.join(DATA_ROOT, 'cmaps', f'{pid}.npy')
+from src.utils.loader import Loader
+from src import config as cfg
+
+
+ckpt_dir = "/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/"
+ckpt = f"{ckpt_dir}/ours/DGM_davis0D_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E.model"
 
 #%%
-# Get prot ids data:
-df_pid = PDBbindProcessor.get_name_data(f'{DATA_ROOT}/index/INDEX_general_PL_name.2020')
-df_pid.drop(columns=['release_year','prot_name'], inplace=True)
-# contains col: prot_id
-# some might not have prot_ids available so we need to use PDBcode as id instead
-missing_pid = df_pid.prot_id == '------'
-df_pid[missing_pid] = df_pid[missing_pid].assign(prot_id = df_pid[missing_pid].index)
+loaders = Loader.load_DataLoaders(cfg.DATA_OPT.davis,
+                            cfg.PRO_FEAT_OPT.nomsa, 
+                            cfg.PRO_EDGE_OPT.binary,
+                            datasets=['test'])
 
-# Get binding data:
-df_binding = PDBbindProcessor.get_binding_data(f'{DATA_ROOT}/index/INDEX_general_PL_data.2020') # _data.2020
-df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
-pdb_codes = df_binding.index # pdbcodes
+# note the distribution of pkd values since we will be using this for min-max normalization
+# this is important since LimeTextExplainer only works for classification...
+# So we can adjust this to be a classification by applying a threshold for what is considered to be "binding"
+xy_p = '/cluster/home/t122995uhn/projects/data/DavisKibaDataset/davis/nomsa_binary_original_binary/full/XY.csv'
+df = pd.read_csv(xy_p, index_col=0)
+df.pkd.describe()
 
-# merge with binding data to get unique protids that are validated:
-df_pid_bind = df_pid.merge(df_binding, on='PDBCode')
+# %% Loading model and checkpoint
+mdl = Loader.init_model(cfg.MODEL_OPT.DG, 
+                  cfg.PRO_FEAT_OPT.nomsa,
+                  cfg.PRO_EDGE_OPT.binary,
+                  dropout=0.4)
 
-############## validating codes #############
-valid_codes = [c for c in pdb_codes if os.path.isfile(pdb_p(c))]
+mdl.load_state_dict(torch.load(ckpt,
+                               map_location='cpu'))
+
+# %% Loading full data for explainer "train data"
+datasets = Loader.load_datasets(data=cfg.DATA_OPT.davis,
+                     pro_feature=cfg.PRO_FEAT_OPT.nomsa,
+                     edge_opt=cfg.PRO_EDGE_OPT.binary,
+                     subsets=['full'],
+                     ligand_edge=cfg.LIG_EDGE_OPT.binary,
+                     ligand_feature=cfg.LIG_FEAT_OPT.original)
+
+
+#%% creating "train data" for Explainer model
+for i, INSTANCE in enumerate(loaders['test']): 
+    if INSTANCE['protein'].x.shape[0] < 1000: break
     
-pdb_codes = valid_codes
-assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
+pnode_INST = INSTANCE['protein'].x
+inst_size = pnode_INST.shape[0] * pnode_INST.shape[1]
+
+
+train_data = None
+max_instances = 442 # 442 is the max number of unique pids
+seen_pids = set()
+for d in datasets['full']._data_pro.values():
+    if d.prot_id in seen_pids: continue
+    else:
+        seen_pids.add(d.prot_id)
         
-############## Get ligand info #############
-# Extracting SMILE strings:
-dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
-                                        dir=lambda x: f'{DATA_ROOT}/{x}/{x}_ligand.sdf')
-df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
-df_smi.index.name = 'PDBCode'
-
-df_smi = df_smi[df_smi.SMILE.notna()]
-num_missing = len(pdb_codes) - len(df_smi)
-if  num_missing > 0:
-    print(f'\t{num_missing} ligands failed to get SMILEs')
-    pdb_codes = list(df_smi.index)
+    # d.x has the shape of Lx54
+    # we will reshape it so that we end up with rows where each row is 
+    # the flattened protein node features
+    x_flat = d.x.flatten()
     
-df = df_pid_bind.merge(df_smi, on='PDBCode')
+    # and cut off any residues past 
+    # the length of our instance
+    if len(x_flat) < inst_size: continue
+    x_flat = x_flat[:inst_size]
+    
+    x_flat = x_flat.reshape((1,-1)) # [L*54] -> [1, L*54]
+    
+    train_data = torch.cat([train_data, x_flat]) if train_data is not None else x_flat
+    
+    if len(seen_pids) >= max_instances:
+        break
 
-############## Getting protein seq: #############
-df_seqs = pd.DataFrame.from_dict(multi_get_sequences(pdb_codes, pdb_p), 
-                                orient='index',
-                                columns=['prot_seq'])
-df_seqs.index.name = 'PDBCode'
-df_seqs_pid = df_pid.merge(df_seqs, on='PDBCode')
-# merge pids with sequence to get unique prots by seq length
-df_unique = BaseDataset.get_unique_prots(df_seqs_pid)
-
-# os.makedirs(os.path.dirname(cmap_p('')), exist_ok=True)
-# %% TODO: use unique pids for cmaps...
-seqs = multi_save_cmaps(
-            [(code, pid) for code, pid in df_unique['prot_id'].items()],
-            pdb_p=pdb_p,
-            cmap_p=cmap_p,
-            overwrite=True)
-
+# train data must be as a simple numpy 2d array
+train_data = train_data.numpy()
 
 # %%
-df = pd.read_csv(csv_fp, index_col=0)
-df_clean = pd.read_csv(csv_clean, index_col=0)
+exp = LimeTabularExplainer(training_data=train_data, mode="regression")
 
-df_unique = BaseDataset.get_unique_prots(df)
-df_unique_clean = BaseDataset.get_unique_prots(df_clean)
-
-mismatched = df_unique.index[:100] != df_unique_clean.index[:100]
-
-print(df_unique.index[:100][mismatched])
-print(df_unique_clean.index[:100][mismatched])
+# %%
+from tqdm import tqdm
+def predict_fn_tabular(node_feats: list[np.ndarray]):
+    print(f'input {type(node_feats)} of len {len(node_feats)}')
+    mdl.eval()
+        
+    outs = None
+    for node_feat in tqdm(node_feats, desc="Running pertubations through model"):
+        # Unflattening node_feat
+        node_feat = torch.Tensor(node_feat.reshape(pnode_INST.shape))
+        
+        # Build graph for model
+        protein_graph = torchg.data.Data(x=node_feat,
+                                    edge_index=INSTANCE['protein'].edge_index, # reuse same contacts
+                                    edge_weight=None) # no edge weights
+        
+        ################### Run through model and return output ######################
+        # Using CONSTANT ligand graph.
+        ligand_graph = INSTANCE['ligand']
+        
+        out = mdl(protein_graph, ligand_graph)
+        outs = out if outs is None else torch.cat([outs, out])
+    
+    print(f'outs {type(outs)} of len {len(outs)}')
+    return outs.flatten().detach().numpy()
 
 #%%
-df = pd.read_csv(csv_clean, index_col=0)
-dfr = df.reset_index(drop=False)
-unique_pro = dfr[['prot_id']].drop_duplicates(keep='first')
+exp_out = exp.explain_instance(pnode_INST.flatten().numpy(),
+                                predict_fn_tabular,
+                                num_features=inst_size,
+                                num_samples=10000)
 
-dfr_i = dfr.set_index('code')
-df_unique = dfr_i.iloc[unique_pro.index]
-'3i3d' in df_unique.index
-
-# mismatched 3i3d with B8LFD6 (slice at [500:625])
-#                              529                                                        586
-# PAVPKWSIKKWLSLPGETRPLILCEYAHA A GNSLGGFAKYWQAFRQYPRLQGGFVWDWVDQSLIKYDENGNPWSAYGGDFGDTPND R QFCMNGLVFADRTPHPALTEAKHQQQFFQFRLSGQTIE
-# PAVPKWSIKKWLSLPGETRPLILCEYAHA M GNSLGGFAKYWQAFRQYPRLQGGFVWDWVDQSLIKYDENGNPWSAYGGDFGDTPND A QFCMNGLVFADRTPHPALTEAKHQQQFFQFRLSGQTIE
 # %%
-from src.utils.residue import Chain
+vals = exp_out.as_map()[1] # returned as (feature_id, weight)
+# feature_id is just the index position for the instance
+vals = sorted(vals, key=lambda x: x[0])
+# reshape into the original Lx54 node features
+vals = np.array([x[1] for x in vals]).reshape(pnode_INST.shape)
 
-ALL_LN_DIR = '/cluster/home/t122995uhn/projects/data/pdbbind/pdbbind_af2_out/all_ln/'
-max_seq_len = 2400
+#%% 
+avg_vals = np.mean(vals, axis=1)
+max_vals = np.max(vals, axis=1)
+min_vals = np.min(vals, axis=1)
+
+#%% Moving average
+def moving_average_with_indices(data, window_size):
+    if window_size <= 1:
+        return data, list(range(len(data)))  # No smoothing needed for window_size 1 or less
+    
+    smoothed_data = []
+    indices = []
+    half_window = window_size // 2
+    
+    for i in range(len(data)):
+        start = max(i - half_window, 0)
+        end = min(i + half_window + 1, len(data))
         
-# Filter proteins greater than max length
-df_new = df[df['prot_seq'].str.len() <= max_seq_len]
-pro_filtered = len(df) - len(df_new)
-logging.info(f'Filtered out {pro_filtered} proteins greater than max length of {max_seq_len}')
-df = df_new
+        window_average = sum(data[start:end]) / (end - start)
+        smoothed_data.append(window_average)
+        # For indices, use the current index as the center of the window
+        indices.append(i)
+    
+    return smoothed_data, indices
 
-missing_conf = set()
-files = [f for f in os.listdir(ALL_LN_DIR) if f.endswith('.pdb')]
-unique_df = BaseDataset.get_unique_prots(df)
-# unique_df.sort_index()
+savg_vals, savg_idxs = moving_average_with_indices(avg_vals, 10)
+smax_vals, smax_idxs = moving_average_with_indices(max_vals, 10)
+smin_vals, smin_idxs = moving_average_with_indices(min_vals, 10)
 
-#%%
-for code, (pid, seq) in tqdm(unique_df[['prot_id', 'prot_seq']].iterrows(),
-        desc='Filtering out proteins with missing PDB files for multiple confirmations',
-        total=len(unique_df)):
-    
-    af_confs = [os.path.join(ALL_LN_DIR, f) for f in files \
-                                if f.startswith(pid)]
-    
-    # need at least 2 confimations...
-    if len(af_confs) <= 1:
-        missing_conf.add(code)
-        continue
-    
-    af_seq = Chain(af_confs[0]).sequence
-    if seq != af_seq:
-        logging.warning(f'Mismatched sequence for {pid}')
-        missing_conf.add(code)
-        continue
-
-
-# %% create symbolic link of missing files into new folder
-REMAIN_DIR = '/cluster/home/t122995uhn/projects/data/pdbbind/a3m_unique_prot/remainder/'
-AF2_OUT_DIR = '/cluster/home/t122995uhn/projects/data/pdbbind/pdbbind_af2_out/'
-ALL_LN_DIR = '/cluster/home/t122995uhn/projects/data/pdbbind/pdbbind_af2_out/all_ln/'
-
-from src.utils.residue import Chain
-import logging
-logging.getLogger().setLevel(logging.INFO)
-mismatched = {}
-missing = {}
-safe = {}
-files = [f for f in os.listdir(ALL_LN_DIR) if f.endswith('.pdb')]
-for code, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
-                             total=len(df_unique)):
-    filt = [f for f in files if f.startswith(pid)]
-    afs = [os.path.join(ALL_LN_DIR, f) for f in filt]
-    
-    if len(afs) == 0:
-        logging.debug(f'Missing confs for {pid}')
-        missing[code] = pid
-        continue
-        
-    af_seq = Chain(afs[0]).sequence
-    if seq != af_seq:
-        logging.debug(f'Mismatched sequence for {pid}')
-        mismatched[code] = (pid, seq, af_seq)
-        continue
-    
-    safe[code] = pid
-    
 # %%
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(15,5))
+idx = list(range(len(avg_vals)))
+plt.plot(idx, avg_vals, label='mean')
+plt.plot(idx, max_vals, label='max')
+plt.plot(idx, min_vals, label='min')
+plt.plot(savg_idxs, savg_vals)
+plt.plot(smax_idxs, smax_vals)
+plt.plot(smin_idxs, smin_vals)
+plt.legend()
+plt.title("Explained values (smoothed=10)")
+plt.xlabel('Amino acid index')
+
+# %%
+plt.figure(figsize=(15,5))
+abs_vals = np.max(np.abs(vals), axis=1)
+sabs_vals, sabs_idxs = moving_average_with_indices(abs_vals, 10)
+
+plt.plot(idx, abs_vals)
+plt.plot(sabs_idxs, sabs_vals)
+
+plt.title("max values after np.absolute (smoothed=10)")
+plt.xlabel('Amino acid index')
+
+
