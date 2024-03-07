@@ -236,6 +236,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     def load(self): 
         # loading cleaned XY.csv file
+        # if self.df is None: # WARNING: HOT FIX to be compatible with old datasets
+        #    self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         
         self._indices = self.df.index
@@ -328,7 +330,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
             files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
             
-            for code, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
+            for _, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
                     desc='Filtering out proteins with missing PDB files for multiple confirmations',
                     total=len(df_unique)):
                 
@@ -469,6 +471,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         elif file_real(self.processed_paths[0]): # raw XY found
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             logging.info(f'{self.processed_paths[0]} file found, using it to create the dataset')
+            # WARNING: HOT fix so that it is still compatible with prev datasets
+            # return
         else:
             logging.info('Creating dataset from scratch!')
             self.df = self.pre_process()

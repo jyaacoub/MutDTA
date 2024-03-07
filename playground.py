@@ -1,3 +1,13 @@
+#%%
+from src.utils.pdb import merge_pdb
+from glob import glob
+
+files = glob("/cluster/home/t122995uhn/projects/alphaflow/test/subsampling_ref/5x79*.pdb")
+out = "/cluster/home/t122995uhn/projects/alphaflow/test/subsampling_ref/5x79_combined_5.pdb"
+
+merge_pdb(files, out)
+
+
 # %% Minimal LIME example
 from lime.lime_tabular import LimeTabularExplainer
 import torch_geometric as torchg
