@@ -24,7 +24,7 @@ def train_func(config):
                             pro_edge=config["edge_opt"],
                             # additional kwargs send to model class to handle
                             dropout=config["dropout"], 
-                            dropout_prot=config["dropout_prot"], extra_profc_layer=config["extra_profc_layer"],
+                            dropout_prot=config["dropout_prot"],
                             pro_emb_dim=config["pro_emb_dim"],
                             )
     
@@ -93,7 +93,6 @@ if __name__ == "__main__":
         "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
         "dropout_prot": ray.tune.uniform(0.0, 0.5),
         "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
-        "extra_profc_layer": True
     }
     
     # each worker is a node from the ray cluster.

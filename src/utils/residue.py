@@ -686,23 +686,26 @@ class Ring3Runner():
             return (pdb_fp, str(e))
 
     @staticmethod
-    def run_multiprocess(pdb_fps:list[str]|list[list[str]], out_dir:str=None, verbose:bool=False, overwrite:bool=False):
+    def run_multiprocess(pdb_fps:list[str]|list[list[str]], out_dir:str=None, verbose:bool=False, overwrite:bool=False,
+                         processes=None):
         """
         Runs RING3 on multiple PDB files using multiprocessing.
         
         Args:
-            pdb_fps (list[str] | list[list[str]]): List of input pdb file paths.
-            out_dir (str, optional): Output directory to save the results, defaults to the input directory.
-            chain_id (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
-            verbose (bool, optional): Whether to display verbose output. Defaults to False.
-            overwrite (bool, optional): Whether to overwrite existing output files. Defaults to False.
+            `pdb_fps` (list[str] | list[list[str]]): List of input pdb file paths as single file with muliple 
+                                                  "models" or multiple pdb files with a single model each.
+            `out_dir` (str, optional): Output directory to save the results, defaults to the input directory.
+            `chain_id` (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
+            `verbose` (bool, optional): Whether to display verbose output. Defaults to False.
+            `overwrite` (bool, optional): Whether to overwrite existing output files. Defaults to False.
+            `processes` (int, optional): # of cores to distribute across, default is to use all available.
             
         Returns:
             results list[tuple[str]]: list of (PDB file paths, output file paths)
         """
         args = [(pdb_fp, out_dir, verbose, overwrite) for pdb_fp in pdb_fps]
         
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=processes) as pool:
             results = list(tqdm(pool.imap(Ring3Runner._run_proc, args),
                                 total=len(args),
                                 desc="Running multiproc. RING3"))
