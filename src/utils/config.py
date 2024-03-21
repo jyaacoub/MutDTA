@@ -40,8 +40,11 @@ class PRO_EDGE_OPT(StringEnum):
     
     anm = 'anm'
     af2 = 'af2'
-    af2_anm = 'af2-anm'
+    af2_anm = 'af2_anm'
     ring3 = 'ring3'
+    
+    aflow = 'aflow' # alphaFlow confirmations
+    aflow_ring3 = 'aflow_ring3'
     
 class PRO_FEAT_OPT(StringEnum):
     nomsa = 'nomsa'
@@ -51,11 +54,11 @@ class PRO_FEAT_OPT(StringEnum):
     foldseek = 'foldseek'
     
 # Protein options that require PDB structure files to work
-OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2-anm', 'ring3', 'foldseek'])
-OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2-anm', 'ring3'])
-
-STRUCT_EDGE_OPT = StringEnum('struct_edge_opt', ['anm', 'af2', 'af2-anm', 'ring3'])
-STRUCT_PRO_FEAT_OPT = StringEnum('struct_pro_feat_opt', ['foldseek'])
+OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2_anm', 'ring3', 
+                                                  'aflow', 'aflow_ring3', 'foldseek'])
+OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2_anm', 'ring3', 'aflow',
+                                                'aflow_ring3'])
+OPT_REQUIRES_AFLOW_CONF = StringEnum('alphaflow_confs', ['aflow', 'aflow_ring3'])
 
 # ligand options
 class LIG_EDGE_OPT(StringEnum):

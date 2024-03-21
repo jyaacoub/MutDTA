@@ -143,7 +143,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         self.only_download = only_download
         self.df = None # dataframe for csv of raw strings for SMILE protein sequence and affinity
-        self.alphaflow = alphaflow
+        self.alphaflow = self.pro_edge_opt in cfg.OPT_REQUIRES_AFLOW_CONF
         
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
@@ -173,8 +173,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     def edgew_p(self, code) -> str:
         """Also includes edge_attr"""
         dirname = os.path.join(self.raw_dir, 'edge_weights', self.pro_edge_opt)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        os.makedirs(dirname, exist_ok=True)
         return os.path.join(dirname, f'{code}.npy')
     
     @property
@@ -726,8 +725,8 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if (self.pro_edge_opt not in cfg.STRUCT_EDGE_OPT) and \
-            (self.pro_feat_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
+        if (self.pro_edge_opt not in cfg.OPT_REQUIRES_PDB) and \
+            (self.pro_feat_opt not in cfg.OPT_REQUIRES_PDB): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -864,7 +863,8 @@ class DavisKibaDataset(BaseDataset):
         
         # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.pro_feat_opt in cfg.STRUCT_PRO_FEAT_OPT:
+        if self.pro_edge_opt in cfg.OPT_REQUIRES_PDB or \
+            self.pro_feat_opt in cfg.OPT_REQUIRES_PDB:
             if self.pro_feat_opt == 'foldseek':
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]

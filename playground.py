@@ -1,36 +1,16 @@
 # %% building test datasets 
 import logging
-from src.data_prep.datasets import PDBbindDataset
+from src.data_prep.init_dataset import create_datasets
 from src import config as cfg
 
 logging.getLogger().setLevel(logging.INFO)
 
-data_root = cfg.DATA_ROOT
 overwrite = True
-FEATURE = cfg.PRO_FEAT_OPT.nomsa
-EDGE = cfg.PRO_EDGE_OPT.ring3 # cfg.PRO_EDGE_OPT.simple # simple edges (freq of contact) 
 
-ligand_feature = cfg.LIG_FEAT_OPT.original
-ligand_edge = cfg.LIG_EDGE_OPT.binary
-
-# prev was from subsampled msa (f'{data_root}/pdbbind/pdbbind_af2_out/all_ln/'):
-af_conf_dir = f"{data_root}/pdbbind/alphaflow_io/out_pid_ln/" 
-
-
-dataset = PDBbindDataset(
-        save_root=f'{data_root}/PDBbindDataset/alphaflow/',
-        data_root=f'{data_root}/pdbbind/v2020-other-PL/',
-        aln_dir=None, # not relevant for nomsa
-        cmap_threshold=8.0,
-        overwrite=overwrite, # overwrite old cmap.npy files
-        af_conf_dir=af_conf_dir,
-        feature_opt=FEATURE,
-        edge_opt=EDGE,
-        ligand_feature=ligand_feature,
-        ligand_edge=ligand_edge,
-        alphaflow=True
-        )
-
+create_datasets([cfg.DATA_OPT.PDBbind], [cfg.PRO_FEAT_OPT.nomsa],
+                [cfg.PRO_EDGE_OPT.aflow_ring3],
+                data_root=cfg.DATA_ROOT, overwrite=False,
+                k_folds=5)
 
 #%%
 from src.data_prep.datasets import BaseDataset
