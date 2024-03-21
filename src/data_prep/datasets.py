@@ -46,6 +46,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  ligand_feature:str='original', 
                  ligand_edge:str='binary',
                  verbose=False,
+                 alphaflow=False,
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
@@ -142,6 +143,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         self.only_download = only_download
         self.df = None # dataframe for csv of raw strings for SMILE protein sequence and affinity
+        self.alphaflow = alphaflow
+        
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
@@ -163,19 +166,16 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         # path to cleaned input alignment file
         raise NotImplementedError
     
+    @abc.abstractmethod
+    def af_conf_files(self, code) -> list[str]:
+        raise NotImplementedError
+    
     def edgew_p(self, code) -> str:
         """Also includes edge_attr"""
         dirname = os.path.join(self.raw_dir, 'edge_weights', self.pro_edge_opt)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
         return os.path.join(dirname, f'{code}.npy')
-    
-    def af_conf_files(self, code) -> list[str]:
-        # removing () from string since file names cannot include them and localcolabfold replaces them with _
-        code = re.sub(r'[()]', '_', code)
-        # localcolabfold has 'unrelaxed' as the first part after the code/ID.
-        # output must be in out directory
-        return glob(f'{self.af_conf_dir}/out?/{code}*_alphafold2_ptm_model_*.pdb')
     
     @property
     def raw_dir(self) -> str:
@@ -337,8 +337,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 af_confs = [os.path.join(self.af_conf_dir, f) for f in files \
                                             if f.startswith(pid)]
                 
-                # need at least 2 confimations...
-                if len(af_confs) <= 1:
+                # for alphaflow  af_confs will be a single file with multiple models
+                if self.alphaflow and len(af_confs) > 0:
+                    model_count = Chain.get_model_count(af_confs[0])
+                else:
+                    model_count = len(af_confs)
+                                            
+                if model_count < 5:
                     missing_conf.add(pid)
                     continue
                 
@@ -406,7 +411,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         edge_opt=edge,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
-                                                        af_confs=af_confs)
+                                                        af_confs=af_confs) #Note: this will handle if af_confs is a single file w/ multiple models
                     np.save(self.edgew_p(code), pro_edge_weight)
                 
                 if len(pro_edge_weight.shape) == 2:
@@ -527,9 +532,15 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
     
-    def af_conf_files(self, pid) -> list[str]:
+    def af_conf_files(self, pid) -> list[str]|str:
         if self.df is not None and pid in self.df.index:
             pid = self.df.loc[pid]['prot_id']
+            
+        if self.alphaflow:
+            fp = f'{self.af_conf_dir}/{pid}.pdb'
+            fp = fp if os.path.exists(fp) else None
+            return fp
+            
         return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
     
     def pdb_p(self, code):
@@ -701,6 +712,14 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
         # output must be in out directory
+        
+        # TODO: fix this to work with alphaflow outputs
+        # if self.alphaflow:
+        #     fp = f'{self.af_conf_dir}/{pid}.pdb'
+        #     fp = fp if os.path.exists(fp) else None
+        #     return fp
+            
+        
         return glob(f'{self.af_conf_dir}/out?/{code}_unrelaxed*_alphafold2_ptm_model_*.pdb')    
     
     def pdb_p(self, code, safe=True):
@@ -850,9 +869,15 @@ class DavisKibaDataset(BaseDataset):
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:
-                no_confs = [c for c in codes if (
-                (self.pdb_p(c, safe=False) is None) or # no highQ structure
-                    (len(self.af_conf_files(c)) < 2))]    # only if not for foldseek
+                if self.alphaflow:
+                    # af_conf_files will be different for alphaflow (single file)
+                    no_confs = [c for c in codes if (
+                        (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                            (Chain.get_model_count(self.af_conf_files(c)) < 5))] # only if not for foldseek
+                else:
+                    no_confs = [c for c in codes if (
+                        (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                            (len(self.af_conf_files(c)) < 5))] # only if not for foldseek
            
             # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
             no_confs.append('TESK1')

@@ -1,41 +1,3 @@
-#%%
-
-chain_sequence_validation_start = time.time()
-assert target_seq is None or chains[0].getSequence() == target_seq, \
-    f'Target seq is not chain seq for {pdb_fp} ({af_confs[0]})'
-logging.debug(f"Chain sequence validation: {time.time() - chain_sequence_validation_start} seconds")
-
-contact_map_start = time.time()
-M = np.array([c.get_contact_map() for c in chains]) < 8.0
-dist_cmap = np.sum(M, axis=0) / len(M)
-logging.debug(f"Contact map calculation: {time.time() - contact_map_start} seconds")
-
-ring3_runner_start = time.time()
-input_pdb, files = Ring3Runner.run(af_confs, overwrite=False)
-seq_len = len(Chain(input_pdb))
-logging.debug(f"Ring3Runner run: {time.time() - ring3_runner_start} seconds")
-
-ring3_cmaps_build_start = time.time()
-r3_cmaps = []
-for k, fp in files.items():
-    cmap = Ring3Runner.build_cmap(fp, seq_len)
-    r3_cmaps.append(cmap)
-logging.debug(f"Ring3 cmaps build: {time.time() - ring3_cmaps_build_start} seconds")
-
-all_cmaps_transpose_start = time.time()
-all_cmaps = np.array(r3_cmaps + [dist_cmap], dtype=np.float32)  # [6, L, L]
-all_cmaps = all_cmaps.transpose(1, 2, 0)  # [L, L, 6]
-logging.debug(f"All cmaps transpose: {time.time() - all_cmaps_transpose_start} seconds")
-
-logging.debug(f'Total runtime: {time.time() - start_time} seconds')
-logging.debug(f'Ring3Runner all_cmaps: {all_cmaps.shape}')
-
-
-# %% test XY.csv
-from src.utils.residue import Chain
-m = Chain.get_all_models('/cluster/home/t122995uhn/projects/data/pdbbind/alphaflow_io/out_pid_ln/T2I3Q3.pdb')
-
-
 # %% building test datasets 
 import logging
 from src.data_prep.datasets import PDBbindDataset
@@ -102,9 +64,8 @@ for file in tqdm(os.listdir(alphaflow_dir)):
     code, _ = os.path.splitext(file)
     pid = df_unique.loc[code].prot_id
     src, dst = f"{alphaflow_dir}/{file}", f"{ln_dir}/{pid}.pdb"
-    if os.path.exists(dst): 
-        os.remove(dst)
-    os.symlink(src,dst)
+    if not os.path.exists(dst):
+        os.symlink(src,dst)
     
 
 # %% RUN RING3
@@ -120,6 +81,7 @@ Ring3Runner.run_multiprocess(pdb_fps=files)
 # %% checking the number of models in each file, flagging any issues:
 from tqdm import tqdm
 import os
+from src.utils.residue import Chain
 alphaflow_dir = "../data/pdbbind/alphaflow_io/out_pdb_MD-distilled/"
 
 invalid_files = {}
@@ -129,9 +91,7 @@ for file in tqdm(os.listdir(alphaflow_dir)):
         continue
     file_path = os.path.join(alphaflow_dir, file)
     try:
-        with open(file_path, 'r') as f:
-            content = f.read()
-        occurrences = content.count("MODEL")
+        occurrences = Chain.get_model_count(file_path)
         if occurrences < 50:
             invalid_files[file] = (occurrences, file_path)
             
