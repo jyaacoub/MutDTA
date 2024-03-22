@@ -365,7 +365,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         unique_df = self.get_unique_prots(df)
         
         # Multiprocessed ring3 creation if chosen
-        if edge == cfg.PRO_EDGE_OPT.ring3:
+        if edge in cfg.OPT_REQUIRES_RING3:
             logging.info('Getting confs list for ring3.')
             files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
             confs = [[os.path.join(self.af_conf_dir, f) for f in files if f.startswith(pid)] for pid in unique_df.prot_id]

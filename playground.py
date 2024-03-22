@@ -8,7 +8,7 @@ logging.getLogger().setLevel(logging.INFO)
 overwrite = True
 
 create_datasets([cfg.DATA_OPT.PDBbind], [cfg.PRO_FEAT_OPT.nomsa],
-                [cfg.PRO_EDGE_OPT.aflow_ring3],
+                [cfg.PRO_EDGE_OPT.aflow],
                 data_root=cfg.DATA_ROOT, overwrite=False,
                 k_folds=5)
 

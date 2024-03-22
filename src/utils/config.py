@@ -59,6 +59,7 @@ OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2_anm', 'ring
 OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2_anm', 'ring3', 'aflow',
                                                 'aflow_ring3'])
 OPT_REQUIRES_AFLOW_CONF = StringEnum('alphaflow_confs', ['aflow', 'aflow_ring3'])
+OPT_REQUIRES_RING3 = StringEnum('ring3', ['ring3', 'aflow_ring3'])
 
 # ligand options
 class LIG_EDGE_OPT(StringEnum):
