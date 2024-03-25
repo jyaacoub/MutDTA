@@ -46,7 +46,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                  ligand_feature:str='original', 
                  ligand_edge:str='binary',
                  verbose=False,
-                 alphaflow=False,
                  *args, **kwargs):
         """
         Base class for datasets. This class is used to create datasets for 
