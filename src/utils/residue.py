@@ -1,3 +1,4 @@
+from typing import Iterable
 from matplotlib import pyplot as plt
 import numpy as np
 import os
@@ -115,7 +116,46 @@ class ResInfo():
 from collections import OrderedDict
 
 class Chain:
-    def __init__(self, pdb_file:str, model:int=1, t_chain:str=None):
+    @staticmethod
+    def _parse_args(args):
+        pdb_file = args[0]
+        model = args[1] if len(args) > 1 else None
+        return Chain(pdb_file, model)
+        
+    @staticmethod
+    def get_all_models_mp(pdb_fp:Iterable[str]|str, processes:int=None):
+        if isinstance(pdb_fp, list):
+            args = [(p) for p in pdb_fp]
+        else:
+            n_chains = Chain.get_model_count(pdb_fp)
+            args = [(pdb_fp, i) for i in range(n_chains)]
+        
+        with multiprocessing.Pool(processes=processes) as pool:
+            chains = list(pool.imap(Chain._parse_args, args))
+        return chains
+    
+    @staticmethod
+    def get_all_models(pdb_fp:Iterable[str]|str):
+        if isinstance(pdb_fp, list):
+            chains = [Chain(p) for p in pdb_fp]
+        else:
+            n_chains = Chain.get_model_count(pdb_fp)
+            chains = [Chain(pdb_fp, model=i) for i in range(n_chains)]
+        return chains
+    
+    @staticmethod
+    def get_model_count(pdb_fp:str):
+        try:
+            count = 0
+            with open(pdb_fp, 'r') as f:
+                for line in f:
+                    if line.startswith('MODEL'):
+                        count += 1
+        except Exception as e:
+            raise Exception(f'Error on {pdb_fp}') from e
+        return count
+    
+    def __init__(self, pdb_file:str, model:int=0, t_chain:str=None):
         """
         This class was created to mimic the AtomGroup class from ProDy but optimized for fast parsing 
         only parses what is required for ANM simulations.
@@ -302,7 +342,7 @@ class Chain:
         return ''.join(mut_seq)
     
     @staticmethod
-    def _pdb_get_chains(pdb_file: str, model:int=1) -> OrderedDict:
+    def _pdb_get_chains(pdb_file: str, model:int=0) -> OrderedDict:
         """
         Reads a pdb file and returns a dict of dicts with the following structure:
             {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
@@ -314,22 +354,29 @@ class Chain:
         `pdb_file` : str
             Path to pdb file
         `model`: int, optional
-            Model number to read, by default 1.
+            Model number to read, by default 0.
             
         Returns
         -------
         OrderedDict
             Dict of dicts with the chain as the key and the value is a dict with the residue as the key
         """
-        assert model == 1, 'Model selection not supported, only first model is read!'
-
         # read and filter
         with open(pdb_file, 'r') as f:
-            lines = f.readlines()
             chains = OrderedDict() # chain dict of dicts
             curr_res = None
             curr_chain = None
-            for line in lines:
+            
+            # moves to the desired model:
+            if model > 0:
+                found_model = False
+                for line in f:
+                    if line.startswith(f'MODEL {model}'):
+                        found_model = True
+                        break
+                assert found_model, f"Failed to find model {model} in {pdb_file}."
+            
+            for line in f:
                 if line[:6].strip() == 'ENDMDL': break # only get first model
                 if (line[:6].strip() != 'ATOM'): continue # skip non-atom lines
                 
@@ -633,9 +680,11 @@ class Ring3Runner():
                             names=['res1', 'type', 'res2', 'freq'])
         ```
         """
-        if isinstance(pdb_fp, list):
+        if isinstance(pdb_fp, list) and len(pdb_fp) > 1:
             combined_pdb_fp = Ring3Runner._prepare_input(pdb_fp, pdb_fp[0], overwrite=overwrite)
             pdb_fp = combined_pdb_fp
+        elif len(pdb_fp) <= 1:
+            pdb_fp = pdb_fp[0]
         
         # check if pdb file exists
         if not os.path.exists(pdb_fp):
@@ -686,23 +735,26 @@ class Ring3Runner():
             return (pdb_fp, str(e))
 
     @staticmethod
-    def run_multiprocess(pdb_fps:list[str]|list[list[str]], out_dir:str=None, verbose:bool=False, overwrite:bool=False):
+    def run_multiprocess(pdb_fps:list[str]|list[list[str]], out_dir:str=None, verbose:bool=False, overwrite:bool=False,
+                         processes=None):
         """
         Runs RING3 on multiple PDB files using multiprocessing.
         
         Args:
-            pdb_fps (list[str] | list[list[str]]): List of input pdb file paths.
-            out_dir (str, optional): Output directory to save the results, defaults to the input directory.
-            chain_id (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
-            verbose (bool, optional): Whether to display verbose output. Defaults to False.
-            overwrite (bool, optional): Whether to overwrite existing output files. Defaults to False.
+            `pdb_fps` (list[str] | list[list[str]]): List of input pdb file paths as single file with muliple 
+                                                  "models" or multiple pdb files with a single model each.
+            `out_dir` (str, optional): Output directory to save the results, defaults to the input directory.
+            `chain_id` (str, optional): Chain ID if the pdb file contains multiple chains. Defaults to None.
+            `verbose` (bool, optional): Whether to display verbose output. Defaults to False.
+            `overwrite` (bool, optional): Whether to overwrite existing output files. Defaults to False.
+            `processes` (int, optional): # of cores to distribute across, default is to use all available.
             
         Returns:
             results list[tuple[str]]: list of (PDB file paths, output file paths)
         """
         args = [(pdb_fp, out_dir, verbose, overwrite) for pdb_fp in pdb_fps]
         
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=processes) as pool:
             results = list(tqdm(pool.imap(Ring3Runner._run_proc, args),
                                 total=len(args),
                                 desc="Running multiproc. RING3"))

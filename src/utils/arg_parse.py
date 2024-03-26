@@ -58,13 +58,13 @@ def add_model_args(parser: argparse.ArgumentParser):
     parser.add_argument('-lf',
         '--ligand_feature_opt',
         choices=cfg.LIG_FEAT_OPT.list(), 
-        nargs='+', default=[None], required=False,
+        nargs='+', default=[cfg.LIG_FEAT_OPT.original], required=False,
         help=f'Ligand features option'
     )
     parser.add_argument('-le',
         '--ligand_edge_opt',
         choices=cfg.LIG_EDGE_OPT.list(),
-        nargs='+', default=[None], required=False,
+        nargs='+', default=[cfg.LIG_EDGE_OPT.binary], required=False,
         help=f'Ligand edge option'
     )
     

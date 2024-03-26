@@ -142,6 +142,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         self.only_download = only_download
         self.df = None # dataframe for csv of raw strings for SMILE protein sequence and affinity
+        self.alphaflow = self.pro_edge_opt in cfg.OPT_REQUIRES_AFLOW_CONF
+        
         super(BaseDataset, self).__init__(save_root, *args, **kwargs)
         self.load()
     
@@ -163,19 +165,15 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         # path to cleaned input alignment file
         raise NotImplementedError
     
+    @abc.abstractmethod
+    def af_conf_files(self, code) -> list[str]:
+        raise NotImplementedError
+    
     def edgew_p(self, code) -> str:
         """Also includes edge_attr"""
         dirname = os.path.join(self.raw_dir, 'edge_weights', self.pro_edge_opt)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        os.makedirs(dirname, exist_ok=True)
         return os.path.join(dirname, f'{code}.npy')
-    
-    def af_conf_files(self, code) -> list[str]:
-        # removing () from string since file names cannot include them and localcolabfold replaces them with _
-        code = re.sub(r'[()]', '_', code)
-        # localcolabfold has 'unrelaxed' as the first part after the code/ID.
-        # output must be in out directory
-        return glob(f'{self.af_conf_dir}/out?/{code}*_alphafold2_ptm_model_*.pdb')
     
     @property
     def raw_dir(self) -> str:
@@ -236,6 +234,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     def load(self): 
         # loading cleaned XY.csv file
+        # if self.df is None: # WARNING: HOT FIX to be compatible with old datasets
+        #    self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         
         self._indices = self.df.index
@@ -328,15 +328,20 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
             files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
             
-            for code, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
+            for _, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
                     desc='Filtering out proteins with missing PDB files for multiple confirmations',
                     total=len(df_unique)):
                 
                 af_confs = [os.path.join(self.af_conf_dir, f) for f in files \
                                             if f.startswith(pid)]
                 
-                # need at least 2 confimations...
-                if len(af_confs) <= 1:
+                # for alphaflow  af_confs will be a single file with multiple models
+                if self.alphaflow and len(af_confs) > 0:
+                    model_count = Chain.get_model_count(af_confs[0])
+                else:
+                    model_count = len(af_confs)
+                                            
+                if model_count < 5:
                     missing_conf.add(pid)
                     continue
                 
@@ -359,7 +364,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         unique_df = self.get_unique_prots(df)
         
         # Multiprocessed ring3 creation if chosen
-        if edge == cfg.PRO_EDGE_OPT.ring3:
+        if edge in cfg.OPT_REQUIRES_RING3:
             logging.info('Getting confs list for ring3.')
             files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
             confs = [[os.path.join(self.af_conf_dir, f) for f in files if f.startswith(pid)] for pid in unique_df.prot_id]
@@ -404,7 +409,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         edge_opt=edge,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
-                                                        af_confs=af_confs)
+                                                        af_confs=af_confs) #Note: this will handle if af_confs is a single file w/ multiple models
                     np.save(self.edgew_p(code), pro_edge_weight)
                 
                 if len(pro_edge_weight.shape) == 2:
@@ -469,6 +474,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         elif file_real(self.processed_paths[0]): # raw XY found
             self.df = pd.read_csv(self.processed_paths[0], index_col=0)
             logging.info(f'{self.processed_paths[0]} file found, using it to create the dataset')
+            # WARNING: HOT fix so that it is still compatible with prev datasets
+            # return
         else:
             logging.info('Creating dataset from scratch!')
             self.df = self.pre_process()
@@ -523,9 +530,15 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
     
-    def af_conf_files(self, pid) -> list[str]:
+    def af_conf_files(self, pid) -> list[str]|str:
         if self.df is not None and pid in self.df.index:
             pid = self.df.loc[pid]['prot_id']
+            
+        if self.alphaflow:
+            fp = f'{self.af_conf_dir}/{pid}.pdb'
+            fp = fp if os.path.exists(fp) else None
+            return fp
+            
         return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
     
     def pdb_p(self, code):
@@ -697,14 +710,22 @@ class DavisKibaDataset(BaseDataset):
         code = re.sub(r'[()]', '_', code)
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
         # output must be in out directory
+        
+        # TODO: fix this to work with alphaflow outputs
+        # if self.alphaflow:
+        #     fp = f'{self.af_conf_dir}/{pid}.pdb'
+        #     fp = fp if os.path.exists(fp) else None
+        #     return fp
+            
+        
         return glob(f'{self.af_conf_dir}/out?/{code}_unrelaxed*_alphafold2_ptm_model_*.pdb')    
     
     def pdb_p(self, code, safe=True):
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
-        if (self.pro_edge_opt not in cfg.STRUCT_EDGE_OPT) and \
-            (self.pro_feat_opt not in cfg.STRUCT_PRO_FEAT_OPT): return None
+        if (self.pro_edge_opt not in cfg.OPT_REQUIRES_PDB) and \
+            (self.pro_feat_opt not in cfg.OPT_REQUIRES_PDB): return None
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -841,14 +862,21 @@ class DavisKibaDataset(BaseDataset):
         
         # Checking that structure and af_confs files are present if required:
         no_confs = []
-        if self.pro_edge_opt in cfg.STRUCT_EDGE_OPT or self.pro_feat_opt in cfg.STRUCT_PRO_FEAT_OPT:
+        if self.pro_edge_opt in cfg.OPT_REQUIRES_PDB or \
+            self.pro_feat_opt in cfg.OPT_REQUIRES_PDB:
             if self.pro_feat_opt == 'foldseek':
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:
-                no_confs = [c for c in codes if (
-                (self.pdb_p(c, safe=False) is None) or # no highQ structure
-                    (len(self.af_conf_files(c)) < 2))]    # only if not for foldseek
+                if self.alphaflow:
+                    # af_conf_files will be different for alphaflow (single file)
+                    no_confs = [c for c in codes if (
+                        (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                            (Chain.get_model_count(self.af_conf_files(c)) < 5))] # only if not for foldseek
+                else:
+                    no_confs = [c for c in codes if (
+                        (self.pdb_p(c, safe=False) is None) or # no highQ structure
+                            (len(self.af_conf_files(c)) < 5))] # only if not for foldseek
            
             # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
             no_confs.append('TESK1')

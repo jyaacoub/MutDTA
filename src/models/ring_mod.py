@@ -16,7 +16,7 @@ from src.models.utils import BaseModel
 
 class Ring3DTA(BaseModel):
     """Model using ring3 features for protein branch with no ESM embeddings"""
-    def __init__(self, pro_emb_dim=512, output_dim=250, 
+    def __init__(self, pro_emb_dim=128, output_dim=250, 
                  dropout=0.2, dropout_prot=0.2, nheads_pro=5,
                  
                  # Feature input sizes:
@@ -55,18 +55,18 @@ class Ring3DTA(BaseModel):
         self.pro_gnn1 = TransformerConv(num_features_pro, pro_emb_dim, 
                                         edge_dim=edge_dim_pro, heads=nheads_pro,
                                         dropout=dropout)
-        self.pro_gnn2 = TransformerConv(pro_emb_dim*nheads_pro, pro_emb_dim * 2,
+        self.pro_gnn2 = TransformerConv(pro_emb_dim*nheads_pro, pro_emb_dim*2,
                                         edge_dim=edge_dim_pro, heads=nheads_pro,
                                         dropout=dropout)
-        self.pro_gnn3 = TransformerConv(pro_emb_dim*2*nheads_pro, pro_emb_dim * 4,
+        self.pro_gnn3 = TransformerConv(pro_emb_dim*2*nheads_pro, pro_emb_dim*2,
                                         edge_dim=edge_dim_pro, heads=nheads_pro,
                                         concat=False, dropout=dropout)
         
         self.pro_fc = nn.Sequential(
-            nn.Linear(pro_emb_dim * 4, pro_emb_dim * 2),
+            nn.Linear(pro_emb_dim*2, pro_emb_dim*2),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(pro_emb_dim * 2, 1024),
+            nn.Linear(pro_emb_dim*2, 1024),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(1024, output_dim),

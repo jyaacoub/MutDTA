@@ -4,6 +4,7 @@ import numpy as np
 from prody import calcANM
 
 from src.utils.residue import Chain, Ring3Runner
+from src.utils import config as cfg
 
 
 def get_target_edge(target_sequence:str, contact_map:str|np.ndarray,
@@ -184,7 +185,7 @@ def get_af_edge_weights(chains:Iterable[Chain], anm_cc=False, n_modes=5, n_cpu=4
 def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
                             n_modes:int=5, n_cpu=4,
                             cmap:str|np.ndarray=None,
-                            af_confs:Iterable[str]=None,
+                            af_confs:Iterable[str]|str=None,
                             filter=False) -> np.ndarray:
     """
     Returns an LxL matrix representing the edge weights of the protein
@@ -200,7 +201,8 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         
         cmap (str or np.array, optional): contact map for 'simple'. Defaults to None.
         
-        af_confs (Iterable[str], optional): configurations for af2 structs. Defaults to None.
+        af_confs (Iterable[str]|str, optional): configurations for af2 structs as seperate 
+                    pdbs or as one pdb with multiple models. Default is None.
         filter (bool, optional): Whether or not to filter misfolds in 'af2'. Defaults to False.
 
     Raises:
@@ -223,8 +225,8 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         # normalize cmap from 0.0 to 1.0 range using min-max normalization
         cmap_min, cmap_max = cmap.min(), cmap.max()
         return (cmap-cmap_min)/(cmap_max-cmap_min)
-    elif 'af2' in edge_opt:
-        chains = [Chain(p) for p in af_confs]
+    elif 'af2' in edge_opt or edge_opt == cfg.PRO_EDGE_OPT.aflow:
+        chains = Chain.get_all_models_mp(af_confs)
         # filter chains by template modeling score:
         if filter:
             template = Chain(pdb_fp)
@@ -232,16 +234,17 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         
         # NOTE: if chains (no pdbs found) is empty then we treat all edges as the same
         if len(chains) == 0:
-            logging.warning(f'no af2 pdbs for {pdb_fp}')
+            logging.warning(f'no conf pdbs for {pdb_fp}')
             # treat all edges as the same if no confirmations are found
             return np.ones(shape=(len(target_seq), len(target_seq)))
         
-        # NOTE: af2-anm gets run here:
+        # NOTE: af2-anm gets run here (if required)
         ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
         assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
         return ew
-    elif edge_opt == 'ring3':
-        chains = [Chain(p) for p in af_confs]
+    elif edge_opt == cfg.PRO_EDGE_OPT.ring3: # NOTE: aflow-ring3 gets run here
+        chains = Chain.get_all_models_mp(af_confs)
+            
         if len(chains) == 0:
             logging.warning(f'no af2 pdbs for {pdb_fp}')
             # treat all edges as the same if no confirmations are found
@@ -255,7 +258,7 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         dist_cmap = np.sum(M, axis=0) / len(M)
 
         # ring3 edge attribute extraction
-        # Note: this will create a "combined" pdb file in the same directory as the confirmaions
+        # Note: if not a single file this will combine all pdbs into one with multiple "MODELs"
         input_pdb, files = Ring3Runner.run(af_confs, overwrite=False)
         seq_len = len(Chain(input_pdb))
 
@@ -274,6 +277,7 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         # deletes all intermediate output files, since the main LxLx6 matrix should be saved at the end
         # Ring3Runner.cleanup(input_pdb, all=True)
         return all_cmaps
+    
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')
     
