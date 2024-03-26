@@ -1,8 +1,6 @@
 # %%
 
 # This file is used to generate the figures for the protein groups analysis (see issue #69)
-from src.utils.mmseq2 import MMseq2Runner
-from src.analysis.stratify_protein import map_davis_to_kinbase
 import pandas as pd 
 from glob import glob
 import os

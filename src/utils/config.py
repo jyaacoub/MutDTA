@@ -1,26 +1,77 @@
 import os
 # for huggingface models:
-
 os.environ['TRANSFORMERS_CACHE'] = os.path.abspath('../hf_models/')
 
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
 
-# model and data options
-MODEL_OPT = ['DG', 'DGI', 'ED', 'EDA', 'EDI', 'EDAI', 'EAT', 'CD', 'CED', 'SPD']
+from src.utils.enum import StringEnum
+#############################
+# Model and data options
+#############################
+# Datasets
+class DATA_OPT(StringEnum):
+    davis = 'davis'
+    kiba = 'kiba'
+    PDBbind = 'PDBbind'
 
-STRUCT_EDGE_OPT = ['anm', 'af2', 'af2-anm'] # edge options that require structural info (pdbs)
-EDGE_OPT = ['simple', 'binary'] + STRUCT_EDGE_OPT
+# Model options
+class MODEL_OPT(StringEnum):
+    DG = 'DG'
+    DGI = 'DGI'
+    
+    # ESM models:
+    ED = 'ED'
+    EDA = 'EDA'
+    EDI = 'EDI'
+    EDAI = 'EDAI'
+    SPD = 'SPD' # SaProt
+    
+    # ChemGPT models
+    CD = 'CD'
+    CED = 'CED'
+    
+    RNG = 'RNG' # ring3DTA model
 
-STRUCT_PRO_FEAT_OPT = ['foldseek'] # requires structural info (pdbs)
-PRO_FEAT_OPT = ['nomsa', 'msa', 'shannon'] + STRUCT_PRO_FEAT_OPT
+# protein options
+class PRO_EDGE_OPT(StringEnum):
+    simple = 'simple'
+    binary = 'binary'
+    
+    anm = 'anm'
+    af2 = 'af2'
+    af2_anm = 'af2_anm'
+    ring3 = 'ring3'
+    
+    aflow = 'aflow' # alphaFlow confirmations
+    aflow_ring3 = 'aflow_ring3'
+    
+class PRO_FEAT_OPT(StringEnum):
+    nomsa = 'nomsa'
+    msa = 'msa'
+    shannon = 'shannon'
+    
+    foldseek = 'foldseek'
+    
+# Protein options that require PDB structure files to work
+OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2_anm', 'ring3', 
+                                                  'aflow', 'aflow_ring3', 'foldseek'])
+OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2_anm', 'ring3', 'aflow',
+                                                'aflow_ring3'])
+OPT_REQUIRES_AFLOW_CONF = StringEnum('alphaflow_confs', ['aflow', 'aflow_ring3'])
+OPT_REQUIRES_RING3 = StringEnum('ring3', ['ring3', 'aflow_ring3'])
 
-LIG_FEAT_OPT = [None, 'original']
-LIG_EDGE_OPT = [None, 'binary']
+# ligand options
+class LIG_EDGE_OPT(StringEnum):
+    binary = 'binary'
 
-DATA_OPT = ['davis', 'kiba', 'PDBbind']
+class LIG_FEAT_OPT(StringEnum):
+    original = 'original'
 
-# data save paths
+
+#############################
+# save paths
+#############################
 DATA_ROOT = os.path.abspath('../data/')
 
 # Model save paths
@@ -60,3 +111,46 @@ elif 'narval' in DOMAIN_NAME:
 from pathlib import Path
 FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
 MMSEQ2_BIN = f'{Path.home()}/lib/mmseqs/bin/mmseqs'
+RING3_BIN = f'{Path.home()}/lib/ring-3.0.0/ring/bin/ring'
+
+
+###########################
+# LOGGING STUFF:
+# Adapted from - https://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
+###########################
+
+import logging 
+
+class CustomFormatter(logging.Formatter):
+
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    blue = "\x1b[36;20m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s|%(name)s:%(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: blue + '%(message)s' + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+logger = logging.getLogger()
+logger.setLevel(logging.WARNING)
+
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+ch.setFormatter(CustomFormatter())
+
+logger.addHandler(ch)

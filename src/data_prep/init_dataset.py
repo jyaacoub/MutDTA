@@ -19,7 +19,9 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                     k_folds:int=None,
                     random_seed:int=0,
                     train_split:float=0.8,
-                    val_split:float=0.1,) -> None:
+                    val_split:float=0.1,
+                    overwrite=True, 
+                    **kwargs) -> None:
     """
     Creates the datasets for the given data, feature, and edge options.
 
@@ -54,30 +56,37 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
             if FEATURE == 'msa':
                 # position frequency matrix creation -> important for msa feature
                 create_pfm_np_files(f'{data_root}/{data}/aln', processes=4)
-                
+            if 'af_conf_dir' not in kwargs:
+                kwargs['af_conf_dir'] = f'../colabfold/{data}_af2_out/'
             dataset = DavisKibaDataset(
                     save_root=f'{data_root}/DavisKibaDataset/{data}/',
                     data_root=f'{data_root}/{data}/',
                     aln_dir=f'{data_root}/{data}/aln/', 
                     cmap_threshold=-0.5, 
                     feature_opt=FEATURE,
-                    af_conf_dir=f'../colabfold/{data}_af2_out/', # colabfold not needed if no structure required methods are used (see config)
+                    overwrite=overwrite,
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
-                    ligand_edge=ligand_edge
+                    ligand_edge=ligand_edge,
+                    **kwargs
             )
         elif data == 'PDBbind':
+            if 'af_conf_dir' not in kwargs:
+                if EDGE in cfg.OPT_REQUIRES_AFLOW_CONF:
+                    kwargs['af_conf_dir'] = f'{data_root}/pdbbind/alphaflow_io/out_pid_ln/'
+                else:
+                    kwargs['af_conf_dir'] = f'{data_root}/pdbbind/pdbbind_af2_out/all_ln/'
             dataset = PDBbindDataset(
                     save_root=f'{data_root}/PDBbindDataset/',
-                    data_root=f'{data_root}/v2020-other-PL/',
-                    aln_dir=f'{data_root}/PDBbind_aln/',
+                    data_root=f'{data_root}/pdbbind/v2020-other-PL/',
+                    aln_dir=f'{data_root}/pdbbind/PDBbind_aln/',
                     cmap_threshold=8.0,
-                    overwrite=False, # overwrite old cmap.npy files
-                    af_conf_dir=f'{data_root}/PDBbind_afConf/',
+                    overwrite=overwrite, # overwrite old cmap.npy files
                     feature_opt=FEATURE,
                     edge_opt=EDGE,
                     ligand_feature=ligand_feature,
-                    ligand_edge=ligand_edge
+                    ligand_edge=ligand_edge,
+                    **kwargs
                     )
         elif data == 'Platinum':
             dataset = PlatinumDataset(
@@ -85,11 +94,15 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
                 data_root=f'{data_root}/PlatinumDataset/raw',
                 aln_dir=None,
                 cmap_threshold=8.0,
+                overwrite=overwrite,
                 feature_opt=FEATURE,
                 edge_opt=EDGE,
                 ligand_feature=ligand_feature,
-                ligand_edge=ligand_edge
+                ligand_edge=ligand_edge,
+                **kwargs
                 )
+        else:
+            raise ValueError(f"Invalid data type {data}, pick from {cfg.DATA_OPT.list()}.")
         
         # saving training, validation, and test sets
         if k_folds is None:

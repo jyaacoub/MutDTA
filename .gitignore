@@ -127,6 +127,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.vscode
 
 # Spyder project settings
 .spyderproject
@@ -217,3 +218,7 @@ results/model_checkpoints/ours/*.model_tmp
 results/model_checkpoints/ours/*.model
 *.swp
 *.swo
+
+results/model_media/*/train_log/*
+results/model_media/*/train_set_pred/*
+results/model_media/*/test_set_pred/*

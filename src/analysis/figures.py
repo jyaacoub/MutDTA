@@ -293,22 +293,20 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
 
     filtered_df.sort_values(by=['edge'], inplace=True)
 
-    # Get values for each edge type
-    binary = filtered_df[filtered_df['edge'] == 'binary'][sel_col]
-    simple = filtered_df[filtered_df['edge'] == 'simple'][sel_col]
-    anm = filtered_df[filtered_df['edge'] == 'anm'][sel_col]
-    af2 = filtered_df[filtered_df['edge'] == 'af2'][sel_col]
+    # Dynamically collect values for each edge type not in exclude
+    edge_types = filtered_df['edge'].unique()
+    edge_types = [e for e in edge_types if e not in exclude]
+    plot_data = [filtered_df[filtered_df['edge'] == edge][sel_col] for edge in edge_types]
 
     # plot violin plot with annotations
-    plot_data = [binary, simple, anm, af2]
     ax = sns.violinplot(data=plot_data, ax=ax)
-    ax.set_xticklabels(['binary', 'simple', 'anm', 'af2'])
+    ax.set_xticklabels(edge_types)
     ax.set_ylabel(sel_col)
     ax.set_xlabel('Edge type')
     ax.set_title(f'Edge type {sel_col} for {sel_dataset}')
 
     if add_stats:
-        pairs = [(0,1), (0,2), (0,3), (1,2), (1,3), (2,3)]
+        pairs = [(i, j) for i in range(len(edge_types)) for j in range(i+1, len(edge_types))]
         annotator = Annotator(ax, pairs, data=plot_data, verbose=verbose)
         annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
                             hide_non_significant=not verbose)
@@ -317,7 +315,7 @@ def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cinde
     if show:
         plt.show()
         
-    return binary, simple, anm, af2
+    return plot_data
 
 def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
     # Create a subplot with 3 rows and 1 column
@@ -413,7 +411,7 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
     df['fold'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)(\d*)', expand=True)[1] # fold number if available
     df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon|foldseek)F_', expand=False)
-    df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2-anm)E_', expand=False)
+    df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2_anm|ring3|aflow|aflow_ring3)E_', expand=False)
     df['ddp'] = df['run'].str.contains('DDP-')
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
     df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False).astype(int)

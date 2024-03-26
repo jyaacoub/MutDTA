@@ -1,15 +1,17 @@
-# %%
-from src.utils.loader import Loader
-from src.utils import config as cfg
+#%%
+from src.analysis.figures import prepare_df
 
-model = Loader.init_test_model()
+df = prepare_df()
 
-loaders = Loader.load_DataLoaders(data='davis', pro_feature='nomsa', edge_opt='binary', path=cfg.DATA_ROOT, 
-                                        ligand_feature=None, ligand_edge=None,
-                                        batch_train=1,
-                                        datasets=['test'])
 # %%
-for b in loaders['test']: break
-# %%
-model(b['protein'], b['ligand'])
+df[df.edge.str.contains('ring3') | df.edge.str.contains('aflow')]
+
+#%%
+from src.analysis.figures import fig5_edge_feat_violin
+
+fig5_edge_feat_violin(df, sel_dataset='PDBbind', exclude=['simple'], 
+                        sel_col='cindex', show=True, add_stats=False)
+fig5_edge_feat_violin(df, sel_dataset='PDBbind', exclude=['simple'], 
+                        sel_col='mse', show=True, add_stats=False)
+
 # %%
