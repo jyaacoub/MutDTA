@@ -53,9 +53,12 @@ class PRO_FEAT_OPT(StringEnum):
     
     foldseek = 'foldseek'
     
+    gvp = 'gvp'
+    
 # Protein options that require PDB structure files to work
 OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2_anm', 'ring3', 
-                                                  'aflow', 'aflow_ring3', 'foldseek'])
+                                                  'aflow', 'aflow_ring3', 'foldseek',
+                                                  'gvp'])
 OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2_anm', 'ring3', 'aflow',
                                                 'aflow_ring3'])
 OPT_REQUIRES_AFLOW_CONF = StringEnum('alphaflow_confs', ['aflow', 'aflow_ring3'])
@@ -67,6 +70,7 @@ class LIG_EDGE_OPT(StringEnum):
 
 class LIG_FEAT_OPT(StringEnum):
     original = 'original'
+    gvp = 'gvp'
 
 
 #############################
@@ -84,7 +88,7 @@ CHECKPOINT_SAVE_DIR = MODEL_SAVE_DIR # alias for clarity
 # cluster based configs:
 import socket
 DOMAIN_NAME = socket.getfqdn().split('.')
-CLUSTER = DOMAIN_NAME[1]
+CLUSTER = DOMAIN_NAME[0]
 
 SLURM_CONSTRAINT = None
 SLURM_PARTITION = None
