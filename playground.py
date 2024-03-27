@@ -1,17 +1,18 @@
-#%%
-from src.analysis.figures import prepare_df
+# %%
+from prody import fetchPDB
 
-df = prepare_df()
+fetchPDB('10gs', compressed=False)
 
 # %%
-df[df.edge.str.contains('ring3') | df.edge.str.contains('aflow')]
+from src.utils.residue import Chain
+c = Chain('10gs.pdb', grep_atoms={'CA', 'N', 'C'})
+# %%
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
 
-#%%
-from src.analysis.figures import fig5_edge_feat_violin
-
-fig5_edge_feat_violin(df, sel_dataset='PDBbind', exclude=['simple'], 
-                        sel_col='cindex', show=True, add_stats=False)
-fig5_edge_feat_violin(df, sel_dataset='PDBbind', exclude=['simple'], 
-                        sel_col='mse', show=True, add_stats=False)
+c.getCoords(get_all=True).shape # (N, 3)
 
 # %%
+from src.data_prep.feature_extraction.gvp import GVPFeatures
+
+gvp_f = GVPFeatures()

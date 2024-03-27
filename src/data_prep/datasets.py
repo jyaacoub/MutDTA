@@ -409,7 +409,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         edge_opt=edge,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
-                                                        af_confs=af_confs) #Note: this will handle if af_confs is a single file w/ multiple models
+                                                        af_confs=af_confs) # NOTE: this will handle if af_confs is a single file w/ multiple models
                     np.save(self.edgew_p(code), pro_edge_weight)
                 
                 if len(pro_edge_weight.shape) == 2:

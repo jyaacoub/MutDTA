@@ -1,7 +1,12 @@
 from typing import Iterable
-from matplotlib import pyplot as plt
+import os, subprocess, shutil, multiprocessing, logging
+
 import numpy as np
-import os
+import pandas as pd
+from tqdm import tqdm
+from matplotlib import pyplot as plt
+
+from src import config as cfg
 
 # one hot encoding
 def one_hot(x, allowable_set, cap=False):
@@ -13,7 +18,6 @@ def one_hot(x, allowable_set, cap=False):
             raise Exception('input {0} not in allowable set{1}:'.format(x, allowable_set))
             
     return np.eye(len(allowable_set))[allowable_set.index(x)]
-
 
 class ResInfo():
     """
@@ -110,8 +114,6 @@ class ResInfo():
     pl = normalize_add_x(pl)
     hydrophobic_ph2 = normalize_add_x(hydrophobic_ph2)
     hydrophobic_ph7 = normalize_add_x(hydrophobic_ph7)
-    
-
 
 from collections import OrderedDict
 
@@ -155,7 +157,8 @@ class Chain:
             raise Exception(f'Error on {pdb_fp}') from e
         return count
     
-    def __init__(self, pdb_file:str, model:int=0, t_chain:str=None):
+    def __init__(self, pdb_file:str, model:int=0, t_chain:str=None,
+                 grep_atoms:set[str]={'CA', 'CB'}, get_all:bool=None):
         """
         This class was created to mimic the AtomGroup class from ProDy but optimized for fast parsing 
         only parses what is required for ANM simulations.
@@ -164,10 +167,20 @@ class Chain:
             pdb_file (str): file path to pdb file to parse
             model (int, optional): model to parse from file. Defaults to 1.
             t_chain (str, optional): target chain to focus on. Defaults to None.
+            grep_atoms (set[str], optional): atoms to grep from the pdb file. Defaults to {'CA'}.
+                        This is useful for GVP model where we need CA, C and N atoms.
         """
-        # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
-        self._chains = self._pdb_get_chains(pdb_file, model)
         self.pdb_file = pdb_file
+        self.model = model
+        self.grep_atoms = grep_atoms
+        
+        if get_all is None:
+            get_all = len(grep_atoms) > 1 and grep_atoms != {'CA', 'CB'}
+        self.get_all = get_all
+        
+        
+        # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
+        self._chains = self._pdb_get_chains(pdb_file, model, self.grep_atoms)
         
         # if t_chain is not specified then set it to be the largest chain
         self.t_chain = t_chain or max(self._chains, key=lambda x: len(self._chains[x]))
@@ -235,22 +248,44 @@ class Chain:
             self._seq = seq
         return self._seq
         
-    def getCoords(self) -> np.array:
+    def getCoords(self, get_all:bool=None) -> np.array:
         """
         camelCase to mimic ProDy
-
+        NOTE Order of residues is maintained in the coords array, and (if get_all) the order of atoms in each 
+        residue is set by the order of the grep_atoms set.
+        
+        Args:
+            get_all (bool, optional): If True, returns a shape of (LxNx3) where L is the length of the chain
+                and N is the number of atoms grep'd (see self.grep_atoms). If False, returns a shape of (Lx3) 
+                falling back to CB if CA is not found Defaults to False.
+                
+        
         Returns:
-            np.array: Lx3 shape array
+            np.array: Lx3|LxNx3 shape array
         """
-        if self._coords is None:
+        get_all = self.get_all if get_all is None else get_all
+        
+        if self._coords is None or self.get_all != get_all:
             coords = []
             # chain has format: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}
             for res in self.chain.values():
-                if "CA" in res:
-                    coords.append(res["CA"])
+                if get_all:
+                    res_coords = []
+                    for atm in self.grep_atoms:
+                        if atm in res:
+                            res_coords.append(res[atm])
+                        else: # if atom not found then add nan
+                            res_coords.append(np.array([np.nan, np.nan, np.nan]))
+                            logging.warning(f"Atom {atm} not found in residue {res}")
+                    coords.append(res_coords)
                 else:
-                    coords.append(res["CB"])
+                    if "CA" in res:
+                        coords.append(res["CA"])
+                    else:
+                        coords.append(res["CB"])
             self._coords = np.array(coords)
+            
+            self.get_all = get_all
         return self._coords
       
     @staticmethod
@@ -342,7 +377,7 @@ class Chain:
         return ''.join(mut_seq)
     
     @staticmethod
-    def _pdb_get_chains(pdb_file: str, model:int=0) -> OrderedDict:
+    def _pdb_get_chains(pdb_file: str, model:int=0, grep_atoms:set[str]={'CA'}) -> OrderedDict:
         """
         Reads a pdb file and returns a dict of dicts with the following structure:
             {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
@@ -382,37 +417,37 @@ class Chain:
                 
                 # only want CA and CB atoms
                 atm_type = line[12:16].strip()
-                alt_loc = line[16] # some can have multiple locations for each protein confirmation.
+                alt_loc = line[16].strip() # some can have multiple locations for each protein confirmation.
                 res_name = line[17:20].strip()
-                if res_name == 'UNK': continue # WARNING: unkown residues are skipped
-                if atm_type not in ['CA', 'CB']: continue
-                icode = line[26].strip() # dumb icode because residues will sometimes share the same res num 
-                                # (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
+                # WARNING: unkown residues are skipped
+                if res_name == 'UNK' or atm_type not in grep_atoms: continue
+                icode = line[26].strip() # icode for insertions (https://www.wwpdb.org/documentation/file-format-content/format33/sect9.html)
 
                 curr_res = int(line[22:26])
                 curr_chain = line[21]
 
                 # Glycine has no CB atom, so only CA is saved
                 res_key = f"{curr_res}_{icode}"            
-                chains.setdefault(curr_chain, OrderedDict())
+                ch_d = chains.setdefault(curr_chain, OrderedDict())
+                res_dict = ch_d.setdefault(res_key, OrderedDict()) # get/create residue dict
                 
-                # Only keep first alt_loc
-                if atm_type in chains[curr_chain].get(res_key, {}) and bool(alt_loc.strip()):
+                # Only keep first alt_loc, skip if already exists in chain
+                if atm_type in res_dict and len(alt_loc) != 0:
                     continue
-                    
-                assert atm_type not in chains[curr_chain].get(res_key, {}), \
-                        f"Duplicate {atm_type} for residue {res_key} in {pdb_file}"
+                
+                if atm_type in res_dict:
+                    raise Exception(f"Duplicate {atm_type} for residue {res_key} in {pdb_file}")
 
                 # adding atom to residue
                 x, y, z = float(line[30:38]), float(line[38:46]), float(line[46:54])
-                chains[curr_chain].setdefault(res_key, OrderedDict())[atm_type] = np.array([x,y,z])
+                res_dict[atm_type] = np.array([x,y,z])
 
                 # Saving residue name
                 res_name = line[17:20].strip()
-                assert ("name" not in chains[curr_chain].get(res_key, {})) or \
-                    (chains[curr_chain][res_key]["name"] == res_name), \
+                assert ("name" not in res_dict) or \
+                    (res_dict["name"] == res_name), \
                                             f"Inconsistent residue name for residue {res_key} in {pdb_file}"
-                chains[curr_chain][res_key]["name"] = res_name
+                res_dict["name"] = res_name
         return chains  
             
     def buildHessian(self, cutoff:int=15., g:float=1.0):
@@ -494,12 +529,6 @@ class Chain:
             plt.show()
             
         return pairwise_distances
-    
-
-import pandas as pd
-from src import config as cfg
-import os, subprocess, shutil, multiprocessing, logging
-from tqdm import tqdm
 
 class Ring3Runner():
     """
