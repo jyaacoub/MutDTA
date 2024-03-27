@@ -95,12 +95,12 @@ class GVPFeatures:
             edge_index = torch_cluster.knn_graph(X_ca, k=self.top_k) 
             
             pos_embeddings = self._positional_embeddings(edge_index)
-            E_vectors = X_ca[edge_index[0]] - X_ca[edge_index[1]]
+            E_vectors = X_ca[edge_index[0]] - X_ca[edge_index[1]] # unit vector in the direction of Ca(j) -> Ca(i)
             rbf = _rbf(E_vectors.norm(dim=-1), D_count=self.num_rbf, device=self.device)
             
-            dihedrals = self._dihedrals(coords)                     
-            orientations = self._orientations(X_ca)
-            sidechains = self._sidechains(coords)
+            dihedrals = self._dihedrals(coords)     # 6 scalar features (sine and cosine of phi, psi, omega)
+            orientations = self._orientations(X_ca) # 2 vector features (forward and reverse unit vectors)
+            sidechains = self._sidechains(coords)   # 1 vector feature (unit vector in the imputed sidechain direction)
             
             # scalar features:
             node_s = dihedrals
