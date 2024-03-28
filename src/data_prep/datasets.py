@@ -355,7 +355,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if len(missing_conf) > 0:
             filtered_df = df[~df.prot_id.isin(missing_conf)]
             logging.warning(f'{len(missing_conf)} mismatched or missing pids')
-            
+        else:
+            filtered_df = df
+        
         logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
         
         return filtered_df
@@ -623,6 +625,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pdb_codes = df_binding.index # pdbcodes
         
         ############## validating codes #############
+        logging.debug('Validating Codes')
         if self.aln_dir is not None: # create msa if 'msaF' is selected
             #NOTE: assuming MSAs are already created, since this would take a long time to do.
             
@@ -634,6 +637,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             valid_codes = [c for c in pdb_codes if os.path.isfile(self.pdb_p(c))]
             
         pdb_codes = valid_codes
+        logging.debug(f"{len(pdb_codes)} valid PDBs with existing files.")
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
                 
         ############## Get ligand info #############

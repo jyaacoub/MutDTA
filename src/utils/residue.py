@@ -171,6 +171,7 @@ class Chain:
                         This is useful for GVP model where we need CA, C and N atoms.
         """
         self.pdb_file = pdb_file
+        self.f_name = os.path.basename(pdb_file)
         self.model = model
         self.grep_atoms = grep_atoms
         
@@ -268,15 +269,16 @@ class Chain:
         if self._coords is None or self.get_all != get_all:
             coords = []
             # chain has format: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}
-            for res in self.chain.values():
+            for key, res in self.chain.items():
                 if get_all:
                     res_coords = []
+                    # ca_or_cb
                     for atm in self.grep_atoms:
                         if atm in res:
                             res_coords.append(res[atm])
                         else: # if atom not found then add nan
                             res_coords.append(np.array([np.nan, np.nan, np.nan]))
-                            logging.warning(f"Atom {atm} not found in residue {res}")
+                            logging.warning(f"Atom {atm} not found in residue {key} of {self.f_name}")
                     coords.append(res_coords)
                 else:
                     if "CA" in res:

@@ -1,7 +1,6 @@
 import os
 import sys
 import itertools
-from typing import Iterable
 from src.utils import config as cfg
 
 # Add the project root directory to Python path so imports work if file is run
@@ -12,10 +11,10 @@ from src.data_prep.feature_extraction.protein_nodes import create_pfm_np_files
 from src.data_prep.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
 from src.train_test.splitting import train_val_test_split, balanced_kfold_split
 
-def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Iterable[str],
+def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:list[str]|str,
                     pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
-                    ligand_features:Iterable[str]=['original'],
-                    ligand_edges:Iterable[str]=['binary'],
+                    ligand_features:list[str]=['original'],
+                    ligand_edges:list[str]=['binary'],
                     k_folds:int=None,
                     random_seed:int=0,
                     train_split:float=0.8,
@@ -27,25 +26,30 @@ def create_datasets(data_opt:Iterable[str], feat_opt:Iterable[str], edge_opt:Ite
 
     Parameters
     ----------
-    `data_opt` : Iterable[str]
+    `data_opt` : list[str]|str
         The datasets to create.
-    `feat_opt` : Iterable[str]
+    `feat_opt` : list[str]|str
         The protein feature options to use.
-    `edge_opt` : Iterable[str]
+    `edge_opt` : list[str]|str
         The protein edge weight options to use.
     `pro_overlap` : bool
         Whether or not to create datasets with overlapping proteins, by default 
         False
     `data_root` : str, optional
         The root directory for the datasets, by default cfg.DATA_ROOT
-    `ligand_features` : Iterable[str], optional
+    `ligand_features` : list[str], optional
         Ligand features to use, by default ['original']
-    `ligand_edges` : Iterable[str], optional
+    `ligand_edges` : list[str], optional
         Ligand edges to use, by default 'binary'
     `k_folds` : int, optional
         If not None, the number of folds to split the final training set into for 
         cross validation, by default None
     """
+    if isinstance(data_opt, str): data_opt = [data_opt]
+    if isinstance(feat_opt, str): feat_opt = [feat_opt]
+    if isinstance(edge_opt, str): edge_opt = [edge_opt]
+    if isinstance(ligand_features, str): ligand_features = [ligand_features]
+    if isinstance(ligand_edges, str): ligand_edges = [ligand_edges]
     
     # Loop through all combinations of data, feature, and edge options
     for data,     FEATURE,      EDGE, ligand_feature, ligand_edge in itertools.product(

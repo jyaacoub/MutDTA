@@ -1,9 +1,13 @@
 #%%
 from src.data_prep.init_dataset import create_datasets
 from src import config as cfg
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
 
 create_datasets(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.gvp, cfg.PRO_EDGE_OPT.binary,
                 k_folds=5)
+create_datasets(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.nomsa, [cfg.PRO_EDGE_OPT.aflow, cfg.PRO_EDGE_OPT.aflow_ring3],
+                k_folds=5, overwrite=True)
 
 
 # %%
@@ -30,7 +34,7 @@ f = gvp_f.featurize_as_graph('10gs', c.getCoords(get_all=True), c.sequence)
 
 # %%
 from src.models.gvp_branch import GVPBranchProt
-
+# MutDTA/src/models/gvp_branch.py
 m = GVPBranchProt(node_in_dim=(6, 3), node_h_dim=(6, 3),
                 edge_in_dim=(32, 1), edge_h_dim=(32, 1),
                 seq_in=False, num_layers=3, drop_rate=0.0)
