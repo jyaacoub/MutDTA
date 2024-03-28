@@ -4,7 +4,7 @@ from torch_scatter import scatter_mean
 from src.models.utils import GVP, GVPConvLayer, LayerNorm
 
 # Adapted from https://github.com/drorlab/gvp-pytorch/blob/82af6b22eaf8311c15733117b0071408d24ed877/gvp/models.py 
-class GVP_Protein(nn.Module):
+class GVPBranchProt(nn.Module):
     '''
     GVP model for protein branch.
     
@@ -28,7 +28,7 @@ class GVP_Protein(nn.Module):
                  edge_in_dim, edge_h_dim,
                  seq_in=False, num_layers=3, drop_rate=0.1):
         
-        super(GVP_Protein, self).__init__()
+        super(GVPBranchProt, self).__init__()
         
         if seq_in:
             self.W_s = nn.Embedding(20, 20)
@@ -59,7 +59,7 @@ class GVP_Protein(nn.Module):
             nn.Linear(2*ns, 1)
         )
 
-    def forward(self, h_V, edge_index, h_E, seq=None, batch=None):      
+    def forward(self, data):      
         '''
         :param h_V: tuple (s, V) of node embeddings
         :param edge_index: `torch.Tensor` of shape [2, num_edges]
@@ -67,6 +67,10 @@ class GVP_Protein(nn.Module):
         :param seq: if not `None`, int `torch.Tensor` of shape [num_nodes]
                     to be embedded and appended to `h_V`
         '''
+        h_V, h_E = (data.node_s, data.node_v), (data.edge_s, data.edge_v)
+        edge_index = data.edge_index
+        batch = data.batch if hasattr(data, 'batch') else None #TODO: check if this is correct
+        
         if seq is not None:
             seq = self.W_s(seq)
             h_V = (torch.cat([h_V[0], seq], dim=-1), h_V[1])

@@ -1,3 +1,11 @@
+#%%
+from src.data_prep.init_dataset import create_datasets
+from src import config as cfg
+
+create_datasets(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.gvp, cfg.PRO_EDGE_OPT.binary,
+                k_folds=5)
+
+
 # %%
 from prody import fetchPDB
 
@@ -21,11 +29,14 @@ gvp_f = GVPFeatures()
 f = gvp_f.featurize_as_graph('10gs', c.getCoords(get_all=True), c.sequence)
 
 # %%
-from src.models.gvp import GVP_Protein
+from src.models.gvp_branch import GVPBranchProt
 
-m = GVP_Protein(node_in_dim=(6, 3), node_h_dim=(6, 3),
+m = GVPBranchProt(node_in_dim=(6, 3), node_h_dim=(6, 3),
                 edge_in_dim=(32, 1), edge_h_dim=(32, 1),
                 seq_in=False, num_layers=3, drop_rate=0.0)
+
+#%%
+p, out, out1, h_V  = m((f.node_s, f.node_v), f.edge_index, (f.edge_s, f.edge_v))
 
 # %%
 # N=number of nodes, E=number of edges
@@ -63,3 +74,5 @@ batch_idx = torch.randint(0, 2, (N,)) # batch size of 2
 p, out, out1, h_V = m(nodes, edge_index, edges, batch=None)
 
 # %%
+
+
