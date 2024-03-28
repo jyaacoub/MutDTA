@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from src.data_prep.feature_extraction.gvp_feats import GVPFeatures
 from src.utils import config as cfg
 from src.utils.residue import Chain, Ring3Runner
 from src.utils.exceptions import DatasetNotFound
@@ -374,6 +375,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
                         total=len(unique_df)):
+            
+            if node_feat == cfg.PRO_FEAT_OPT.gvp:
+                # gvp has its own unique graph to support the architecture implementation.
+                coords = Chain(self.pdb_p(code), grep_atoms={'CA', 'N', 'C'}).getCoords(get_all=True)
+                processed_prots[prot_id] = GVPFeatures().featurize_as_graph(code, coords, pro_seq)
+                continue
+            
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
@@ -629,7 +637,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
                 
         ############## Get ligand info #############
-        # WARNING: ORDER MATTERS SINCE LIGAND INFO REDUCED NUMBER OF PDBS DUE TO MISSING SMI...
+        # WARNING: THIS SHOULD ALWAYS COME BEFORE GETTING PROTEIN SEQUEINCES. ORDER MATTERS 
+        # BECAUSE LIGAND INFO REDUCES NUMBER OF PDBS DUE TO MISSING SMILES.
         # Extracting SMILE strings:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
                                               dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
@@ -864,7 +873,7 @@ class DavisKibaDataset(BaseDataset):
         no_confs = []
         if self.pro_edge_opt in cfg.OPT_REQUIRES_PDB or \
             self.pro_feat_opt in cfg.OPT_REQUIRES_PDB:
-            if self.pro_feat_opt == 'foldseek':
+            if self.pro_feat_opt == cfg.PRO_FEAT_OPT.foldseek:
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:

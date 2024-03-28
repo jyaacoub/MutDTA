@@ -72,13 +72,14 @@ class GVPFeatures:
                        'N': 2, 'Y': 18, 'M': 12}
         self.num_to_letter = {v:k for k, v in self.letter_to_num.items()}
     
-    def featurize_as_graph(self, prot_id, prot_coords, prot_seq):
+    def featurize_as_graph(self, prot_id, prot_coords, prot_seq) -> torch_geometric.data.Data:
         """
         Converts inputs into a graph data object for GVP model.
         
         prot_coords: For each structure, coords should be a 
                 [num_residues x 4 x 3] nested list of the positions of the 
-                backbone N, C-alpha, C, and O atoms of each residue (in that order).
+                backbone C-alpha, N, and C atoms of each residue (in that order).
+                    - {'CA', 'N', 'C'}
         
         """
         with torch.no_grad():
