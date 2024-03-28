@@ -1,13 +1,18 @@
-#%%
-from src.data_prep.init_dataset import create_datasets
-from src import config as cfg
-import logging
-logging.getLogger().setLevel(logging.DEBUG)
 
-create_datasets(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.gvp, cfg.PRO_EDGE_OPT.binary,
-                k_folds=5)
-create_datasets(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.nomsa, [cfg.PRO_EDGE_OPT.aflow, cfg.PRO_EDGE_OPT.aflow_ring3],
-                k_folds=5, overwrite=True)
+#%%
+from src.utils.loader import Loader
+from src import config as cfg
+dl = Loader.load_DataLoaders(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.gvp, cfg.PRO_EDGE_OPT.binary, training_fold=0)
+sample = next(iter(dl['test']))
+
+#%%
+from src.models.gvp_models import GVPModel
+m = GVPModel()
+#%%
+m.pro_branch(sample['protein'])
+
+# %%
+o = m(sample['protein'], sample['ligand'])
 
 
 # %%

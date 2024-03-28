@@ -147,6 +147,8 @@ class Loader():
         elif model == 'RNG':
             model = Ring3DTA(num_features_pro=54,
                              dropout=dropout)
+        elif model == cfg.MODEL_OPT.GVP:
+            model = GVPModel(num_feat_mol=78, dropout=dropout, dropout_prot=dropout)
         return model
     
     @staticmethod

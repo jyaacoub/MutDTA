@@ -24,12 +24,13 @@ class GVPBranchProt(nn.Module):
     :param num_layers: number of GVP-GNN layers
     :param drop_rate: rate to use in all dropout layers
     '''
-    def __init__(self, node_in_dim, node_h_dim, 
-                 edge_in_dim, edge_h_dim,
-                 seq_in=False, num_layers=3, drop_rate=0.1):
+    def __init__(self, node_in_dim=(6, 3), node_h_dim=(6, 3), 
+                edge_in_dim=(32, 1), edge_h_dim=(32, 1), final_out=1,
+                seq_in=False, num_layers=3, drop_rate=0.1):
         
         super(GVPBranchProt, self).__init__()
         
+        self.seq = seq_in
         if seq_in:
             self.W_s = nn.Embedding(20, 20)
             node_in_dim = (node_in_dim[0] + 20, node_in_dim[1])
@@ -56,7 +57,7 @@ class GVPBranchProt(nn.Module):
         self.dense = nn.Sequential(
             nn.Linear(ns, 2*ns), nn.ReLU(inplace=True),
             nn.Dropout(p=drop_rate),
-            nn.Linear(2*ns, 1)
+            nn.Linear(2*ns, final_out)
         )
 
     def forward(self, data):      
@@ -70,10 +71,12 @@ class GVPBranchProt(nn.Module):
         h_V, h_E = (data.node_s, data.node_v), (data.edge_s, data.edge_v)
         edge_index = data.edge_index
         batch = data.batch if hasattr(data, 'batch') else None #TODO: check if this is correct
-        
-        if seq is not None:
+
+        if self.seq:
+            seq = data.seq
             seq = self.W_s(seq)
             h_V = (torch.cat([h_V[0], seq], dim=-1), h_V[1])
+            
         h_V = self.W_v(h_V)
         h_E = self.W_e(h_E)
         for layer in self.layers:
@@ -84,4 +87,4 @@ class GVPBranchProt(nn.Module):
         if batch is None: out = out1.mean(dim=0, keepdims=True)
         else: out = scatter_mean(out1, batch, dim=0)
         
-        return self.dense(out).squeeze(-1) + 0.5, out, out1, h_V
+        return self.dense(out).squeeze(-1) + 0.5

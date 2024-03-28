@@ -32,6 +32,8 @@ class MODEL_OPT(StringEnum):
     CED = 'CED'
     
     RNG = 'RNG' # ring3DTA model
+    
+    GVP = 'GVP'
 
 # protein options
 class PRO_EDGE_OPT(StringEnum):
