@@ -9,6 +9,7 @@ from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.esm_models import EsmDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.models.ring_mod import Ring3DTA
+from src.models.gvp_models import GVPModel
 from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
 
@@ -148,7 +149,7 @@ class Loader():
             model = Ring3DTA(num_features_pro=54,
                              dropout=dropout)
         elif model == cfg.MODEL_OPT.GVP:
-            model = GVPModel(num_feat_mol=78, dropout=dropout, dropout_prot=dropout)
+            model = GVPModel(num_features_mol=78, **kwargs)
         return model
     
     @staticmethod

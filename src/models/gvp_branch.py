@@ -70,7 +70,7 @@ class GVPBranchProt(nn.Module):
         '''
         h_V, h_E = (data.node_s, data.node_v), (data.edge_s, data.edge_v)
         edge_index = data.edge_index
-        batch = data.batch if hasattr(data, 'batch') else None #TODO: check if this is correct
+        batch = data.batch if hasattr(data, 'batch') else None
 
         if self.seq:
             seq = data.seq

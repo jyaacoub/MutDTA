@@ -8,9 +8,9 @@ from src.models.utils import BaseModel
 from src.models.gvp_branch import GVPBranchProt
 
 class GVPModel(BaseModel):
-    def __init__(self, num_features_mol=78, 
+    def __init__(self, num_features_mol=78,
                  output_dim=128, dropout=0.2,
-                 dropout_prot=0.0):
+                 dropout_prot=0.0, **kwargs):
         
         super(GVPModel, self).__init__()
 
@@ -30,8 +30,6 @@ class GVPModel(BaseModel):
         ## OUTPUT LAYERS:
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
-        # note that dropout for edge and nodes is handled by torch_geometric in forward pass
-        self.dropout_prot_p = dropout_prot
 
         # combined layers
         self.fc1 = nn.Linear(2 * output_dim, 1024)

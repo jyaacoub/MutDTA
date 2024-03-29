@@ -23,13 +23,12 @@ def train_func(config):
     model = Loader.init_model(model=config["model"], pro_feature=config["feature_opt"],
                             pro_edge=config["edge_opt"],
                             # additional kwargs send to model class to handle
-                            dropout=config["dropout"], 
-                            dropout_prot=config["dropout_prot"],
-                            pro_emb_dim=config["pro_emb_dim"],
+                            **config['architecture_kwargs']
                             )
     
     # prepare model with rayTrain (moves it to correct device and wraps it in DDP)
-    model = ray.train.torch.prepare_model(model)
+    model = ray.train.torch.prepare_model(model, parallel_strategy='ddp',
+                                          parallel_strategy_kwargs={'find_unused_parameters':True})
     
     # ============ Load dataset ==============
     print("Loading Dataset")
@@ -78,10 +77,10 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": "RNG",
-        "dataset": "PDBbind",
-        "feature_opt": "nomsa", # NOTE: SPD requires foldseek features!!!
-        "edge_opt": "ring3",
+        "model": cfg.MODEL_OPT.GVP,
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.gvp, # NOTE: SPD requires foldseek features!!!
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
         "fold_selection": 0,
         "save_checkpoint": False,
                 
@@ -90,9 +89,11 @@ if __name__ == "__main__":
         "batch_size": ray.tune.choice([8, 16, 24]),        # batch size is per GPU! #NOTE: multiply this by num_workers
         
         # model architecture hyperparams
-        "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
-        "dropout_prot": ray.tune.uniform(0.0, 0.5),
-        "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
+        "architecture_kwargs":{
+            "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
+            "dropout_prot": ray.tune.uniform(0.0, 0.5),
+            "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
+        }
     }
     
     # each worker is a node from the ray cluster.
