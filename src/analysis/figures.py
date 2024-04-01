@@ -243,38 +243,31 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], sho
 
 # Figure 4: violin plot with error bars for Cross-validation results to show significance among pro feats
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
-                         show=False, add_labels=True, add_stats=True, ax=None):
-    # Extract relevant data
+                         show=False, add_stats=True, ax=None):
+    # Filter data based on conditions
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
-    
-    # show all with fold info
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
-    nomsa = filtered_df[(filtered_df['feat'] == 'nomsa')][sel_col]
-    msa = filtered_df[(filtered_df['feat'] == 'msa')][sel_col]
-    shannon = filtered_df[(filtered_df['feat'] == 'shannon')][sel_col]
-    esm = filtered_df[(filtered_df['feat'] == 'ESM')][sel_col]
 
-    # printing length of each feature
-    if verbose:
-        print(f'nomsa: {len(nomsa)}')
-        print(f'msa: {len(msa)}')
-        print(f'shannon: {len(shannon)}')
-        print(f'esm: {len(esm)}')
+    # Dynamically collect values for each feature type not in exclude
+    features = filtered_df['feat'].unique()
+    features = [f for f in features if f not in exclude]
+    plot_data = [filtered_df[filtered_df['feat'] == feature][sel_col] for feature in features]
 
-
-    # Get values for each node feature
-    plot_data = [nomsa, msa, shannon, esm]
+    # Dynamically plotting
     ax = sns.violinplot(data=plot_data, ax=ax)
-    ax.set_xticklabels(['nomsa', 'msa', 'shannon', 'esm'])
+    ax.set_xticklabels(features)
     ax.set_ylabel(sel_col)
-    ax.set_xlabel('Features')
+    ax.set_xlabel('Protein Node Features')
     ax.set_title(f'Feature {sel_col} for {sel_dataset}')
-    
+
+    # Verbose printing
+    if verbose:
+        for feature, data in zip(features, plot_data):
+            print(f'{feature}: {len(data)}')
+
     # Annotation for stats
     if add_stats:
-        pairs = [(0,1), (0,2), (1,2)]
-        if len(esm) > 0: 
-            pairs += [(0,3),(1,3), (2,3)] # add esm pairs if esm is not empty
+        pairs = [(i, j) for i in range(len(features)) for j in range(i+1, len(features))]
         annotator = Annotator(ax, pairs, data=plot_data, verbose=verbose)
         annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
                             hide_non_significant=not verbose)
@@ -283,7 +276,7 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
     if show:
         plt.show()
         
-    return nomsa, msa, shannon, esm
+    return plot_data
 
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
@@ -345,13 +338,16 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
 def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], 
                   fig_callable=fig4_pro_feat_violin,
                   show=False, **kwargs):    
-    # Create subplots with datasets as columns and cols as rows
+    # Create subplots with datasets as columns and metrics as rows
     fig, axes = plt.subplots(len(metrics), len(datasets), 
                              figsize=(5*len(datasets), 4*len(metrics)))
     for i, dataset in enumerate(datasets):
         for j, metric in enumerate(metrics):
             # Set current subplot
-            ax = axes[j, i]
+            if len(datasets) == 1 or len(metrics) == 1:
+                ax = axes[j] if len(datasets) == 1 else axes[i]
+            else:
+                ax = axes[j, i]
 
             fig_callable(df, sel_col=metric, sel_dataset=dataset, show=False, 
                          ax=ax, **kwargs)
@@ -410,7 +406,7 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     # create data, feat, and overlap columns for easier filtering.
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
     df['fold'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)(\d*)', expand=True)[1] # fold number if available
-    df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon|foldseek)F_', expand=False)
+    df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon|foldseek|gvp)F_', expand=False)
     df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2_anm|ring3|aflow|aflow_ring3)E_', expand=False)
     df['ddp'] = df['run'].str.contains('DDP-')
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
@@ -443,7 +439,6 @@ if __name__ == '__main__':
     from src.analysis.figures import (prepare_df, fig1_pro_overlap, 
                                         fig2_pro_feat, fig3_edge_feat, 
                                         fig4_pro_feat_violin, fig5_edge_feat_violin)
-
 
     # %%
     df = prepare_df(csv_p=cfg.MODEL_STATS_CSV, old_csv_p="results/model_media/old_model_stats.csv")
