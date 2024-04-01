@@ -34,6 +34,8 @@ def train_func(config):
     print("Loading Dataset")
     loaders = Loader.load_DataLoaders(data=config['dataset'], pro_feature=config['feature_opt'], 
                                       edge_opt=config['edge_opt'], 
+                                      ligand_feature=config['lig_feat_opt'],
+                                      ligand_edge=config['lig_edge_opt'],
                                       path=cfg.DATA_ROOT, 
                                       batch_train=config['batch_size'],
                                       datasets=['train', 'val'],
@@ -77,29 +79,33 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": cfg.MODEL_OPT.GVP,
+        "model": cfg.MODEL_OPT.GVPL,
         "dataset": cfg.DATA_OPT.PDBbind,
-        "feature_opt": cfg.PRO_FEAT_OPT.gvp, # NOTE: SPD requires foldseek features!!!
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa, # NOTE: SPD requires foldseek features!!!
         "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+        
         "fold_selection": 0,
         "save_checkpoint": False,
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([8, 16, 24]),        # batch size is per GPU! #NOTE: multiply this by num_workers
+        "batch_size": ray.tune.choice([16, 32, 64, 128]),        # batch size is per GPU! #NOTE: multiply this by num_workers
         
         # model architecture hyperparams
         "architecture_kwargs":{
             "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
-            "dropout_prot": ray.tune.uniform(0.0, 0.5),
-            "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
+            "output_dim": ray.tune.choice([128, 256, 512])
+            # "dropout_prot": ray.tune.uniform(0.0, 0.5),
+            # "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
         }
     }
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
-    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=1, # number of ray actors to launch to distribute compute across
                                    use_gpu=True,  # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    resources_per_worker={"CPU": 2, "GPU": 1},
                                    # trainer_resources={"CPU": 2, "GPU": 1},
@@ -119,7 +125,7 @@ if __name__ == "__main__":
             search_alg=OptunaSearch(), # using ray.tune.search.Repeater() could be useful to get multiple trials per set of params
                                        # would be even better if we could set trial-wise dependencies for a certain fold.
                                        # https://github.com/ray-project/ray/issues/33677
-            num_samples=200,
+            num_samples=600,
         ),
     )
 
