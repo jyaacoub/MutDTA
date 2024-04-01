@@ -151,7 +151,7 @@ def dtrain(args):
                                 map_location=torch.device(f'cuda:{args.gpu}')))
         
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
-    model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
     
     torch.distributed.barrier() # Sync params across GPUs before training
     
