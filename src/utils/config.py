@@ -34,6 +34,8 @@ class MODEL_OPT(StringEnum):
     RNG = 'RNG' # ring3DTA model
     
     GVP = 'GVP'
+    
+    GVPL = "GVPL" # GVP ligand branch only
 
 # protein options
 class PRO_EDGE_OPT(StringEnum):

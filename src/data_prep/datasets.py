@@ -446,7 +446,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         processed_ligs = {}
         errors = []
         if node_feat == cfg.LIG_FEAT_OPT.gvp:
-            for code, lig_seq in tqdm(df['SMILE'].items(), desc='Creating ligand graphs'):
+            for code, lig_seq in tqdm(df['SMILE'].items(), desc='Creating ligand graphs', 
+                                      total=len(df)):
                 processed_ligs[lig_seq] = GVPFeaturesLigand().featurize_as_graph(self.sdf_p(code))
             return processed_ligs
         

@@ -1,6 +1,7 @@
 from torch import nn
 import torch
 from torch_scatter import scatter_mean
+import torch_geometric
 from src.models.utils import GVP, GVPConvLayer, LayerNorm
 
 # Adapted from https://github.com/drorlab/gvp-pytorch/blob/82af6b22eaf8311c15733117b0071408d24ed877/gvp/models.py 
@@ -88,3 +89,87 @@ class GVPBranchProt(nn.Module):
         else: out = scatter_mean(out1, batch, dim=0)
         
         return self.dense(out).squeeze(-1) + 0.5
+    
+    
+
+class GVPBranchLigand(nn.Module):
+    """
+    Adapted from https://github.com/luoyunan/KDBNet/blob/main/kdbnet/model.py
+    """
+    
+    def __init__(self, 
+        node_in_dim=[66, 1], node_h_dim=[128, 64],
+        edge_in_dim=[16, 1], edge_h_dim=[32, 1],
+        num_layers=3, drop_rate=0.1,
+        final_out=128
+    ):
+        """
+        Node features are 
+            - 66 "scalar feat" (see GVPFeaturesLigand._build_atom_feature)
+                - One hot vectors... for symbol(44), degree(7), totalHs(7), 
+                  valence count(7), Aromaticity(1)
+            - 1 "vector feat" for coordinate positions for atoms
+
+            
+        edge features are:
+            - 16 "scalar feats" 
+                - 16d RBF embedding of the edge vectors representing the distance between them
+            - 1 "vector feat" representing the normalized distances between edges
+        
+        Parameters
+        ----------
+        node_in_dim : list of int
+            Input dimension of drug node features (si, vi).
+            Scalar node feartures have shape (N, si).
+            Vector node features have shape (N, vi, 3).
+        node_h_dims : list of int
+            Hidden dimension of drug node features (so, vo).
+            Scalar node feartures have shape (N, so).
+            Vector node features have shape (N, vo, 3).
+        """
+        super(GVPBranchLigand, self).__init__()
+        self.W_v = nn.Sequential(
+            LayerNorm(node_in_dim),
+            GVP(node_in_dim, node_h_dim, activations=(None, None))
+        )
+        self.W_e = nn.Sequential(
+            LayerNorm(edge_in_dim),
+            GVP(edge_in_dim, edge_h_dim, activations=(None, None))
+        )
+
+        self.layers = nn.ModuleList(
+                GVPConvLayer(node_h_dim, edge_h_dim, drop_rate=drop_rate)
+            for _ in range(num_layers))
+
+        ns, _ = node_h_dim
+        # same as protein branch, here we ignore the "vector features" and only return 
+        # scalar outputs from nodes.
+        self.W_out = nn.Sequential(
+            LayerNorm(node_h_dim),
+            GVP(node_h_dim, (ns, 0))
+            )
+        
+        self.dense = nn.Sequential(
+            nn.Linear(ns, 2*ns), 
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=drop_rate),
+            nn.Linear(2*ns, final_out)
+        )
+
+    def forward(self, xd):
+        # Unpack input data
+        h_V = (xd.node_s, xd.node_v)
+        h_E = (xd.edge_s, xd.edge_v)
+        edge_index = xd.edge_index
+        batch = xd.batch
+
+        h_V = self.W_v(h_V)
+        h_E = self.W_e(h_E)
+        for layer in self.layers:
+            h_V = layer(h_V, edge_index, h_E)
+        out = self.W_out(h_V)
+
+        # per-graph mean
+        out = torch_geometric.nn.global_add_pool(out, batch)
+
+        return self.dense(out)
