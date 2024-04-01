@@ -1,4 +1,5 @@
 import math
+from typing import Callable
 import numpy as np
 
 import torch
@@ -7,6 +8,8 @@ import torch.nn.functional as F
 
 import torch_geometric
 
+import rdkit.Chem
+import pandas as pd
 
 def _normalize(tensor, dim=-1):
     '''
@@ -33,7 +36,7 @@ def _rbf(D, D_min=0., D_max=20., D_count=16, device='cpu'):
     return RBF
 
 
-class GVPFeatures:
+class GVPFeaturesProtein:
     '''
     Process protein data into graph-based features for GVP model following the original
     implementation in the manuscript (https://github.com/drorlab/gvp-pytorch/blob/main/gvp/data.py).
@@ -57,7 +60,7 @@ class GVPFeatures:
     def __init__(self, num_positional_embeddings=16,
                  top_k=30, num_rbf=16, device="cpu"):
         
-        super(GVPFeatures, self).__init__()
+        super(GVPFeaturesProtein, self).__init__()
         
         self.top_k = top_k
         self.num_rbf = num_rbf
@@ -179,3 +182,107 @@ class GVPFeatures:
         perp = _normalize(torch.cross(c, n))
         vec = -bisector * math.sqrt(1 / 3) - perp * math.sqrt(2 / 3)
         return vec 
+    
+class GVPFeaturesLigand:
+    """
+    Adapted from KBDNet (https://github.com/luoyunan/KDBNet/blob/main/kdbnet/mol_graph.py)
+    """
+    def __init__(self, vocab:list[str]=None, num_rbf=16, edge_cutoff=4.5) -> None:
+        self.num_rbf = num_rbf
+        self.edge_cutoff = edge_cutoff
+        
+        self.ATOM_VOCAB = vocab or [
+            'C', 'N', 'O', 'S', 'F', 'Si', 'P', 'Cl', 'Br', 'Mg', 'Na','Ca',
+            'Fe', 'As', 'Al', 'I', 'B', 'V', 'K', 'Tl', 'Yb','Sb', 'Sn', 'Ag',
+            'Pd', 'Co', 'Se', 'Ti', 'Zn', 'H','Li', 'Ge', 'Cu', 'Au', 'Ni',
+            'Cd', 'In', 'Mn', 'Zr','Cr', 'Pt', 'Hg', 'Pb', 'unk']
+        
+        self.feature_alphabet = {
+            # (alphabet, default value)
+            'GetSymbol': (self.ATOM_VOCAB, 'unk'),
+            'GetDegree': ([0, 1, 2, 3, 4, 5, 6], 6),
+            'GetTotalNumHs': ([0, 1, 2, 3, 4, 5, 6], 6),
+            'GetImplicitValence': ([0, 1, 2, 3, 4, 5, 6], 6),
+            'GetIsAromatic': ([0, 1], 1)
+        }
+
+    @staticmethod
+    def _onehot_encoder(a=None, alphabet=None, default=None, drop_first=False):
+        '''
+        Parameters
+        ----------
+        a: array of numerical value of categorical feature classes.
+        alphabet: valid values of feature classes.
+        default: default class if out of alphabet.
+        Returns
+        -------
+        A 2-D one-hot array with size |x| * |alphabet|
+        '''
+        # replace out-of-vocabulary classes
+        alphabet_set = set(alphabet)
+        a = [x if x in alphabet_set else default for x in a]
+
+        # cast to category to force class not present
+        a = pd.Categorical(a, categories=alphabet)
+
+        onehot = pd.get_dummies(pd.Series(a), columns=alphabet, drop_first=drop_first)
+        return onehot.values
+    
+    def _build_edge_feature(self, coords, edge_index, D_max=4.5, num_rbf=16):
+        E_vectors = coords[edge_index[0]] - coords[edge_index[1]]
+        rbf = _rbf(E_vectors.norm(dim=-1), D_max=D_max, D_count=num_rbf)
+
+        edge_s = rbf
+        edge_v = _normalize(E_vectors).unsqueeze(-2)
+
+        edge_s, edge_v = map(torch.nan_to_num, (edge_s, edge_v))
+
+        return edge_s, edge_v
+    
+    def _build_atom_feature(self, mol):
+        # dim: 44 + 7 + 7 + 7 + 1
+        atom_feature = None
+        for attr in ['GetSymbol', 'GetDegree', 'GetTotalNumHs',
+                    'GetImplicitValence', 'GetIsAromatic']:
+            feature = [getattr(atom, attr)() for atom in mol.GetAtoms()]
+            feature = self._onehot_encoder(feature,
+                        alphabet=self.feature_alphabet[attr][0],
+                        default=self.feature_alphabet[attr][1],
+                        drop_first=(attr in ['GetIsAromatic']) # binary-class feature
+                    )
+            atom_feature = feature if atom_feature is None else np.concatenate((atom_feature, feature), axis=1)
+        atom_feature = atom_feature.astype(np.float32)
+        return atom_feature
+        
+    def featurize_as_graph(self, sdf_path, name=None):
+        """
+        Parameters
+        ----------
+        sdf_path: str
+            Path to sdf file
+        name: str
+            Name of drug
+        Returns
+        -------
+        graph: torch_geometric.data.Data
+            A torch_geometric graph
+        """
+        mol = rdkit.Chem.MolFromMolFile(sdf_path)
+        conf = mol.GetConformer()
+        with torch.no_grad():
+            coords = conf.GetPositions()
+            coords = torch.as_tensor(coords, dtype=torch.float32)
+            atom_feature = self._build_atom_feature(mol)
+            atom_feature = torch.as_tensor(atom_feature, dtype=torch.float32)
+            edge_index = torch_cluster.radius_graph(coords, r=self.edge_cutoff)
+
+        node_s = atom_feature
+        node_v = coords.unsqueeze(1)
+        # edge_v, edge_index = _build_edge_feature(mol)
+        edge_s, edge_v = self._build_edge_feature(
+            coords, edge_index, D_max=self.edge_cutoff, num_rbf=self.num_rbf)
+
+        data = torch_geometric.data.Data(
+            x=coords, edge_index=edge_index, name=name,
+            node_v=node_v, node_s=node_s, edge_v=edge_v, edge_s=edge_s)
+        return data
