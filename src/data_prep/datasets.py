@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from src.data_prep.feature_extraction.gvp_feats import GVPFeatures
 from src.utils import config as cfg
 from src.utils.residue import Chain, Ring3Runner
 from src.utils.exceptions import DatasetNotFound
@@ -354,7 +355,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if len(missing_conf) > 0:
             filtered_df = df[~df.prot_id.isin(missing_conf)]
             logging.warning(f'{len(missing_conf)} mismatched or missing pids')
-            
+        else:
+            filtered_df = df
+        
         logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
         
         return filtered_df
@@ -374,6 +377,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
                         total=len(unique_df)):
+            
+            if node_feat == cfg.PRO_FEAT_OPT.gvp:
+                # gvp has its own unique graph to support the architecture implementation.
+                coords = Chain(self.pdb_p(code), grep_atoms={'CA', 'N', 'C'}).getCoords(get_all=True)
+                processed_prots[prot_id] = GVPFeatures().featurize_as_graph(code, coords, pro_seq)
+                continue
+            
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
@@ -409,7 +419,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         edge_opt=edge,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
-                                                        af_confs=af_confs) #Note: this will handle if af_confs is a single file w/ multiple models
+                                                        af_confs=af_confs) # NOTE: this will handle if af_confs is a single file w/ multiple models
                     np.save(self.edgew_p(code), pro_edge_weight)
                 
                 if len(pro_edge_weight.shape) == 2:
@@ -615,6 +625,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pdb_codes = df_binding.index # pdbcodes
         
         ############## validating codes #############
+        logging.debug('Validating Codes')
         if self.aln_dir is not None: # create msa if 'msaF' is selected
             #NOTE: assuming MSAs are already created, since this would take a long time to do.
             
@@ -626,10 +637,12 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             valid_codes = [c for c in pdb_codes if os.path.isfile(self.pdb_p(c))]
             
         pdb_codes = valid_codes
+        logging.debug(f"{len(pdb_codes)} valid PDBs with existing files.")
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
                 
         ############## Get ligand info #############
-        # WARNING: ORDER MATTERS SINCE LIGAND INFO REDUCED NUMBER OF PDBS DUE TO MISSING SMI...
+        # WARNING: THIS SHOULD ALWAYS COME BEFORE GETTING PROTEIN SEQUEINCES. ORDER MATTERS 
+        # BECAUSE LIGAND INFO REDUCES NUMBER OF PDBS DUE TO MISSING SMILES.
         # Extracting SMILE strings:
         dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
                                               dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
@@ -864,7 +877,7 @@ class DavisKibaDataset(BaseDataset):
         no_confs = []
         if self.pro_edge_opt in cfg.OPT_REQUIRES_PDB or \
             self.pro_feat_opt in cfg.OPT_REQUIRES_PDB:
-            if self.pro_feat_opt == 'foldseek':
+            if self.pro_feat_opt == cfg.PRO_FEAT_OPT.foldseek:
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:

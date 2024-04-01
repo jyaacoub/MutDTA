@@ -1,7 +1,6 @@
 numpy==1.23.5
 pandas==1.5.3
 tqdm==4.65.0
-rdkit==2023.3.1
 scipy==1.10.1
 
 # for generating figures:
@@ -12,7 +11,7 @@ statannotations==0.6.0
 lifelines==0.27.7 # used for concordance index calc
 
 # model building
-torch==2.0.1
+torch==1.12.1
 torch-geometric==2.3.1
 transformers==4.36.0 # huggingface needed for esm
 
@@ -25,7 +24,8 @@ requests==2.31.0
 #ray[tune]
 
 submitit==1.4.5
-ProDy==2.4.1
 
-# for chemgpt
-selfies==1.0.4
+# For protein/ligand processing:
+rdkit==2023.3.1
+ProDy==2.4.1
+selfies==1.0.4 # ChemGPT uses this
