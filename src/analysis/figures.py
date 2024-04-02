@@ -1,4 +1,5 @@
-from collections import Counter
+from collections import Counter, OrderedDict
+import logging
 import os, pickle, json
 
 import pandas as pd
@@ -245,7 +246,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], sho
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
                          show=False, add_stats=True, ax=None):
     # Filter data based on conditions
-    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'] = 'original')]
+    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'] == 'original')]
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
 
     # Dynamically collect values for each feature type not in exclude
@@ -281,7 +282,7 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
                             show=False, add_labels=True, add_stats=True, ax=None):
-    filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'] = 'original')]
+    filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'] == 'original')]
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
 
     filtered_df.sort_values(by=['edge'], inplace=True)
@@ -372,6 +373,59 @@ def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'm
     plt.tight_layout() # Adjust layout to prevent clipping of titles
     if show: plt.show()
     return fig, axes
+
+def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cindex', 
+                   verbose=False, show=False, add_stats=True, ax=None):
+    if models is None: # example custom plot:
+        # models to plot:
+        # - Original model with (nomsa, binary) and (original,  binary) features for protein and ligand respectively
+        # - Aflow models with   (nomsa, aflow*) and (original,  binary) # x2 models here (aflow and aflow_ring3)
+        # - GVP protein model   (gvp,   binary) and (original,  binary)
+        # - GVP ligand model    (nomsa, binary) and (gvp,       binary)
+        models = {
+            'DG': ('nomsa', 'binary', 'original', 'binary'),
+            'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+            'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
+            'gvpP': ('gvp', 'binary', 'original', 'binary'),
+            'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        }
+    
+    # Filter out df based on args
+    filtered_df = df[(df['data'] == sel_dataset) & (df['fold'] != '') & (~df['overlap'])]
+    
+    def matched(df, tuple):
+        return (df['feat']      == tuple[0]) & (df['edge']     == tuple[1]) & \
+                (df['lig_feat'] == tuple[2]) & (df['lig_edge'] == tuple[3])
+
+    filter_conditions = [matched(filtered_df, v) for v in models.values()]
+    filtered_df = filtered_df[sum(filter_conditions) > 0]
+
+    # Group each model results
+    plot_data = OrderedDict()
+    for model, feat in models.items():
+        plot_data[model] = filtered_df[matched(filtered_df, feat)][sel_col]
+        if len(plot_data[model]) != 5:
+            logging.warning(f'Expected 5 results for {model}, got {len(plot_data[model])}')
+
+    # plot violin plot with annotations
+    vals = list(plot_data.values())
+    ax = sns.violinplot(data=vals, ax=ax)
+    ax.set_xticklabels(list(plot_data.keys()))
+    ax.set_ylabel(sel_col)
+    ax.set_xlabel('Model Type')
+    ax.set_title(f'{sel_col} for {sel_dataset}')
+
+    if add_stats:
+        pairs = [(i, j) for i in range(len(models)) for j in range(i+1, len(models))]
+        annotator = Annotator(ax, pairs, data=vals, verbose=verbose)
+        annotator.configure(test='Mann-Whitney', text_format='star', loc='inside', 
+                            hide_non_significant=not verbose)
+        annotator.apply_and_annotate()
+        
+    if show:
+        plt.show()
+    
+    return plot_data
 
 def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
     """
