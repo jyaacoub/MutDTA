@@ -108,7 +108,7 @@ def fig2_pro_feat(df, verbose=False, sel_col='cindex', exclude=[], show=False, a
                   context='poster'):
     # Extract relevant data
     filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) 
-                     & (df['fold'] != '') & (df['lig_feat'].isna())]
+                     & (df['fold'] != '') & (df['lig_feat'] == 'original')]
     
     # get only data, feat, and sel_col columns
     plot_df = filtered_df[['data', 'feat', sel_col]]
@@ -182,7 +182,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], sho
     # this will capture multiple models per dataset (different LR, batch size, etc)
     #   Taking the max cindex value for each dataset will give us the best model for each dataset
     filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) 
-                     & (df['fold'] != '') & (df['lig_feat'].isna())]
+                     & (df['fold'] != '') & (df['lig_feat'] == 'original')]
     plot_df = filtered_df[['data', 'edge', sel_col]]
     
     hue_order = ['binary', 'simple', 'anm', 'af2', 'af2-anm']
@@ -245,7 +245,7 @@ def fig3_edge_feat(df, verbose=False, sel_col='cindex', exclude=['af2-anm'], sho
 def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[], 
                          show=False, add_stats=True, ax=None):
     # Filter data based on conditions
-    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'].isna())]
+    filtered_df = df[(df['edge'] == 'binary') & (~df['overlap']) & (df['lig_feat'] = 'original')]
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
 
     # Dynamically collect values for each feature type not in exclude
@@ -281,7 +281,7 @@ def fig4_pro_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex
 # Figure 5: violin plot with error bars for Cross-validation results to show significance among edge feats
 def fig5_edge_feat_violin(df, sel_dataset='davis', verbose=False, sel_col='cindex', exclude=[],
                             show=False, add_labels=True, add_stats=True, ax=None):
-    filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'].isna())]
+    filtered_df = df[(df['feat'] == 'nomsa') & (~df['overlap']) & (df['lig_feat'] = 'original')]
     filtered_df = filtered_df[(filtered_df['data'] == sel_dataset) & (filtered_df['fold'] != '')]
 
     filtered_df.sort_values(by=['edge'], inplace=True)
@@ -408,6 +408,11 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     df['fold'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)(\d*)', expand=True)[1] # fold number if available
     df['feat'] = df['run'].str.extract(r'_(nomsa|msa|shannon|foldseek|gvp)F_', expand=False)
     df['edge'] = df['run'].str.extract(r'_(binary|simple|anm|af2|af2_anm|ring3|aflow|aflow_ring3)E_', expand=False)
+    
+    # # ligand features and edges (defaults are original and binary):
+    df['lig_feat'] = df['run'].str.extract(r'_(original|gvp)LF', expand=False).fillna('original')
+    df['lig_edge'] = df['run'].str.extract(r'_(binary)LE', expand=False).fillna('binary')
+    
     df['ddp'] = df['run'].str.contains('DDP-')
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
     df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False).astype(int)
