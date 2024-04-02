@@ -42,3 +42,7 @@ xc = torch.cat((outl, outp), 1)
 # %%
 m.dense_combined_out(xc)
 # %%
+from torch import nn
+
+nn.Linear(10,'10')
+# %%

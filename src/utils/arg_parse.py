@@ -291,4 +291,11 @@ def parse_train_test_args(verbose=True, distributed=False,
         print(f"       Learning rate: {args.learning_rate}")
         print(f"             Dropout: {args.dropout}")
         print(f"          Num epochs: {args.num_epochs}\n")
+        
+        if len(unknown_args) > 0:
+            print(f"--------------- UNKNOWN ARGS --------------")
+            print(unknown_args)
+            print(f"-------------------------------------------\n")
+        
+        
     return args, unknown_args

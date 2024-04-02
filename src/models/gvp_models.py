@@ -19,7 +19,7 @@ class GVPLigand_DGPro(DGraphDTA):
                  output_dim=512,
                  dropout=0.2,
                  edge_weight_opt='binary'):
-        
+        output_dim = int(output_dim)
         super(GVPLigand_DGPro, self).__init__(num_features_pro, 
                                                 num_features_mol, output_dim, 
                                                 dropout, edge_weight_opt)
