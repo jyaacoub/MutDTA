@@ -153,6 +153,7 @@ class Loader():
             
         elif model == cfg.MODEL_OPT.GVPL:
             model = GVPLigand_DGPro(num_features_pro=num_feat_pro,
+                                    dropout=dropout,
                                     **kwargs)
         return model
     

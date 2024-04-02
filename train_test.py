@@ -1,7 +1,7 @@
 # %%
 from src.utils.arg_parse import parse_train_test_args
 
-args = parse_train_test_args(verbose=True,
+args, unknown_args = parse_train_test_args(verbose=True,
                              jyp_args='-m DG -d PDBbind -f nomsa -e binary -bs 64')
 FORCE_TRAINING = args.train
 DEBUG = args.debug
@@ -85,7 +85,8 @@ for (MODEL, DATA,
     # ==== LOAD MODEL ====
     print(f'#Device: {device}')
     model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGEW, dropout=DROPOUT,
-                                ligand_feature=ligand_feature, ligand_edge=ligand_edge).to(device)
+                                ligand_feature=ligand_feature, ligand_edge=ligand_edge,
+                                **unknown_args).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
     
     if DEBUG: 

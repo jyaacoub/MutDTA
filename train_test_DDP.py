@@ -6,7 +6,7 @@ from src.utils import config as cfg  # sets up env vars
 from src.utils.arg_parse import parse_train_test_args
 from src.train_test import dtrain
 
-args = parse_train_test_args(verbose=True, distributed=True,
+args, unknown_args = parse_train_test_args(verbose=True, distributed=True,
                              jyp_args=' -odir ./slurm_out_DDP/%j' +
                              ' -m EDI -d PDBbind -f nomsa -e anm' +
                              ' -lr 0.00001 -bs 16 -do 0.2 --train' +
@@ -55,7 +55,7 @@ executor.update_parameters(
 )
 
 #%% submit job:
-job = executor.submit(dtrain, args)
+job = executor.submit(dtrain, args, unknown_args)
 print(f"Submitted job_id: {job.job_id}")
 
 # %%

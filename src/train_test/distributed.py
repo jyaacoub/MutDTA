@@ -61,7 +61,7 @@ def init_dist_gpu(args):
 
 
 # distributed training fn
-def dtrain(args):
+def dtrain(args, unknown_args):
     # ==== initialize the node ====
     init_node(args)
     
@@ -138,7 +138,8 @@ def dtrain(args):
     model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGEW, 
                               dropout=args.dropout, 
                               dropout_prot=args.dropout_prot, 
-                              pro_emb_dim=args.pro_emb_dim).cuda(args.gpu)
+                              pro_emb_dim=args.pro_emb_dim,
+                              **unknown_args).cuda(args.gpu)
     
     cp_saver = CheckpointSaver(model=model, save_path=f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
