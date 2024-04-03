@@ -8,8 +8,8 @@ from src.models.utils import BaseModel
 from src.models.lig_mod import ChemDTA, ChemEsmDTA
 from src.models.esm_models import EsmDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
-from src.models.ring_mod import Ring3DTA
-from src.models.gvp_models import GVPModel, GVPLigand_DGPro
+from src.models.ring3 import Ring3DTA
+from src.models.gvp_models import GVPModel, GVPLigand_DGPro, GVPLigand_RNG3
 from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
 from src.utils import config  as cfg # sets up os env for HF
 
@@ -155,6 +155,8 @@ class Loader():
             model = GVPLigand_DGPro(num_features_pro=num_feat_pro,
                                     dropout=dropout,
                                     **kwargs)
+        elif model == cfg.MODEL_OPT.GVPL_RNG:
+            model = GVPLigand_RNG3(dropout=dropout, **kwargs)
         return model
     
     @staticmethod
