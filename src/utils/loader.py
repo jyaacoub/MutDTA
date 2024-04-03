@@ -60,8 +60,7 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float, 
-                   ligand_feature:str='original', ligand_edge:str='binary', **kwargs) -> BaseModel:
+    def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float, **kwargs) -> BaseModel:
         """
         kwargs are used to pass additional arguments to the model constructor 
         (e.g.: pro_emb_dim, extra_profc_layer, dropout_prot_p for EsmDTA)
