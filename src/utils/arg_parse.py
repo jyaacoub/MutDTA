@@ -242,10 +242,20 @@ def process_unknown_args(unknown_args):
                 # The next item is the value
                 value = unknown_args[i + 1]
                 i += 2  # Move past the value for the next iteration
+                
+                # Attempt to cast value to int, then float, or leave as string
+                try:
+                    value = int(value)
+                except ValueError:
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass  # Leave value as string if both conversions fail
             else:
                 # Assume a flag-like argument that implies a boolean value
                 value = True
                 i += 1
+                
             kwargs[key] = value
         else:
             # Move to the next item if the current one doesn't start with '--'
