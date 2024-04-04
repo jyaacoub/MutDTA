@@ -50,11 +50,15 @@ def train_func(config):
     optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"])
     save_checkpoint = config.get("save_checkpoint", False)
     
-    for _ in range(config['epochs']):
-        
-        # NOTE: no need to pass in device, rayTrain will handle that for us
-        simple_train(model, optimizer, loaders['train'], epochs=1)  # Train the model
-        loss = simple_eval(model, loaders['val'])  # Compute test accuracy
+    for _ in range(config['epochs']):            
+        try:
+            # NOTE: no need to pass in device, rayTrain will handle that for us
+            simple_train(model, optimizer, loaders['train'], epochs=1)  # Train the model
+            loss = simple_eval(model, loaders['val'])  # Compute test accuracy
+        except RuntimeError as e: # potential memory error
+            print("RuntimeError:", e)
+            ray.train.report({"loss": 100})
+            break
         
             
         # Report metrics (and possibly a checkpoint) to ray        
@@ -65,7 +69,7 @@ def train_func(config):
             torch.save(model.state_dict(), checkpoint_path)
             checkpoint = Checkpoint.from_directory(checkpoint_dir)
             
-        ray.train.report({"loss": loss},   checkpoint=checkpoint)
+        ray.train.report({"loss": loss}, checkpoint=checkpoint)
     
     
 if __name__ == "__main__":
@@ -79,10 +83,10 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": cfg.MODEL_OPT.GVPL,
+        "model": cfg.MODEL_OPT.GVPL_RNG,
         "dataset": cfg.DATA_OPT.PDBbind,
-        "feature_opt": cfg.PRO_FEAT_OPT.nomsa, # NOTE: SPD requires foldseek features!!!
-        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow_ring3,
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
         
@@ -91,21 +95,21 @@ if __name__ == "__main__":
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([16, 32, 64, 128]),        # batch size is per GPU! #NOTE: multiply this by num_workers
+        "batch_size": ray.tune.choice([16,32,64]), # local batch size
         
         # model architecture hyperparams
         "architecture_kwargs":{
-            "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
-            "output_dim": ray.tune.choice([128, 256, 512])
-            # "dropout_prot": ray.tune.uniform(0.0, 0.5),
-            # "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
+            "dropout": ray.tune.uniform(0.0, 0.5),
+            "pro_emb_dim": ray.tune.choice([64, 128, 256]),
+            "output_dim":  ray.tune.choice([128, 256, 512]), 
+            "nheads_pro":  ray.tune.choice([3, 4, 5]),   
         }
     }
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
-    scaling_config = ScalingConfig(num_workers=1, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch to distribute compute across
                                    use_gpu=True,  # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    resources_per_worker={"CPU": 2, "GPU": 1},
                                    # trainer_resources={"CPU": 2, "GPU": 1},
@@ -125,7 +129,7 @@ if __name__ == "__main__":
             search_alg=OptunaSearch(), # using ray.tune.search.Repeater() could be useful to get multiple trials per set of params
                                        # would be even better if we could set trial-wise dependencies for a certain fold.
                                        # https://github.com/ray-project/ray/issues/33677
-            num_samples=600,
+            num_samples=1000,
         ),
     )
 
