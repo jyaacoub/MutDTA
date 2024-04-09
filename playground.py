@@ -1,24 +1,38 @@
-#%%
+# %%
 import logging
-logging.getLogger().setLevel(logging.DEBUG)
+from typing import OrderedDict
 
-from src import config as cfg
-from src.data_prep.init_dataset import create_datasets
-from src.utils.loader import Loader
+import seaborn as sns
+from matplotlib import pyplot as plt
+from statannotations.Annotator import Annotator
 
-# create_datasets(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow_ring3,
-#                 ligand_features=cfg.LIG_FEAT_OPT.gvp, ligand_edges=cfg.LIG_EDGE_OPT.binary,
-#                 k_folds=5, overwrite=False)
+from src.analysis.figures import prepare_df, custom_fig, fig_combined
 
-l = Loader.load_DataLoaders(cfg.DATA_OPT.PDBbind, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow_ring3,
-                            training_fold=0, ligand_feature=cfg.LIG_FEAT_OPT.gvp, batch_train=2)
-
+df = prepare_df()
+sel_dataset = 'PDBbind'
+exclude = []
+sel_col = 'cindex'
 # %%
 
-m = Loader.init_model(cfg.MODEL_OPT.GVPL_RNG, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow_ring3,
-                  dropout=0.2)
-# %%
-sample = next(iter(l['train']))
+# models to plot:
+# - Original model with (nomsa, binary) and (original,  binary) features for protein and ligand respectively
+# - Aflow models with   (nomsa, aflow*) and (original,  binary) # x2 models here (aflow and aflow_ring3)
+# - GVP protein model   (gvp,   binary) and (original,  binary)
+# - GVP ligand model    (nomsa, binary) and (gvp,       binary)
 
-m(sample['protein'], sample['ligand'])
+models = {
+    'DG': ('nomsa', 'binary', 'original', 'binary'),
+    'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+    'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
+    # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
+    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
+}
+
+# custom_fig(df, models, sel_dataset, sel_col)
+
+# %%
+fig_combined(df, datasets=['PDBbind'], fig_callable=custom_fig,
+             models=models)
+
 # %%
