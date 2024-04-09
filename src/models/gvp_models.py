@@ -20,6 +20,7 @@ class GVPLigand_RNG3(BaseModel):
                  # Feature input sizes:
                  num_features_pro=54, # esm has 320d embeddings original feats is 54
                  edge_dim_pro=6, # edge dim for protein branch from RING3
+                 **kwargs
                  ):
         
         super(GVPLigand_RNG3, self).__init__()

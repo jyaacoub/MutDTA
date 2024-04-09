@@ -48,7 +48,7 @@ executor.update_parameters(
     slurm_mem=args.slurm_mem,
     
     # Might need this since ESM takes up a lot of memory
-    slurm_constraint=cfg.SLURM_CONSTRAINT, 
+    #    slurm_constraint=cfg.SLURM_CONSTRAINT, 
     # For CC docs see: (https://docs.alliancecan.ca/wiki/Using_GPUs_with_Slurm)
     
     slurm_additional_parameters=additional_params
