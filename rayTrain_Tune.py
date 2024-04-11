@@ -78,15 +78,15 @@ if __name__ == "__main__":
     print("Cuda support:", torch.cuda.is_available(),":", 
                             torch.cuda.device_count(), "devices")
     print("CUDA VERSION:", torch.__version__)
-#    ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
-    
+
+  # 'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'): 
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": cfg.MODEL_OPT.GVPL_RNG,
+        "model": cfg.MODEL_OPT.GVPL,
         "dataset": cfg.DATA_OPT.PDBbind,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
-        "edge_opt": cfg.PRO_EDGE_OPT.aflow_ring3,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
         
@@ -95,21 +95,45 @@ if __name__ == "__main__":
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([16,32,64]), # local batch size
+        "batch_size": ray.tune.choice([32, 64, 128]), # local batch size
         
         # model architecture hyperparams
         "architecture_kwargs":{
             "dropout": ray.tune.uniform(0.0, 0.5),
-            "pro_emb_dim": ray.tune.choice([64, 128, 256]),
             "output_dim":  ray.tune.choice([128, 256, 512]), 
-            "nheads_pro":  ray.tune.choice([3, 4, 5]),   
         }
     }
+ # search space for GVPL_RNG MODEL:
+#    search_space = {
+#        ## constants:
+#        "epochs": 20,
+#        "model": cfg.MODEL_OPT.GVPL_RNG,
+#        "dataset": cfg.DATA_OPT.PDBbind,
+#        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+#        "edge_opt": cfg.PRO_EDGE_OPT.aflow_ring3,
+#        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+#        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+#        
+#        "fold_selection": 0,
+#        "save_checkpoint": False,
+#                
+#        ## hyperparameters to tune:
+#        "lr": ray.tune.loguniform(1e-5, 1e-3),
+#        "batch_size": ray.tune.choice([16,32,64]), # local batch size
+#        
+#        # model architecture hyperparams
+#        "architecture_kwargs":{
+#            "dropout": ray.tune.uniform(0.0, 0.5),
+#            "pro_emb_dim": ray.tune.choice([64, 128, 256]),
+#            "output_dim":  ray.tune.choice([128, 256, 512]), 
+#            "nheads_pro":  ray.tune.choice([3, 4, 5]),   
+#        }
+#    }
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
-    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=1, # number of ray actors to launch to distribute compute across
                                    use_gpu=True,  # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    resources_per_worker={"CPU": 2, "GPU": 1},
                                    # trainer_resources={"CPU": 2, "GPU": 1},
