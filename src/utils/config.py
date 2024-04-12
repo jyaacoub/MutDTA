@@ -62,6 +62,7 @@ class PRO_FEAT_OPT(StringEnum):
     gvp = 'gvp'
     
 # Protein options that require PDB structure files to work
+OPT_REQUIRES_MSA_ALN = StringEnum('msa', ['msa', 'shannon'])
 OPT_REQUIRES_PDB = StringEnum('needs_structure', ['anm', 'af2', 'af2_anm', 'ring3', 
                                                   'aflow', 'aflow_ring3', 'foldseek',
                                                   'gvp'])

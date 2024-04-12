@@ -63,7 +63,7 @@ def target_to_graph(target_sequence:str, contact_map:str|np.ndarray,
         pssm = np.zeros((len(target_sequence), len(ResInfo.amino_acids)))
         line_count = 1
         target_feature = np.concatenate((pssm, pro_hot, pro_property), axis=1)
-    elif pro_feat == 'msa' or pro_feat == 'shannon':
+    elif pro_feat in cfg.OPT_REQUIRES_MSA_ALN:
         # get pssm matrix from alignment file
         pssm, line_count = get_pfm(aln_file, target_sequence)
         if pro_feat == 'shannon':

@@ -109,12 +109,12 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
             raise ValueError(f"Invalid data type {data}, pick from {cfg.DATA_OPT.list()}.")
         
         # saving training, validation, and test sets
+        test_split = 1 - train_split - val_split
         if k_folds is None:
             train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                                     train_split=train_split, val_split=val_split, 
                                     random_seed=random_seed, split_by_prot=not pro_overlap)
         else:
-            test_split = 1 - train_split - val_split
             assert test_split > 0, f"Invalid train/val/test split: {train_split}/{val_split}/{test_split}"
             assert not pro_overlap, f"No support for overlapping proteins with k-folds rn."
             train_loader, val_loader, test_loader = balanced_kfold_split(dataset, 
@@ -125,13 +125,14 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
         if pro_overlap:
             subset_names = [s+'-overlap' for s in subset_names]
         
-        if k_folds is None:
-            dataset.save_subset(train_loader, subset_names[0])
-            dataset.save_subset(val_loader, subset_names[1])
-        else:
-            # loops through all k folds and saves as train1, train2, etc.
-            dataset.save_subset_folds(train_loader, subset_names[0])
-            dataset.save_subset_folds(val_loader, subset_names[1])
+        if test_split < 1: # for datasets that are purely for testing, no training
+            if k_folds is None:
+                dataset.save_subset(train_loader, subset_names[0])
+                dataset.save_subset(val_loader, subset_names[1])
+            else:
+                # loops through all k folds and saves as train1, train2, etc.
+                dataset.save_subset_folds(train_loader, subset_names[0])
+                dataset.save_subset_folds(val_loader, subset_names[1])
             
         dataset.save_subset(test_loader, subset_names[2])
             
