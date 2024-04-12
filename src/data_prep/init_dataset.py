@@ -92,7 +92,7 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                     ligand_edge=ligand_edge,
                     **kwargs
                     )
-        elif data == 'Platinum':
+        elif data == 'platinum':
             dataset = PlatinumDataset(
                 save_root=f'{data_root}/PlatinumDataset/',
                 data_root=f'{data_root}/PlatinumDataset/raw',

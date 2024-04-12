@@ -976,6 +976,17 @@ class PlatinumDataset(BaseDataset):
         super().__init__(save_root, data_root, None, cmap_threshold, 
                          feature_opt, *args, **kwargs)
     
+    def af_conf_files(self, code) -> list[str]:
+        """
+        Multiple confirmations are needed to generate edge attributes/weights 
+        (see cfg.OPT_REQUIRES_CONF)
+        """
+        raise NotImplementedError
+    
+    def sdf_p(self, code) -> str:
+        """Needed for gvp ligand branch (uses coordinate info)"""
+        raise NotImplementedError
+    
     def pdb_p(self, code):
         code = code.split('_')[0] # removing additional information for mutations.
         return os.path.join(self.raw_paths[1], f'{code}.pdb')

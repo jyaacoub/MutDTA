@@ -14,6 +14,7 @@ class DATA_OPT(StringEnum):
     davis = 'davis'
     kiba = 'kiba'
     PDBbind = 'PDBbind'
+    platinum = 'platinum'
 
 # Model options
 class MODEL_OPT(StringEnum):
