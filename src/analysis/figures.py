@@ -337,11 +337,12 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
     
     
 def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], 
-                  fig_callable=fig4_pro_feat_violin,
+                  fig_callable=fig4_pro_feat_violin, fig_scale=(5,4),
                   show=False, **kwargs):    
     # Create subplots with datasets as columns and metrics as rows
     fig, axes = plt.subplots(len(metrics), len(datasets), 
-                             figsize=(5*len(datasets), 4*len(metrics)))
+                             figsize=(fig_scale[0]*len(datasets), 
+                                      fig_scale[1]*len(metrics)))
     for i, dataset in enumerate(datasets):
         for j, metric in enumerate(metrics):
             # Set current subplot

@@ -26,13 +26,17 @@ models = {
     'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
     # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
     'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
     'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
 }
 
 # custom_fig(df, models, sel_dataset, sel_col)
 
 # %%
-fig_combined(df, datasets=['PDBbind'], fig_callable=custom_fig,
-             models=models)
+fig, axes = fig_combined(df, datasets=['PDBbind'], fig_callable=custom_fig,
+             models=models, metrics=['pearson', 'cindex', 'mse', 'mae'],
+             fig_scale=(8,5))
+plt.xticks(rotation=45)
+
 
 # %%
