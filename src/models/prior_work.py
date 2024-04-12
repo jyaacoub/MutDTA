@@ -21,7 +21,7 @@ class DGraphDTA(BaseModel):
         paper: https://pubs.rsc.org/en/content/articlelanding/2020/ra/d0ra02297g
     """
     def __init__(self, num_features_pro=54, num_features_mol=78, output_dim=128, dropout=0.2,
-                 edge_weight_opt='binary'):
+                 edge_weight_opt='binary', **kwargs):
         super(DGraphDTA, self).__init__(pro_feat=None, edge_weight_opt=edge_weight_opt)
 
         print('DGraphDTA Loaded')

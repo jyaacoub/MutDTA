@@ -14,6 +14,70 @@ from transformers.utils import logging
 
 from src.models.utils import BaseModel
 
+class Ring3Branch(BaseModel):
+    """Model using ring3 features for protein branch with no ESM embeddings"""
+    def __init__(self, pro_emb_dim=128, output_dim=250, 
+                 dropout=0.2, nheads_pro=5,
+                 
+                 # Feature input sizes:
+                 num_features_pro=54, # esm has 320d embeddings original feats is 54
+                 edge_dim_pro=6, # edge dim for protein branch from RING3
+                 ):
+        
+        super(Ring3Branch, self).__init__()
+        # PROTEIN BRANCH: (cant use nn_g.Sequential since we want dropout and edge attr)
+        self.pro_gnn1 = TransformerConv(num_features_pro, pro_emb_dim, 
+                                        edge_dim=edge_dim_pro, heads=nheads_pro,
+                                        dropout=dropout)
+        self.pro_gnn2 = TransformerConv(pro_emb_dim*nheads_pro, pro_emb_dim*2,
+                                        edge_dim=edge_dim_pro, heads=nheads_pro,
+                                        dropout=dropout)
+        self.pro_gnn3 = TransformerConv(pro_emb_dim*2*nheads_pro, pro_emb_dim*2,
+                                        edge_dim=edge_dim_pro, heads=nheads_pro,
+                                        concat=False, dropout=dropout)
+        
+        self.pro_fc = nn.Sequential(
+            nn.Linear(pro_emb_dim*2, pro_emb_dim*2),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(pro_emb_dim*2, 1024),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(1024, output_dim),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+        )
+        
+        # misc functions
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(dropout)
+    
+    def forward(self, data):
+        ei = data.edge_index
+        edge_attr = data.edge_weight
+        
+        #### Graph NN ####
+        target_x = self.relu(data.x)
+        
+        # GNN layers:
+        # NOTE: dropout is done to the attention coefficients in the TransformerConv
+        xt = self.pro_gnn1(target_x, ei, edge_attr)
+        xt = self.relu(xt)
+        xt = self.pro_gnn2(xt, ei, edge_attr)
+        xt = self.relu(xt)
+        xt = self.pro_gnn3(xt, ei, edge_attr)
+        xt = self.relu(xt)
+
+        # flatten/pool
+        xt = global_mean_pool(xt, data.batch)  # global avg pooling
+        xt = self.relu(xt)
+        xt = self.dropout(xt)
+
+        #### FC layers ####
+        xt = self.pro_fc(xt)
+        return xt
+    
+
 class Ring3DTA(BaseModel):
     """Model using ring3 features for protein branch with no ESM embeddings"""
     def __init__(self, pro_emb_dim=128, output_dim=250, 
@@ -41,38 +105,20 @@ class Ring3DTA(BaseModel):
         
         self.mol_fc = nn.Sequential(
             nn.Linear(1024, 1024),
-            nn.ReLU(),
             nn.Dropout(dropout),
+            nn.ReLU(),
             nn.Linear(1024, 512),
-            nn.ReLU(),
             nn.Dropout(dropout),
+            nn.ReLU(),
             nn.Linear(512, output_dim),
-            nn.ReLU(),
             nn.Dropout(dropout),
+            nn.ReLU(),
         )
 
-        # PROTEIN BRANCH: (cant use nn_g.Sequential since we want dropout and edge attr)
-        self.pro_gnn1 = TransformerConv(num_features_pro, pro_emb_dim, 
-                                        edge_dim=edge_dim_pro, heads=nheads_pro,
-                                        dropout=dropout)
-        self.pro_gnn2 = TransformerConv(pro_emb_dim*nheads_pro, pro_emb_dim*2,
-                                        edge_dim=edge_dim_pro, heads=nheads_pro,
-                                        dropout=dropout)
-        self.pro_gnn3 = TransformerConv(pro_emb_dim*2*nheads_pro, pro_emb_dim*2,
-                                        edge_dim=edge_dim_pro, heads=nheads_pro,
-                                        concat=False, dropout=dropout)
-        
-        self.pro_fc = nn.Sequential(
-            nn.Linear(pro_emb_dim*2, pro_emb_dim*2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(pro_emb_dim*2, 1024),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(1024, output_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-        )
+        # PROTEIN BRANCH:
+        self.ring3_pro = Ring3Branch(pro_emb_dim, output_dim, dropout, 
+                                     nheads_pro,num_features_pro,
+                                     edge_dim_pro)
         
         # CONCATENATION OF BRANCHES:
         self.fc_concat = nn.Sequential(
@@ -91,32 +137,7 @@ class Ring3DTA(BaseModel):
         self.dropout_prot_p = dropout_prot
     
     def forward_pro(self, data):
-        ei = data.edge_index
-        edge_attr = data.edge_weight
-        
-        #### Graph NN ####
-        target_x = self.relu(data.x)
-        # ei, _, _ = dropout_node(ei, p=self.dropout_prot_p, 
-        #                         num_nodes=target_x.shape[0], 
-        #                         training=self.training)
-        
-        # GNN layers:
-        # NOTE: dropout is done to the attention coefficients in the TransformerConv
-        xt = self.pro_gnn1(target_x, ei, edge_attr)
-        xt = self.relu(xt)
-        xt = self.pro_gnn2(xt, ei, edge_attr)
-        xt = self.relu(xt)
-        xt = self.pro_gnn3(xt, ei, edge_attr)
-        xt = self.relu(xt)
-
-        # flatten/pool
-        xt = global_mean_pool(xt, data.batch)  # global avg pooling
-        xt = self.relu(xt)
-        xt = self.dropout(xt)
-
-        #### FC layers ####
-        xt = self.pro_fc(xt)
-        return xt
+        return self.ring3_pro(data)
     
     def forward_mol(self, data):
         x = self.mol_gnn(data.x, data.edge_index, data.batch)
@@ -146,7 +167,6 @@ class Ring3DTA(BaseModel):
         xc = torch.cat((xm, xp), 1)
         out = self.fc_concat(xc)
         return out
-    
     
 class Ring3_ESMDTA(Ring3DTA):
     def __init__(self, esm_head: str = 'facebook/esm2_t6_8M_UR50D', pro_emb_dim=512, output_dim=250, dropout=0.2, dropout_prot=0):

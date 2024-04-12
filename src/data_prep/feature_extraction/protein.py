@@ -15,7 +15,7 @@ from src.data_prep.feature_extraction.protein_edges import get_target_edge
 ###################### Protein Feature Extraction ######################
 ########################################################################
 def target_to_graph(target_sequence:str, contact_map:str|np.ndarray, 
-                    threshold=10.5, pro_feat='nomsa', aln_file:str=None,
+                    threshold=8.0, pro_feat='nomsa', aln_file:str=None,
                     pdb_fp:str=None, pddlt_fp:str=None) -> tuple[np.ndarray, np.ndarray]:
     """
     Feature extraction for protein sequence using contact map to generate
@@ -32,7 +32,7 @@ def target_to_graph(target_sequence:str, contact_map:str|np.ndarray,
         is considered an edge. Passing in a negative value will flip 
         this to be anything **above** the value (useful for when the cmap 
         is probability based, anything above 0.5 is considered in contact),
-        by default 10.5
+        by default 8.0
     `pro_feat` : str, optional
         Type of protein node feature to use, by default 'nomsa'
     `aln_file` : str, optional
@@ -74,7 +74,8 @@ def target_to_graph(target_sequence:str, contact_map:str|np.ndarray,
                     P_i = n_i/line_count # number of res of type i/ total res in col
                     ent -= P_i*(math.log(P_i,2)) # entropy calc
                 # "1 -" so that the larger the value the more conserved that amino acid is. 
-                return 1 - (ent / math.log2(21)) # divided by log2(21) which is the max entropy score for any 21 dimension vector
+                # divided by log2(21) which is the max entropy score for any 21 dimension vector
+                return 1 - (ent / math.log2(21)) 
                 
             pssm = np.apply_along_axis(entropy, axis=1, arr=pssm)
             pssm = pssm.reshape((len(target_sequence),1))
@@ -222,5 +223,3 @@ def create_aln_files(df_seq: pd.DataFrame, aln_p: Callable[[str], str]):
     """
     raise NotImplementedError("This function is not complete (see yumika)")
 
-if __name__ == "__main__":
-    print("hi")

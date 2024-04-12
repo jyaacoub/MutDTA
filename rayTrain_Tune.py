@@ -23,18 +23,19 @@ def train_func(config):
     model = Loader.init_model(model=config["model"], pro_feature=config["feature_opt"],
                             pro_edge=config["edge_opt"],
                             # additional kwargs send to model class to handle
-                            dropout=config["dropout"], 
-                            dropout_prot=config["dropout_prot"],
-                            pro_emb_dim=config["pro_emb_dim"],
+                            **config['architecture_kwargs']
                             )
     
     # prepare model with rayTrain (moves it to correct device and wraps it in DDP)
-    model = ray.train.torch.prepare_model(model)
+    model = ray.train.torch.prepare_model(model, parallel_strategy='ddp',
+                                          parallel_strategy_kwargs={'find_unused_parameters':True})
     
     # ============ Load dataset ==============
     print("Loading Dataset")
     loaders = Loader.load_DataLoaders(data=config['dataset'], pro_feature=config['feature_opt'], 
                                       edge_opt=config['edge_opt'], 
+                                      ligand_feature=config['lig_feat_opt'],
+                                      ligand_edge=config['lig_edge_opt'],
                                       path=cfg.DATA_ROOT, 
                                       batch_train=config['batch_size'],
                                       datasets=['train', 'val'],
@@ -49,11 +50,15 @@ def train_func(config):
     optimizer = torch.optim.Adam(model.parameters(), lr=config["lr"])
     save_checkpoint = config.get("save_checkpoint", False)
     
-    for _ in range(config['epochs']):
-        
-        # NOTE: no need to pass in device, rayTrain will handle that for us
-        simple_train(model, optimizer, loaders['train'], epochs=1)  # Train the model
-        loss = simple_eval(model, loaders['val'])  # Compute test accuracy
+    for _ in range(config['epochs']):            
+        try:
+            # NOTE: no need to pass in device, rayTrain will handle that for us
+            simple_train(model, optimizer, loaders['train'], epochs=1)  # Train the model
+            loss = simple_eval(model, loaders['val'])  # Compute test accuracy
+        except RuntimeError as e: # potential memory error
+            print("RuntimeError:", e)
+            ray.train.report({"loss": 100})
+            break
         
             
         # Report metrics (and possibly a checkpoint) to ray        
@@ -64,7 +69,7 @@ def train_func(config):
             torch.save(model.state_dict(), checkpoint_path)
             checkpoint = Checkpoint.from_directory(checkpoint_dir)
             
-        ray.train.report({"loss": loss},   checkpoint=checkpoint)
+        ray.train.report({"loss": loss}, checkpoint=checkpoint)
     
     
 if __name__ == "__main__":
@@ -73,32 +78,85 @@ if __name__ == "__main__":
     print("Cuda support:", torch.cuda.is_available(),":", 
                             torch.cuda.device_count(), "devices")
     print("CUDA VERSION:", torch.__version__)
-#    ray.init(num_gpus=1, num_cpus=8, ignore_reinit_error=True)
     
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": "RNG",
-        "dataset": "PDBbind",
-        "feature_opt": "nomsa", # NOTE: SPD requires foldseek features!!!
-        "edge_opt": "ring3",
+        "model": cfg.MODEL_OPT.DG,
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+        
         "fold_selection": 0,
         "save_checkpoint": False,
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([8, 16, 24]),        # batch size is per GPU! #NOTE: multiply this by num_workers
+        "batch_size": ray.tune.choice([32, 64, 128]), # local batch size
         
         # model architecture hyperparams
-        "dropout": ray.tune.uniform(0.0, 0.5), # for fc layers
-        "dropout_prot": ray.tune.uniform(0.0, 0.5),
-        "pro_emb_dim": ray.tune.choice([128, 256, 512]), # input from SaProt is 480 dims
+        "architecture_kwargs":{
+            "dropout": ray.tune.uniform(0.0, 0.5),
+            "output_dim":  ray.tune.choice([128, 256, 512]), 
+        }
     }
+  # 'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'): 
+    # search_space = {
+    #     ## constants:
+    #     "epochs": 20,
+    #     "model": cfg.MODEL_OPT.GVPL,
+    #     "dataset": cfg.DATA_OPT.PDBbind,
+    #     "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+    #     "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+    #     "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+    #     "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+        
+    #     "fold_selection": 0,
+    #     "save_checkpoint": False,
+                
+    #     ## hyperparameters to tune:
+    #     "lr": ray.tune.loguniform(1e-5, 1e-3),
+    #     "batch_size": ray.tune.choice([32, 64, 128]), # local batch size
+        
+    #     # model architecture hyperparams
+    #     "architecture_kwargs":{
+    #         "dropout": ray.tune.uniform(0.0, 0.5),
+    #         "output_dim":  ray.tune.choice([128, 256, 512]), 
+    #     }
+    # }
+ # search space for GVPL_RNG MODEL:
+#    search_space = {
+#        ## constants:
+#        "epochs": 20,
+#        "model": cfg.MODEL_OPT.GVPL_RNG,
+#        "dataset": cfg.DATA_OPT.PDBbind,
+#        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+#        "edge_opt": cfg.PRO_EDGE_OPT.aflow_ring3,
+#        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+#        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+#        
+#        "fold_selection": 0,
+#        "save_checkpoint": False,
+#                
+#        ## hyperparameters to tune:
+#        "lr": ray.tune.loguniform(1e-5, 1e-3),
+#        "batch_size": ray.tune.choice([16,32,64]), # local batch size
+#        
+#        # model architecture hyperparams
+#        "architecture_kwargs":{
+#            "dropout": ray.tune.uniform(0.0, 0.5),
+#            "pro_emb_dim": ray.tune.choice([64, 128, 256]),
+#            "output_dim":  ray.tune.choice([128, 256, 512]), 
+#            "nheads_pro":  ray.tune.choice([3, 4, 5]),   
+#        }
+#    }
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
-    scaling_config = ScalingConfig(num_workers=2, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=1, # number of ray actors to launch to distribute compute across
                                    use_gpu=True,  # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    resources_per_worker={"CPU": 2, "GPU": 1},
                                    # trainer_resources={"CPU": 2, "GPU": 1},
@@ -118,7 +176,7 @@ if __name__ == "__main__":
             search_alg=OptunaSearch(), # using ray.tune.search.Repeater() could be useful to get multiple trials per set of params
                                        # would be even better if we could set trial-wise dependencies for a certain fold.
                                        # https://github.com/ray-project/ray/issues/33677
-            num_samples=200,
+            num_samples=1000,
         ),
     )
 

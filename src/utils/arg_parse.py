@@ -221,13 +221,46 @@ def safe_parse(parser: argparse.ArgumentParser,
         if get_ipython().__class__.__name__ == 'ZMQInteractiveShell':
             # Jupyter notebook
             in_args = jyp_args.split()
-            args = parser.parse_args(args=in_args)
+            args, unknown_args = parser.parse_known_args(args=in_args)
         else:  
-            args = parser.parse_args()
+            args, unknown_args = parser.parse_known_args()
     except NameError:
         # Python script
-        args = parser.parse_args()
-    return args
+        args, unknown_args = parser.parse_known_args()
+    return args, unknown_args
+
+def process_unknown_args(unknown_args):
+    """Converts a list of unknown arguments into a dictionary, handling both '--key value' and '--key=value' formats."""
+    kwargs = {}
+    i = 0
+    while i < len(unknown_args):
+        arg = unknown_args[i]
+        if arg.startswith('--'):
+            key = arg[2:]
+            # Check if the next item is a value (not another key)
+            if i + 1 < len(unknown_args) and not unknown_args[i + 1].startswith('--'):
+                # The next item is the value
+                value = unknown_args[i + 1]
+                i += 2  # Move past the value for the next iteration
+                
+                # Attempt to cast value to int, then float, or leave as string
+                try:
+                    value = int(value)
+                except ValueError:
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        pass  # Leave value as string if both conversions fail
+            else:
+                # Assume a flag-like argument that implies a boolean value
+                value = True
+                i += 1
+                
+            kwargs[key] = value
+        else:
+            # Move to the next item if the current one doesn't start with '--'
+            i += 1
+    return kwargs
 
 def parse_train_test_args(verbose=True, distributed=False, 
                           jyp_args='-m EAT -d davis -f nomsa -e simple -D'):
@@ -238,7 +271,8 @@ def parse_train_test_args(verbose=True, distributed=False,
     add_hyperparam_args(parser)
     if distributed: 
         add_slurm_dist_args(parser)
-    args = safe_parse(parser, jyp_args=jyp_args)
+    args, unknown_args = safe_parse(parser, jyp_args=jyp_args)
+    unknown_args = process_unknown_args(unknown_args)
 
     # Model training args
     
@@ -267,4 +301,11 @@ def parse_train_test_args(verbose=True, distributed=False,
         print(f"       Learning rate: {args.learning_rate}")
         print(f"             Dropout: {args.dropout}")
         print(f"          Num epochs: {args.num_epochs}\n")
-    return args
+        
+        if len(unknown_args) > 0:
+            print(f"--------------- UNKNOWN ARGS --------------")
+            print(unknown_args)
+            print(f"-------------------------------------------\n")
+        
+        
+    return args, unknown_args

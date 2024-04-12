@@ -8,7 +8,7 @@ from src.analysis.metrics import get_metrics
 from src.train_test.training import test
 from src.utils.loader import Loader
 from src.utils.arg_parse import parse_train_test_args
-args = parse_train_test_args(verbose=True,
+args, unknown_args = parse_train_test_args(verbose=True,
                              jyp_args=' -m EDI -d PDBbind -f nomsa -e anm -lr 0.0001 -bs 20 -do 0.4 -ne 2000')
 # %%
 MODEL = args.model_opt[0]
@@ -46,7 +46,7 @@ print(model_p)
 
 
 # %% Initialize model and load checkpoint
-model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGE, dropout=DROPOUT)
+model = Loader.init_model(model=MODEL, pro_feature=FEATURE, pro_edge=EDGE, dropout=DROPOUT, **unknown_args)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 mdl_dict = torch.load(model_p, map_location=device)

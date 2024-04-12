@@ -242,7 +242,7 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         ew = get_af_edge_weights(chains=chains, anm_cc=('anm' in edge_opt))
         assert len(ew) == len(target_seq), f'Mismatch sequence length for {pdb_fp}'
         return ew
-    elif edge_opt == cfg.PRO_EDGE_OPT.ring3: # NOTE: aflow-ring3 gets run here
+    elif edge_opt in cfg.OPT_REQUIRES_RING3:
         chains = Chain.get_all_models_mp(af_confs)
             
         if len(chains) == 0:
@@ -277,7 +277,6 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
         # deletes all intermediate output files, since the main LxLx6 matrix should be saved at the end
         # Ring3Runner.cleanup(input_pdb, all=True)
         return all_cmaps
-    
     else:
         raise ValueError(f'Invalid edge_opt {edge_opt}')
     

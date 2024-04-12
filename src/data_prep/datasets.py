@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from src.data_prep.feature_extraction.gvp_feats import GVPFeaturesProtein, GVPFeaturesLigand
 from src.utils import config as cfg
 from src.utils.residue import Chain, Ring3Runner
 from src.utils.exceptions import DatasetNotFound
@@ -149,6 +150,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     @abc.abstractmethod
     def pdb_p(self, code) -> str:
+        """path to pdbfile for a particular protein"""
+        raise NotImplementedError
+    
+    @abc.abstractmethod
+    def sdf_p(self, code) -> str:
         """path to pdbfile for a particular protein"""
         raise NotImplementedError
     
@@ -354,7 +360,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         if len(missing_conf) > 0:
             filtered_df = df[~df.prot_id.isin(missing_conf)]
             logging.warning(f'{len(missing_conf)} mismatched or missing pids')
-            
+        else:
+            filtered_df = df
+        
         logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
         
         return filtered_df
@@ -374,6 +382,13 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                         unique_df[['prot_id', 'prot_seq']].iterrows(), 
                         desc='Creating protein graphs',
                         total=len(unique_df)):
+            
+            if node_feat == cfg.PRO_FEAT_OPT.gvp:
+                # gvp has its own unique graph to support the architecture implementation.
+                coords = Chain(self.pdb_p(code), grep_atoms={'CA', 'N', 'C'}).getCoords(get_all=True)
+                processed_prots[prot_id] = GVPFeaturesProtein().featurize_as_graph(code, coords, pro_seq)
+                continue
+            
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
@@ -409,7 +424,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                                         edge_opt=edge,
                                                         cmap=pro_cmap,
                                                         n_modes=5, n_cpu=4,
-                                                        af_confs=af_confs) #Note: this will handle if af_confs is a single file w/ multiple models
+                                                        af_confs=af_confs) # NOTE: this will handle if af_confs is a single file w/ multiple models
                     np.save(self.edgew_p(code), pro_edge_weight)
                 
                 if len(pro_edge_weight.shape) == 2:
@@ -427,24 +442,26 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             
         return processed_prots
     
-    def _create_ligand_graphs(self, df, node_feat, edge):
+    def _create_ligand_graphs(self, df:pd.DataFrame, node_feat, edge):
         processed_ligs = {}
         errors = []
-        for lig_seq in tqdm(df['SMILE'].unique(), 
-                            desc='Creating ligand graphs'):
+        if node_feat == cfg.LIG_FEAT_OPT.gvp:
+            for code, lig_seq in tqdm(df['SMILE'].items(), desc='Creating ligand graphs', 
+                                      total=len(df)):
+                processed_ligs[lig_seq] = GVPFeaturesLigand().featurize_as_graph(self.sdf_p(code))
+            return processed_ligs
+        
+        for lig_seq in tqdm(df['SMILE'].unique(), desc='Creating ligand graphs'):
             if lig_seq not in processed_ligs:
                 try:
-                    mol_feat, mol_edge = smile_to_graph(lig_seq, 
-                                                        lig_feature=node_feat, 
-                                                        lig_edge=edge)
+                    mol_feat, mol_edge = smile_to_graph(lig_seq, lig_feature=node_feat, lig_edge=edge)
                 except ValueError:
                     errors.append(f'L-{lig_seq}')
                     continue
                 except AttributeError as e:
                     raise Exception(f'Error on graph creation for ligand {lig_seq}.') from e
                 
-                lig = torchg.data.Data(x=torch.Tensor(mol_feat),
-                                    edge_index=torch.LongTensor(mol_edge),
+                lig = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol_edge),
                                     lig_seq=lig_seq)
                 processed_ligs[lig_seq] = lig
         
@@ -544,6 +561,9 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
     def pdb_p(self, code):
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
+    def sdf_p(self, code):
+        return os.path.join(self.data_root, code, f'{code}_ligand.sdf')
+    
     def cmap_p(self, pid):
         # cmap is saved in seperate directory under pdbbind/v2020-other-PL/cmaps/
         # file names are unique protein ids...
@@ -615,6 +635,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         pdb_codes = df_binding.index # pdbcodes
         
         ############## validating codes #############
+        logging.debug('Validating Codes')
         if self.aln_dir is not None: # create msa if 'msaF' is selected
             #NOTE: assuming MSAs are already created, since this would take a long time to do.
             
@@ -626,13 +647,14 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
             valid_codes = [c for c in pdb_codes if os.path.isfile(self.pdb_p(c))]
             
         pdb_codes = valid_codes
+        logging.debug(f"{len(pdb_codes)} valid PDBs with existing files.")
         assert len(pdb_codes) > 0, 'Too few PDBCodes, need at least 1...'
                 
         ############## Get ligand info #############
-        # WARNING: ORDER MATTERS SINCE LIGAND INFO REDUCED NUMBER OF PDBS DUE TO MISSING SMI...
+        # WARNING: THIS SHOULD ALWAYS COME BEFORE GETTING PROTEIN SEQUEINCES. ORDER MATTERS 
+        # BECAUSE LIGAND INFO REDUCES NUMBER OF PDBS DUE TO MISSING SMILES.
         # Extracting SMILE strings:
-        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes,
-                                              dir=lambda x: f'{self.data_root}/{x}/{x}_ligand.sdf')
+        dict_smi = PDBbindProcessor.get_SMILE(pdb_codes, dir=self.sdf_p)
         df_smi = pd.DataFrame.from_dict(dict_smi, orient='index', columns=['SMILE'])
         df_smi.index.name = 'PDBCode'
         
@@ -864,7 +886,7 @@ class DavisKibaDataset(BaseDataset):
         no_confs = []
         if self.pro_edge_opt in cfg.OPT_REQUIRES_PDB or \
             self.pro_feat_opt in cfg.OPT_REQUIRES_PDB:
-            if self.pro_feat_opt == 'foldseek':
+            if self.pro_feat_opt == cfg.PRO_FEAT_OPT.foldseek:
                 # we only need HighQ structures for foldseek
                 no_confs = [c for c in codes if (self.pdb_p(c, safe=False) is None)]
             else:
