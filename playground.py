@@ -1,49 +1,54 @@
-# %% Create and test on platinum dataset:
-from src.data_prep.init_dataset import create_datasets
-from src import config as cfg
-
-create_datasets(cfg.DATA_OPT.platinum,
-                cfg.PRO_FEAT_OPT.nomsa,
-                cfg.PRO_EDGE_OPT.binary,
-                ligand_features=cfg.LIG_FEAT_OPT.original,
-                ligand_edges=cfg.LIG_EDGE_OPT.binary,
-                k_folds=None,
-# just a test dataset, no training can be done on this
-                train_split=0.0, val_split=0.0) 
-
 #%%
+import os
 import pandas as pd
-data_p = "/home/jean/projects/data/PlatinumDataset"
-csv = f"{data_p}/nomsa_binary_original_binary/full/cleaned_XY.csv"
-csv_raw = f"{data_p}/nomsa_binary_original_binary/full/XY.csv"
+import matplotlib.pyplot as plt
 
-df = pd.read_csv(csv, index_col=0)
-df_raw = pd.read_csv(csv_raw, index_col=0)
+# Function to load sequences and their lengths from csv files
+def load_sequences(directory):
+    lengths = []
+    labels_positions = {}  # Dictionary to hold the last length of each file for labeling
+    files = sorted([f for f in os.listdir(directory) if f.endswith('.csv') and f.startswith('input_')])
+    for file in files:
+        file_path = os.path.join(directory, file)
+        data = pd.read_csv(file_path)
+        # Extract lengths
+        current_lengths = data['seqres'].apply(len)
+        lengths.extend(current_lengths)
+        # Store the position for the label using the last length in the current file
+        labels_positions[int(file.split('_')[1].split('.')[0])] = current_lengths.iloc[0]
+    return lengths, labels_positions
 
-# sorting by sequence length to keep the longest protein sequence 
-# instead of just the first.
-if 'sort_order' in df:
-    # ensures that the right codes are always present in unique_pro
-    df.sort_values(by='sort_order', inplace=True)
-else:
-    df['seq_len'] = df['prot_seq'].str.len()
-    df.sort_values(by='seq_len', ascending=False, inplace=True)
-    df['sort_order'] = [i for i in range(len(df))]
+p = lambda d: f"/cluster/home/t122995uhn/projects/data/{d}/alphaflow_io"
 
-# Get unique protid codes
-idx_name = df.index.name
-df.reset_index(drop=False, inplace=True)
-unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+DATASETS = {d: p(d) for d in ['davis', 'kiba', 'pdbbind']}
+DATASETS['platinum'] = "/cluster/home/t122995uhn/projects/data/PlatinumDataset/raw/alphaflow_io"
 
-# reverting index to code-based index
-df.set_index(idx_name, inplace=True)
-unique_df = df.iloc[unique_pro.index]
+fig, axs = plt.subplots(len(DATASETS), 1, figsize=(10, 5*len(DATASETS) + len(DATASETS)))
 
+n_bins = 50  # Adjust the number of bins according to your preference
 
+for i, (dataset, d_dir) in enumerate(DATASETS.items()):
+    # Load sequences and positions for labels
+    lengths, labels_positions = load_sequences(d_dir)
+    
+    # Plot histogram
+    ax = axs[i]
+    n, bins, patches = ax.hist(lengths, bins=n_bins, color='blue', alpha=0.7)
+    ax.set_title(dataset)
+    
+    # Add counts to each bin
+    for count, x, patch in zip(n, bins, patches):
+        ax.text(x + 0.5, count, str(int(count)), ha='center', va='bottom')
+    
+    # Adding red number labels
+    for label, pos in labels_positions.items():
+        ax.text(pos, label, str(label), color='red', ha='center')
+    
+    # Optional: Additional formatting for readability
+    ax.set_xlabel('Sequence Length')
+    ax.set_ylabel('Frequency')
+    ax.set_xlim([0, max(lengths) + 10])  # Adjust xlim to make sure labels fit
 
-# %%
-from src.data_prep.datasets import PlatinumDataset
-
-PlatinumDataset.get_unique_prots(df)
-
+plt.tight_layout()
+plt.show()
 # %%

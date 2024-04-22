@@ -986,7 +986,8 @@ class PlatinumDataset(BaseDataset):
     
     def sdf_p(self, code) -> str:
         """Needed for gvp ligand branch (uses coordinate info)"""
-        raise NotImplementedError
+        lig_id = self.df.loc[code].lig_id
+        return os.path.join(self.raw_paths[2], f'{lig_id}.sdf')
     
     def pdb_p(self, code):
         code = code.split('_')[0] # removing additional information for mutations.
