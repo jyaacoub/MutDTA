@@ -10,7 +10,7 @@ from src.models.esm_models import EsmDTA, SaProtDTA
 from src.models.prior_work import DGraphDTA, DGraphDTAImproved
 from src.models.ring3 import Ring3DTA
 from src.models.gvp_models import GVPModel, GVPLigand_DGPro, GVPLigand_RNG3
-from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset
+from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset, PlatinumDataset
 from src.utils import config  as cfg # sets up os env for HF
 
 def validate_args(valid_options):
@@ -60,7 +60,7 @@ class Loader():
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float, **kwargs) -> BaseModel:
+    def init_model(model:str, pro_feature:str, pro_edge:str, dropout:float=0.2, **kwargs) -> BaseModel:
         """
         kwargs are used to pass additional arguments to the model constructor 
         (e.g.: pro_emb_dim, extra_profc_layer, dropout_prot_p for EsmDTA)
@@ -192,6 +192,20 @@ class Loader():
                     ligand_edge=ligand_edge,
                     max_seq_len=1500
                     )
+        elif data == 'platinum':
+            dataset = PlatinumDataset(
+                    save_root=f'{path}/PlatinumDataset/',
+                    data_root=f'{path}/PlatinumDataset/raw',
+                    af_conf_dir=f'{path}/PlatinumDataset/raw/alphaflow_io/out_pdb_MD-distilled/',
+                    aln_dir=None,
+                    cmap_threshold=8.0,
+                    
+                    feature_opt=pro_feature,
+                    edge_opt=edge_opt,
+                    ligand_feature=ligand_feature,
+                    ligand_edge=ligand_edge,
+                    subset=subset,
+                )
         else:
             raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
             

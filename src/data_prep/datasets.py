@@ -977,12 +977,20 @@ class PlatinumDataset(BaseDataset):
         super().__init__(save_root, data_root, None, cmap_threshold, 
                          feature_opt, *args, **kwargs)
     
-    def af_conf_files(self, code) -> list[str]:
+    def af_conf_files(self, pid, map=True) -> list[str]:
         """
         Multiple confirmations are needed to generate edge attributes/weights 
         (see cfg.OPT_REQUIRES_CONF)
         """
-        raise NotImplementedError
+        if self.df is not None and pid in self.df.index:
+            pid = self.df.loc[pid]['prot_id']
+            
+        if self.alphaflow:
+            fp = f'{self.af_conf_dir}/{pid}.pdb'
+            fp = fp if os.path.exists(fp) else None
+            return fp
+            
+        return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
     
     def sdf_p(self, code) -> str:
         """Needed for gvp ligand branch (uses coordinate info)"""
@@ -990,7 +998,8 @@ class PlatinumDataset(BaseDataset):
         return os.path.join(self.raw_paths[2], f'{lig_id}.sdf')
     
     def pdb_p(self, code):
-        code = code.split('_')[0] # removing additional information for mutations.
+        # code = code.split('_')[0] # removing additional information for mutations.
+        # no need to remove mutation information since that is curtial for the pdb id
         return os.path.join(self.raw_paths[1], f'{code}.pdb')
     
     def cmap_p(self, prot_id):
@@ -1149,11 +1158,11 @@ class PlatinumDataset(BaseDataset):
                     chain_mt = chain_wt
                 
                 # Getting and saving cmaps under the unique protein ID
-                if not os.path.isfile(self.cmap_p(wt_id, map=False)):
-                    np.save(self.cmap_p(wt_id, map=False), chain_wt.get_contact_map())
+                if not os.path.isfile(self.cmap_p(wt_id)):
+                    np.save(self.cmap_p(wt_id), chain_wt.get_contact_map())
                 
-                if not os.path.isfile(self.cmap_p(mt_id, map=False)):
-                    np.save(self.cmap_p(mt_id, map=False), chain_mt.get_contact_map())
+                if not os.path.isfile(self.cmap_p(mt_id)):
+                    np.save(self.cmap_p(mt_id), chain_mt.get_contact_map())
                 
             except Exception as e:
                 raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e

@@ -61,7 +61,12 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                 # position frequency matrix creation -> important for msa feature
                 create_pfm_np_files(f'{data_root}/{data}/aln', processes=4)
             if 'af_conf_dir' not in kwargs:
-                kwargs['af_conf_dir'] = f'../colabfold/{data}_af2_out/'
+                if EDGE in cfg.OPT_REQUIRES_AFLOW_CONF:
+                    kwargs['af_conf_dir'] = f'/{data}/alphaflow_io/out_pdb_MD-distilled/'
+                else:
+                    kwargs['af_conf_dir'] = f'../colabfold/{data}_af2_out/'
+                
+                
             dataset = DavisKibaDataset(
                     save_root=f'{data_root}/DavisKibaDataset/{data}/',
                     data_root=f'{data_root}/{data}/',
@@ -93,6 +98,8 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                     **kwargs
                     )
         elif data == 'platinum':
+            if 'af_conf_dir' not in kwargs:
+                kwargs['af_conf_dir'] = f'{data_root}/PlatinumDataset/raw/alphaflow_io/out_pdb_MD-distilled/'
             dataset = PlatinumDataset(
                 save_root=f'{data_root}/PlatinumDataset/',
                 data_root=f'{data_root}/PlatinumDataset/raw',
@@ -125,7 +132,7 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
         if pro_overlap:
             subset_names = [s+'-overlap' for s in subset_names]
         
-        if test_split < 1: # for datasets that are purely for testing, no training
+        if test_split < 1: # for datasets that are purely for testing we skip this section
             if k_folds is None:
                 dataset.save_subset(train_loader, subset_names[0])
                 dataset.save_subset(val_loader, subset_names[1])
