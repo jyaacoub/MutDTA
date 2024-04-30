@@ -1,54 +1,47 @@
 #%%
-import os
+from src.data_prep.init_dataset import create_datasets
+from src import config as cfg
+from src.utils.loader import Loader
+from src.train_test.training import test
+import torch, os
 import pandas as pd
-import matplotlib.pyplot as plt
+import tqdm
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+#%%
+# create_datasets(cfg.DATA_OPT.platinum, 
+#                 cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow, 
+#                 ligand_features=cfg.LIG_FEAT_OPT.gvp, ligand_edges=cfg.LIG_EDGE_OPT.binary,
+#                 k_folds=None, train_split=0, val_split=0)
+#%%
+loaders = Loader.load_DataLoaders(cfg.DATA_OPT.platinum,
+                               cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+                               ligand_feature=cfg.LIG_FEAT_OPT.gvp, ligand_edge=cfg.LIG_EDGE_OPT.binary,
+                               datasets=['test'])
 
-# Function to load sequences and their lengths from csv files
-def load_sequences(directory):
-    lengths = []
-    labels_positions = {}  # Dictionary to hold the last length of each file for labeling
-    files = sorted([f for f in os.listdir(directory) if f.endswith('.csv') and f.startswith('input_')])
-    for file in files:
-        file_path = os.path.join(directory, file)
-        data = pd.read_csv(file_path)
-        # Extract lengths
-        current_lengths = data['seqres'].apply(len)
-        lengths.extend(current_lengths)
-        # Store the position for the label using the last length in the current file
-        labels_positions[int(file.split('_')[1].split('.')[0])] = current_lengths.iloc[0]
-    return lengths, labels_positions
+#%%
+model = Loader.init_model(cfg.MODEL_OPT.GVPL, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+                          dropout=0.02414, output_dim=256)
 
-p = lambda d: f"/cluster/home/t122995uhn/projects/data/{d}/alphaflow_io"
+#%%
+cp_dir = "/cluster/home/t122995uhn/projects/MutDTA/results/model_checkpoints/ours"
+MODEL_KEY = lambda fold: f"GVPLM_PDBbind{fold}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE"
+cp = lambda fold: f"{cp_dir}/{MODEL_KEY(fold)}.model"
 
-DATASETS = {d: p(d) for d in ['davis', 'kiba', 'pdbbind']}
-DATASETS['platinum'] = "/cluster/home/t122995uhn/projects/data/PlatinumDataset/raw/alphaflow_io"
+out_dir = f'{cfg.MEDIA_SAVE_DIR}/test_set_pred/'
+os.makedirs(out_dir, exist_ok=True)
 
-fig, axs = plt.subplots(len(DATASETS), 1, figsize=(10, 5*len(DATASETS) + len(DATASETS)))
+for i in range(5):
+    model.safe_load_state_dict(torch.load(cp(i), map_location=device))
+    model.to(device)
+    model.eval()
 
-n_bins = 50  # Adjust the number of bins according to your preference
-
-for i, (dataset, d_dir) in enumerate(DATASETS.items()):
-    # Load sequences and positions for labels
-    lengths, labels_positions = load_sequences(d_dir)
+    loss, pred, actual = test(model, loaders['test'], device, verbose=True)
     
-    # Plot histogram
-    ax = axs[i]
-    n, bins, patches = ax.hist(lengths, bins=n_bins, color='blue', alpha=0.7)
-    ax.set_title(dataset)
-    
-    # Add counts to each bin
-    for count, x, patch in zip(n, bins, patches):
-        ax.text(x + 0.5, count, str(int(count)), ha='center', va='bottom')
-    
-    # Adding red number labels
-    for label, pos in labels_positions.items():
-        ax.text(pos, label, str(label), color='red', ha='center')
-    
-    # Optional: Additional formatting for readability
-    ax.set_xlabel('Sequence Length')
-    ax.set_ylabel('Frequency')
-    ax.set_xlim([0, max(lengths) + 10])  # Adjust xlim to make sure labels fit
+    # saving as csv with columns code, pred, actual
+    # get codes from test loader
+    codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1
+    df = pd.DataFrame({'pred': pred, 'actual': actual}, index=codes)
+    df.index.name = 'code'
+    df.to_csv(f'{out_dir}/{MODEL_KEY(i)}_PLATINUM.csv')
 
-plt.tight_layout()
-plt.show()
 # %%

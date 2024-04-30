@@ -244,7 +244,7 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     return logs
 
 
-def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray, np.ndarray]:
+def test(model, test_loader, device, CRITERION=None, verbose=False) -> Tuple[float, np.ndarray, np.ndarray]:
     """
     Run inference on the test set.
 
@@ -269,9 +269,9 @@ def test(model, test_loader, device, CRITERION=None) -> Tuple[float, np.ndarray,
     
     pred = np.array([])
     actual = np.array([])
-    
+    model.eval()
     with torch.no_grad():
-        for data in test_loader:
+        for data in tqdm(test_loader, total=len(test_loader), disable=not verbose):
             batch_pro = data['protein'].to(device)
             batch_mol = data['ligand'].to(device)
             labels = data['y'].reshape(-1,1).to(device)
