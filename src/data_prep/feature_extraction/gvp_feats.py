@@ -232,7 +232,7 @@ class GVPFeaturesLigand:
         E_vectors = coords[edge_index[0]] - coords[edge_index[1]]
         rbf = _rbf(E_vectors.norm(dim=-1), D_max=D_max, D_count=num_rbf)
 
-        edge_s = rbf
+        edge_s = rbf # to standardize the distances
         edge_v = _normalize(E_vectors).unsqueeze(-2)
 
         edge_s, edge_v = map(torch.nan_to_num, (edge_s, edge_v))

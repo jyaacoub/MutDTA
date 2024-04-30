@@ -39,9 +39,30 @@ for i in range(5):
     
     # saving as csv with columns code, pred, actual
     # get codes from test loader
-    codes = [b['code'][0] for b in loaders['test']] # NOTE: batch size is 1
-    df = pd.DataFrame({'pred': pred, 'actual': actual}, index=codes)
+    codes, pid = [b['code'][0] for b in loaders['test']], [b['prot_id'][0] for b in loaders['test']]
+    df = pd.DataFrame({'prot_id': pid, 'pred': pred, 'actual': actual}, index=codes)
     df.index.name = 'code'
     df.to_csv(f'{out_dir}/{MODEL_KEY(i)}_PLATINUM.csv')
 
+# %%
+# filter out training data PDBs for pdbbind:
+
+# /cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/train0/cleaned_XY.csv
+# /cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/val0/cleaned_XY.csv
+# /cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/test/cleaned_XY.csv
+# /cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/full/cleaned_XY.csv
+#%%
+from src.analysis.figures import fig_dpkd_dist, fig_sig_mutations_conf_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv("results/model_media/test_set_pred/GVPLM_PDBbind0D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+                 index_col=0)
+
+true_dpkd = fig_dpkd_dist(df, pkd_col='actual')
+pred_dpkd = fig_dpkd_dist(df, pkd_col='pred')
+
+fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd)
 # %%

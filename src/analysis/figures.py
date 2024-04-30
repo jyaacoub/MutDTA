@@ -9,6 +9,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 from statannotations.Annotator import Annotator
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 from src.utils import config as cfg
 from src.utils.loader import Loader
@@ -427,6 +428,63 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
         plt.show()
     
     return plot_data
+
+def fig_dpkd_dist(df, pkd_col='pkd', verbose=False, show_plot=True, ax=None) -> list[float]:
+    """Delta pkd distribution given df containing wt and mutated proteins and their pkd values"""
+    wt_df = df[df.index.str.contains("_wt")]
+    mt_df = df[df.index.str.contains("_mt")]
+    
+    delta_pkd= []
+    for m in mt_df.index:
+        wt_pkd = wt_df.loc[m.split('_')[0] + '_wt'][pkd_col]
+        delta_pkd.append((wt_pkd - mt_df.loc[m][pkd_col]))
+
+    # Display the Δpkd values
+    if verbose:
+        print("Δpkd values:")
+        print(delta_pkd)
+
+    # Visualizing the distribution of Δpkd values
+    ax = sns.histplot(delta_pkd, kde=True, ax=ax)
+    ax.set_title(('Distribution of Δpkd Values' if pkd_col.lower()[:4] != 'pred' else 
+                    'Distribution of PREDICTED Δpkd Values'))
+    ax.set_xlabel('Δpkd (change in pkd from wildtype)')
+    ax.set_ylabel('Frequency')
+    if show_plot: plt.show()
+        
+    return delta_pkd
+
+def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, show_plot=True, ax=None):
+    dpkd = []
+    # filter out nan vals
+    for y,p in zip(true_dpkd, pred_dpkd):
+        if not (np.isnan(y) or np.isnan(p)):
+            dpkd.append((y,p))
+    dpkd = np.array(dpkd)
+    
+    # identify significance threshold seperately:
+    mean_dpkd = np.mean(dpkd, axis=0)
+    std_dpkd = np.std(dpkd, axis=0)
+    sig_thresh = mean_dpkd + std* std_dpkd
+
+    # Mark observed mutations as significant or not
+    sig_dpkd = abs(dpkd) > sig_thresh
+    conf_matrix = confusion_matrix(sig_dpkd[:,0], sig_dpkd[:,1])
+
+    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, 
+                                display_labels=["significant", "not significant"])
+    disp.plot(cmap=plt.cm.Blues, ax=ax)
+    disp.ax_.set_title('Confusion Matrix for Mutation Significance')
+    if show_plot: plt.show()
+
+    # Calculate and print TPR and TNR
+    tn, fp, fn, tp = conf_matrix.ravel()
+    tpr = tp / (tp + fn)
+    tnr = tn / (tn + fp)
+    if verbose:
+        print(f"True Positive Rate (TPR): {tpr:.2f}")
+        print(f"True Negative Rate (TNR): {tnr:.2f}")
+    return conf_matrix, tpr, tnr
 
 def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
     """
