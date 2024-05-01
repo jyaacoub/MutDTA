@@ -72,9 +72,9 @@ try:
 except:
     pass
 
-def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, 
+def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=True,
                 save_path='results/model_media',
-                model_key='trained_davis_test',
+                model_key='Predictions',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
                 show=True,
                 title_prefix='', 
@@ -126,6 +126,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True,
     plt.plot(y_true, m*y_true + b, color='black', alpha=0.8)
     plt.xlabel('Experimental affinity value')
     plt.ylabel(f'{model_key} prediction')
+    plt.grid(True)
     plt.title(f'{title_prefix}Scatter plot of affinity values (pkd)')
 
     if save_figs: plt.savefig(f'{save_path}/{model_key}_scatter{dataset}.png')
@@ -159,16 +160,17 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True,
         print(f"MAE: {mae:.3f}")
         print(f"RMSE: {rmse:.3f}")
 
-    # creating stats csv if it doesnt exist or empty/incomplete header
-    if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
-        stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-        stats.set_index('run', inplace=True)
-        stats.to_csv(csv_file)
+    if save_data:
+        # creating stats csv if it doesnt exist or empty/incomplete header
+        if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
+            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+            stats.set_index('run', inplace=True)
+            stats.to_csv(csv_file)
 
-    # replacing existing record if run_num already exists
-    stats = pd.read_csv(csv_file, index_col=0)
-    stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
-    stats.to_csv(csv_file)    
+        # replacing existing record if run_num already exists
+        stats = pd.read_csv(csv_file, index_col=0)
+        stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
+        stats.to_csv(csv_file)    
     plt.clf()
     
     ############ display train val plot ###########
@@ -188,6 +190,3 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True,
         if show: plt.show()
     
     return c_index, p_corr, s_corr, mse, mae, rmse
-
-
-# %%

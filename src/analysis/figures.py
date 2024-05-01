@@ -435,14 +435,20 @@ def fig_dpkd_dist(df, pkd_col='pkd', verbose=False, show_plot=True, ax=None) -> 
     mt_df = df[df.index.str.contains("_mt")]
     
     delta_pkd= []
+    missing_wt = 0
     for m in mt_df.index:
-        wt_pkd = wt_df.loc[m.split('_')[0] + '_wt'][pkd_col]
-        delta_pkd.append((wt_pkd - mt_df.loc[m][pkd_col]))
+        i_wt = m.split('_')[0] + '_wt'
+        if i_wt not in wt_df.index:
+            missing_wt += 1
+            continue
+        else:
+            wt_pkd = wt_df.loc[i_wt][pkd_col]
+            delta_pkd.append((wt_pkd - mt_df.loc[m][pkd_col]))
 
     # Display the Δpkd values
     if verbose:
-        print("Δpkd values:")
-        print(delta_pkd)
+        print("missing wt:", missing_wt)
+        print("total Δpkd values:", len(delta_pkd))
 
     # Visualizing the distribution of Δpkd values
     ax = sns.histplot(delta_pkd, kde=True, ax=ax)
@@ -454,7 +460,7 @@ def fig_dpkd_dist(df, pkd_col='pkd', verbose=False, show_plot=True, ax=None) -> 
         
     return delta_pkd
 
-def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, show_plot=True, ax=None):
+def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plot=True, show_plot=False, ax=None):
     dpkd = []
     # filter out nan vals
     for y,p in zip(true_dpkd, pred_dpkd):
@@ -471,11 +477,12 @@ def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, sho
     sig_dpkd = abs(dpkd) > sig_thresh
     conf_matrix = confusion_matrix(sig_dpkd[:,0], sig_dpkd[:,1])
 
-    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, 
-                                display_labels=["significant", "not significant"])
-    disp.plot(cmap=plt.cm.Blues, ax=ax)
-    disp.ax_.set_title('Confusion Matrix for Mutation Significance')
-    if show_plot: plt.show()
+    if plot:
+        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, 
+                                    display_labels=["significant", "not significant"])
+        disp.plot(cmap=plt.cm.Blues, ax=ax)
+        disp.ax_.set_title('Confusion Matrix for Mutation Significance')
+        if show_plot: plt.show()
 
     # Calculate and print TPR and TNR
     tn, fp, fn, tp = conf_matrix.ravel()
@@ -485,6 +492,63 @@ def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, sho
         print(f"True Positive Rate (TPR): {tpr:.2f}")
         print(f"True Negative Rate (TNR): {tnr:.2f}")
     return conf_matrix, tpr, tnr
+
+
+def generate_roc_curve(true_dpkd, pred_dpkd, thres_range=(0,5), step=0.1):
+    # Define a range of standard deviations to use as thresholds
+    std_values = np.arange(thres_range[0], thres_range[1], step)
+    tprs = []
+    fprs = []
+    distances = []
+    best_threshold = None
+    min_distance = float('inf')  # Initialize with infinity
+
+    # Store indices for std = 1.0 and std = 2.0
+    index_std_1 = None
+    index_std_2 = None
+
+    for i, std in enumerate(std_values):
+        # Use the confusion matrix function to get performance metrics at each threshold
+        conf_matrix, tpr, tnr = fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=std, 
+                                                              verbose=False, plot=False, show_plot=False)
+        fpr = 1 - tnr
+        tprs.append(tpr)
+        fprs.append(fpr)
+        
+        # Calculate the Euclidean distance from the top-left corner (0,1)
+        distance = np.sqrt((0 - fpr) ** 2 + (1 - tpr) ** 2)
+        distances.append(distance)
+        if distance < min_distance:
+            min_distance = distance
+            best_threshold = std
+            best_tpr = tpr
+            best_fpr = fpr
+        
+        # Check if the current std is 1.0 or 2.0
+        if np.isclose(std, 1.0, atol=0.05):
+            index_std_1 = i
+        elif np.isclose(std, 2.0, atol=0.05):
+            index_std_2 = i
+
+    # Plot the ROC curve
+    plt.figure(figsize=(16, 12))
+    plt.plot(fprs, tprs, marker='o', linestyle='-', color='b', label='ROC Curve')
+    plt.plot([0, 1], [0, 1], 'k--', label='No Skill Line')  # diagonal line for reference
+    # Highlight the best point
+    plt.scatter([best_fpr], [best_tpr], color='red', s=150, edgecolors='k', label=f'Best Threshold (STD={best_threshold:.1f})')
+    # Highlight specific std points
+    plt.scatter([fprs[index_std_1]], [tprs[index_std_1]], color='green', s=150, edgecolors='k', label='STD=1.0')
+    plt.scatter([fprs[index_std_2]], [tprs[index_std_2]], color='purple', s=150, edgecolors='k', label='STD=2.0')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    print(f"Best threshold: {best_threshold} with minimum distance: {min_distance}")
+    return std_values, tprs, fprs, best_threshold
+
 
 def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
     """
