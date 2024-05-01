@@ -77,7 +77,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
                 model_key='Predictions',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
                 show=True,
-                title_prefix='', 
+                title_prefix='', title_postfix='affinity values (pkd)',
                 dataset='test', # for discriminating between test and val
                 logs=None) -> Tuple[Number]:
     """
@@ -114,7 +114,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
     plt.hist(y_true, bins=10, alpha=0.5)
     plt.hist(y_pred, bins=10, alpha=0.5)
     plt.legend(['Experimental', model_key])
-    plt.title(f'{title_prefix}Histogram of affinity values (pkd)')
+    plt.title(f'{title_prefix}Histogram of {title_postfix}')
     if save_figs: plt.savefig(f'{save_path}/{model_key}_his{dataset}.png')
     if show: plt.show()
     plt.clf()
@@ -127,7 +127,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
     plt.xlabel('Experimental affinity value')
     plt.ylabel(f'{model_key} prediction')
     plt.grid(True)
-    plt.title(f'{title_prefix}Scatter plot of affinity values (pkd)')
+    plt.title(f'{title_prefix}Scatter plot of {title_postfix}')
 
     if save_figs: plt.savefig(f'{save_path}/{model_key}_scatter{dataset}.png')
     if show: plt.show()

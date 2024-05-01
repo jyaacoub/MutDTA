@@ -429,12 +429,12 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
     
     return plot_data
 
-def fig_dpkd_dist(df, pkd_col='pkd', verbose=False, show_plot=True, ax=None) -> list[float]:
+def fig_dpkd_dist(df, pkd_col='pkd', verbose=False, plot=False, show_plot=True, ax=None, normalize=False) -> list[float]:
     """Delta pkd distribution given df containing wt and mutated proteins and their pkd values"""
     wt_df = df[df.index.str.contains("_wt")]
     mt_df = df[df.index.str.contains("_mt")]
     
-    delta_pkd= []
+    dpkd= []
     missing_wt = 0
     for m in mt_df.index:
         i_wt = m.split('_')[0] + '_wt'
@@ -443,22 +443,32 @@ def fig_dpkd_dist(df, pkd_col='pkd', verbose=False, show_plot=True, ax=None) -> 
             continue
         else:
             wt_pkd = wt_df.loc[i_wt][pkd_col]
-            delta_pkd.append((wt_pkd - mt_df.loc[m][pkd_col]))
+            dpkd.append((wt_pkd - mt_df.loc[m][pkd_col]))
 
+    dpkd = np.array(dpkd)
+    
     # Display the Δpkd values
     if verbose:
         print("missing wt:", missing_wt)
-        print("total Δpkd values:", len(delta_pkd))
+        print("total Δpkd values:", len(dpkd))
 
-    # Visualizing the distribution of Δpkd values
-    ax = sns.histplot(delta_pkd, kde=True, ax=ax)
-    ax.set_title(('Distribution of Δpkd Values' if pkd_col.lower()[:4] != 'pred' else 
-                    'Distribution of PREDICTED Δpkd Values'))
-    ax.set_xlabel('Δpkd (change in pkd from wildtype)')
-    ax.set_ylabel('Frequency')
-    if show_plot: plt.show()
+    if normalize:    
+        # identify significance threshold seperately:
+        mean_dpkd = np.mean(dpkd, axis=0)
+        std_dpkd = np.std(dpkd, axis=0)
         
-    return delta_pkd
+        dpkd = (dpkd - mean_dpkd) / std_dpkd # z-normalization
+    
+    if plot:
+        # Visualizing the distribution of Δpkd values
+        ax = sns.histplot(dpkd, kde=True, ax=ax)
+        ax.set_title(f'Distribution of{"" if pkd_col.lower()[:4] != "pred" else " PREDICTED"} Δpkd values' + \
+                    f'{" (normalized)" if normalize else ""}')
+        ax.set_xlabel('Δpkd (change in pkd from wildtype)')
+        ax.set_ylabel('Frequency')
+        if show_plot: plt.show()
+        
+    return dpkd
 
 def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plot=True, show_plot=False, ax=None):
     dpkd = []
