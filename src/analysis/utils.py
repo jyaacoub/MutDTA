@@ -1,5 +1,7 @@
 from typing import Tuple
 from collections import OrderedDict
+from scipy.stats import ttest_ind
+import pandas as pd
 
 
 def count_missing_res(pdb_file: str) -> Tuple[int,int]:
@@ -49,6 +51,62 @@ def count_missing_res(pdb_file: str) -> Tuple[int,int]:
                 num_gaps +=1
     
     return num_gaps, num_missing
+
+###################################
+#### FOR MUTATION ANALYSIS ########
+def get_mut_count(df):
+    """creates column called n_mut for the number of mutations a protein has depending on its id"""
+    df['pdb'] = df['prot_id'].str.split('_').str[0]
+    n_mut = []
+    for code, prot_id in df[['prot_id']].iterrows():
+        if '_wt' in code:
+            n_mut.append(0)
+        else:
+            n_mut.append(len(prot_id[0].split('-')))
+            
+    df['n_mut'] = n_mut
+    return df
+
+def generate_markdown(results, names=None, verbose=False):
+    """
+    generates a markdown given a list or single df containing metrics from get_metrics
+    
+    example usage:
+    ```
+        _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd1, pred_dpkd1)
+        result = [[p_corr[0], s_corr[0], mse, mae, rmse]]
+        generate_markdown(result)
+    ```
+    """
+    n_groups = len(results)
+    names = names if names else [str(i) for i in range(n_groups)]
+    # Convert results to DataFrame
+    results_df = [None for i in range(n_groups)]
+    md_table = None
+    for i, r in enumerate(results):
+        df = pd.DataFrame(r, columns=['pcorr', 'scorr', 'mse', 'mae', 'rmse'])
+
+        mean = df.mean()
+        std = df.std()
+        results_df[i] = df
+        
+        # formating for markdown table:
+        combined = mean.map(lambda x: f"{x:.3f}") + " $\pm$ " + std.map(lambda x: f"{x:.3f}")
+        md_table = combined if md_table is None else pd.concat([md_table, combined], axis=1)
+
+    if n_groups == 2: # no support for sig  if groups are more than 2
+        # T-tests for significance
+        ttests = {col: ttest_ind(results_df[0][col], results_df[1][col]) for col in results_df[0].columns}
+        sig = pd.Series({col: '*' if ttests[col].pvalue < 0.05 else '' for col in results_df[0].columns})
+
+        md_table = pd.concat([md_table, sig], axis=1)
+        md_table.columns = [*names, 'Sig']
+    else:
+        md_table.columns = names
+
+    md_output = md_table.to_markdown()
+    if verbose: print(md_output)
+    return md_table
 
 if __name__ == '__main__':
     #NOTE: the following is code for stratifying AutoDock Vina results by 

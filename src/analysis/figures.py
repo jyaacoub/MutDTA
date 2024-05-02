@@ -16,6 +16,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from src.utils import config as cfg
 from src.utils.loader import Loader
 from src.analysis.metrics import get_metrics
+from src.analysis.utils import generate_markdown, get_mut_count
 
 
 def fig0_dataPro_overlap(data:str='davis', data_root:str=cfg.DATA_ROOT, verbose=False):
@@ -545,7 +546,7 @@ def fig_dpkd_dist(df, pkd_cols=['pred', 'actual'], normalize=False, show_plot=Tr
     if show_plot: plt.show()
     return pred_dpkd, true_dpkd, ax
 
-def tbl_dpkd_metrics(
+def tbl_dpkd_metrics_overlap(
     MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
     TRAIN_DATA_P = lambda set: f'/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
     NORMALIZE = True,
@@ -554,79 +555,80 @@ def tbl_dpkd_metrics(
     n_models=5,
     ):
     """
-    2. Mutation impact analysis - Iterates through all 5 models for relevant metrics on delta pkd values. 
-        Reports mean +- standard deviation with t-test significance of with/without overlap of training data from the 5-fold CV. 
+    2. Reports mean +- standard deviation with t-test significance of with/without overlap of training data from the 5-fold CV. 
     """
+    
     df_t = pd.Index.append(pd.read_csv(TRAIN_DATA_P('train'), index_col=0).index, 
                         pd.read_csv(TRAIN_DATA_P('val'), index_col=0).index)
     df_t = df_t.str.upper()
+    def get_in_train(df, training_set_df):
+        df['in_train'] = df['pdb'].isin(training_set_df)
+        return df
 
-    results_with_overlap = []
-    results_without_overlap = []     
+    conditions = ['(not in_train) | in_train', 'not in_train']
+    names = ['with overlap', 'without overlap']
+
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_in_train, 
+                                       conditions=conditions, names=names, verbose=verbose, plot=plot, training_set_df=df_t)
+
+def tbl_stratified_dpkd_metrics(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    NORMALIZE=True,
+    n_models=5,
+    df_transform=get_mut_count, # transformation to apply to df before condition for grouping
+    conditions = ["(n_mut == 1) | (n_mut == 0)", "(n_mut > 1) | (n_mut == 0)"],
+    names = ['single mutation', '2+ mutations'],
+    verbose=True,
+    plot=False,
+    **kwargs,
+    ):
+    """
+    Generates markdown table for stratified results given some transform and conditions to performn on df for grouping.
+
+    Args:
+        `MODEL` (callable, optional): function to give path to model predictions. Defaults to lambdai:f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv".
+        `NORMALIZE` (bool, optional): Whether or not to scale predictions and truths before getting metrics. Defaults to True.
+        `n_models` (int, optional): number of models to get data from (calls MODEL(i)). Defaults to 5.
+        `df_transform` (callable, optional): returns a modified version of the predictions csv. Defaults to get_mut_count.
+        `conditions`(list, optional): conditions to df.query() for grouping. Defaults to ["(n_mut == 1) | (n_mut == 0)", "(n_mut > 1) | (n_mut == 0)"].
+        `names` (list, optional): names of each group. Defaults to ['single mutation', '2+ mutations'].
+        `verbose` (bool, optional): Defaults to True.
+        `plot` (bool, optional): Defaults to False.
+        `**kwargs`: any additional args for the df_transform.
+
+    Returns:
+        pd.Dataframe: the table containing mean metrics and std for each group.
+    """
+
+    results = [[] for _ in range(len(conditions))]
     for i in range(n_models):
         df = pd.read_csv(MODEL(i), index_col=0).dropna()
         df['pdb'] = df['prot_id'].str.split('_').str[0]
+        df = df_transform(df, **kwargs)
         
-        # with overlap
-        true_dpkd_o = get_dpkd(df, 'actual', NORMALIZE)
-        pred_dpkd_o = get_dpkd(df, 'pred', NORMALIZE)
-        
-        # without overlap
-        df = df[~(df['pdb'].isin(df_t))].dropna()
-        true_dpkd = get_dpkd(df, 'actual', NORMALIZE)
-        pred_dpkd = get_dpkd(df, 'pred', NORMALIZE)
-        
-        if i==0 and plot:
-            # plot histogram for with and without overlap:
+        if i == 0 and plot:
             fig = plt.figure(figsize=(14,10))
             axes = fig.subplots(2,1)
+        
+        # must include 0 in both cases since they are the wildtype reference 
+        for j, c in enumerate(conditions):
+            grp = df.query(c)
+            true_dpkd1 = get_dpkd(grp, 'actual', NORMALIZE)
+            pred_dpkd1 = get_dpkd(grp, 'pred', NORMALIZE)
             
-            axes[0].set_title(f"{'Normalized 'if NORMALIZE else ''}Δpkd distribution")
-            sns.histplot(true_dpkd_o, kde=True, ax=axes[0], alpha=0.5, label='True Δpkd')#, color='blue')
-            sns.histplot(pred_dpkd_o, kde=True, ax=axes[0], alpha=0.5, label='Predicted Δpkd', color='orange')
-            axes[0].legend()
-        
-            axes[1].set_title(f"{'Normalized 'if NORMALIZE else ''}Δpkd distribution without overlap")
-            sns.histplot(true_dpkd, kde=True, ax=axes[1], alpha=0.5, label='True Δpkd')#, color='blue')
-            sns.histplot(pred_dpkd, kde=True, ax=axes[1], alpha=0.5, label='Predicted Δpkd', color='orange')
-            axes[1].legend()
-            
-            plt.show()
+            if i==0 and plot:
+                sns.histplot(true_dpkd1, kde=True, ax=axes[j], alpha=0.5, label='True Δpkd')
+                sns.histplot(pred_dpkd1, kde=True, ax=axes[j], alpha=0.5, label='Predicted Δpkd', color='orange')
+                axes[j].set_title(f"{'Normalized 'if NORMALIZE else ''}Δpkd distribution {names[j]}")
+                axes[j].legend()
 
-        _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd_o, pred_dpkd_o)
-        results_with_overlap.append([p_corr[0], s_corr[0], mse, mae, rmse])
-        
-        _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd, pred_dpkd)
-        results_without_overlap.append([p_corr[0], s_corr[0], mse, mae, rmse])
-        
+            _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd1, pred_dpkd1)
+            results[j].append([p_corr[0], s_corr[0], mse, mae, rmse])
 
-    # Convert results to DataFrame
-    results_with_df = pd.DataFrame(results_with_overlap, columns=['pcorr', 'scorr', 'mse', 'mae', 'rmse'])
-    results_without_df = pd.DataFrame(results_without_overlap, columns=['pcorr', 'scorr', 'mse', 'mae', 'rmse'])
+    return generate_markdown(results, names=names, verbose=verbose)
 
-    # Statistics computation
-    mean_with = results_with_df.mean()
-    std_with = results_with_df.std()
-    mean_without = results_without_df.mean()
-    std_without = results_without_df.std()
 
-    # T-tests for significance
-    ttests = {col: ttest_ind(results_with_df[col], results_without_df[col]) for col in results_with_df.columns}
-
-    # Combine mean and std
-    combined_with = mean_with.map(lambda x: f"{x:.3f}") + " $\pm$ " + std_with.map(lambda x: f"{x:.3f}")
-    combined_without = mean_without.map(lambda x: f"{x:.3f}") + " $\pm$ " + std_without.map(lambda x: f"{x:.3f}")
-
-    # Add significance marks
-    significance = pd.Series({col: '*' if ttests[col].pvalue < 0.05 else '' for col in results_with_df.columns})
-
-    # Prepare markdown table
-    md_table = pd.concat([combined_with, combined_without, significance], axis=1)
-    md_table.columns = ['With Overlap', 'Without Overlap', 'Significance']
-    md_output = md_table.to_markdown()
-    if verbose: print(md_output)
-    return md_table
-
+### 3. significant mutations as a classification problem
 def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plot=True, show_plot=False, ax=None):
     """For 3. significant mutation impact analysis"""
     dpkd = []
