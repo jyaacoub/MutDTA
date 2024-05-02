@@ -67,7 +67,7 @@ def get_mut_count(df):
     df['n_mut'] = n_mut
     return df
 
-def generate_markdown(results, names=None, verbose=False):
+def generate_markdown(results, names=None, verbose=False, thresh_sig=False):
     """
     generates a markdown given a list or single df containing metrics from get_metrics
     
@@ -97,7 +97,10 @@ def generate_markdown(results, names=None, verbose=False):
     if n_groups == 2: # no support for sig  if groups are more than 2
         # T-tests for significance
         ttests = {col: ttest_ind(results_df[0][col], results_df[1][col]) for col in results_df[0].columns}
-        sig = pd.Series({col: '*' if ttests[col].pvalue < 0.05 else '' for col in results_df[0].columns})
+        if thresh_sig:
+            sig = pd.Series({col: '*' if ttests[col].pvalue < 0.05 else '' for col in results_df[0].columns})
+        else:
+            sig =pd.Series({col: f"{ttests[col].pvalue:.4f}" for col in results_df[0].columns})
 
         md_table = pd.concat([md_table, sig], axis=1)
         md_table.columns = [*names, 'Sig']
