@@ -546,31 +546,6 @@ def fig_dpkd_dist(df, pkd_cols=['pred', 'actual'], normalize=False, show_plot=Tr
     if show_plot: plt.show()
     return pred_dpkd, true_dpkd, ax
 
-def tbl_dpkd_metrics_overlap(
-    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
-    TRAIN_DATA_P = lambda set: f'/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
-    NORMALIZE = True,
-    verbose=True,
-    plot=False,
-    n_models=5,
-    ):
-    """
-    2. Reports mean +- standard deviation with t-test significance of with/without overlap of training data from the 5-fold CV. 
-    """
-    
-    df_t = pd.Index.append(pd.read_csv(TRAIN_DATA_P('train'), index_col=0).index, 
-                        pd.read_csv(TRAIN_DATA_P('val'), index_col=0).index)
-    df_t = df_t.str.upper()
-    def get_in_train(df, training_set_df):
-        df['in_train'] = df['pdb'].isin(training_set_df)
-        return df
-
-    conditions = ['(not in_train) | in_train', 'not in_train']
-    names = ['with overlap', 'without overlap']
-
-    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_in_train, 
-                                       conditions=conditions, names=names, verbose=verbose, plot=plot, training_set_df=df_t)
-
 def tbl_stratified_dpkd_metrics(
     MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
     NORMALIZE=True,
@@ -607,8 +582,8 @@ def tbl_stratified_dpkd_metrics(
         df = df_transform(df, **kwargs)
         
         if i == 0 and plot:
-            fig = plt.figure(figsize=(14,10))
-            axes = fig.subplots(2,1)
+            fig = plt.figure(figsize=(14,5*len(conditions)))
+            axes = fig.subplots(len(conditions),1)
         
         # must include 0 in both cases since they are the wildtype reference 
         for j, c in enumerate(conditions):
@@ -627,6 +602,66 @@ def tbl_stratified_dpkd_metrics(
 
     return generate_markdown(results, names=names, verbose=verbose)
 
+
+def tbl_dpkd_metrics_overlap(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    TRAIN_DATA_P = lambda set: f'/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
+    NORMALIZE = True,
+    verbose=True,
+    plot=False,
+    n_models=5,
+    ):
+    """
+    2. Reports mean +- standard deviation with t-test significance of with/without overlap of training data from the 5-fold CV. 
+    """
+    
+    df_t = pd.Index.append(pd.read_csv(TRAIN_DATA_P('train'), index_col=0).index, 
+                        pd.read_csv(TRAIN_DATA_P('val'), index_col=0).index)
+    df_t = df_t.str.upper()
+    def get_in_train(df, training_set_df):
+        df['in_train'] = df['pdb'].isin(training_set_df)
+        return df
+
+    conditions = ['(not in_train) | in_train', 'not in_train']
+    names = ['with overlap', 'without overlap']
+
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_in_train, 
+                                       conditions=conditions, names=names, verbose=verbose, plot=plot, training_set_df=df_t)
+    
+def tbl_dpkd_metrics_n_mut(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    NORMALIZE = True,
+    n_models=5,
+    conditions=[1,2],
+    verbose=True,
+    plot=False,
+    ):
+    """
+    Conditions are the grouping for number of mutations with the last entry being all above that number:
+    e.g.:
+    conditions = [1,2]
+    
+    means we have two groups: single mutations and those with multiple (2+) mutations
+    
+    Any inbetween are considered as exact matches
+    so conditions = [1,2,3]
+    would mean 3 groups: exactly 1 mutation, exactly 2 mutations, and 3 or more mutations
+    
+    """
+    names = []
+    for i, c in enumerate(conditions):
+        if i == len(conditions)-1:
+            q = f"(n_mut >= {c}) | (n_mut == 0)"
+            n = f"{c}+ mutations"
+        else:
+            q = f"(n_mut == {c}) | (n_mut == 0)"
+            n = f"{c} mutations"
+        
+        conditions[i] = q
+        names.append(n)
+
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_mut_count,
+                                       conditions=conditions, names=names, verbose=verbose, plot=plot)
 
 ### 3. significant mutations as a classification problem
 def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plot=True, show_plot=False, ax=None):
