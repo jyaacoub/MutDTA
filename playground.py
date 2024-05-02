@@ -28,8 +28,6 @@ results_without_overlap = []
 import functools
 
 dpkd_dist = functools.partial(fig_dpkd_dist, verbose=False, normalize=NORMALIZE, show_plot=False)
-metrics_np = functools.partial(get_metrics, title_postfix=f'Δpkd {"(normalized)" if NORMALIZE else ""}', 
-                               save_figs=False, save_data=False, show=False)
 fig = plt.figure(figsize=(14,10))
 axes = fig.subplots(2,1)
 ax_placeholder = [[None]]*2
@@ -56,10 +54,10 @@ for i in range(5):
     
     if i==0: plt.show()
 
-    _, p_corr, s_corr, mse, mae, rmse = metrics_np(true_dpkd_w, pred_dpkd_w)
+    _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd_w, pred_dpkd_w)
     results_with_overlap.append([p_corr[0], s_corr[0], mse, mae, rmse])
     
-    _, p_corr, s_corr, mse, mae, rmse = metrics_np(true_dpkd, pred_dpkd)
+    _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd, pred_dpkd)
     results_without_overlap.append([p_corr[0], s_corr[0], mse, mae, rmse])
     
 

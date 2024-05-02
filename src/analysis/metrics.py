@@ -72,7 +72,37 @@ try:
 except:
     pass
 
-def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=True,
+def get_metrics(y_true, y_pred, verbose=False):
+    # get metrics:
+    try:
+        # cindex throws zero division error if all values are the same
+        c_index = concordance_index(y_true, y_pred)
+    except ZeroDivisionError:
+        c_index = -1
+        print('ZeroDivisionError: cindex set to -1')
+        
+    p_corr = pearsonr(y_true, y_pred)
+    s_corr = spearmanr(y_true, y_pred)
+
+    # error
+    mse = np.mean((y_true-y_pred)**2)
+    mae = np.mean(np.abs(y_true-y_pred))
+    rmse = np.sqrt(mse)
+    
+    if verbose:
+        print(f"Concordance index: {c_index:.3f}")
+        print(f"Pearson correlation: {p_corr[0]:.3f}")
+        print(f"Pearson p-value: {p_corr[1]:.3f}")
+        print(f"Spearman correlation: {s_corr[0]:.3f}")
+        print(f"Spearman p-value: {s_corr[1]:.3f}")
+        print(f"MSE: {mse:.3f}")
+        print(f"MAE: {mae:.3f}")
+        print(f"RMSE: {rmse:.3f}")
+   
+
+    return c_index, p_corr, s_corr, mse, mae, rmse
+
+def get_save_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=True,
                 save_path='results/model_media',
                 model_key='Predictions',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
@@ -110,6 +140,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
     """
     dataset = '' if dataset == 'test' else dataset # To maintain compatibility with prev figs
     
+    ############ plot histogram of data distribution of pred and true #################
     plt.clf()
     plt.hist(y_true, bins=10, alpha=0.5)
     plt.hist(y_pred, bins=10, alpha=0.5)
@@ -119,7 +150,7 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
     if show: plt.show()
     plt.clf()
 
-    # scatter plot of affinity values
+    ################ scatter plot of affinity values x=true y=pred ###############
     # fitting a line
     m, b = np.polyfit(y_true, y_pred, 1)
     plt.scatter(y_true, y_pred, alpha=0.5)
@@ -133,46 +164,6 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
     if show: plt.show()
     plt.clf()
 
-    ########### saving metrics to csv file ###########
-    # get metrics:
-    try:
-        # cindex throws zero division error if all values are the same
-        c_index = concordance_index(y_true, y_pred)
-    except ZeroDivisionError:
-        c_index = -1
-        print('ZeroDivisionError: cindex set to -1')
-        
-    p_corr = pearsonr(y_true, y_pred)
-    s_corr = spearmanr(y_true, y_pred)
-
-    # error
-    mse = np.mean((y_true-y_pred)**2)
-    mae = np.mean(np.abs(y_true-y_pred))
-    rmse = np.sqrt(mse)
-    
-    if show:
-        print(f"Concordance index: {c_index:.3f}")
-        print(f"Pearson correlation: {p_corr[0]:.3f}")
-        print(f"Pearson p-value: {p_corr[1]:.3f}")
-        print(f"Spearman correlation: {s_corr[0]:.3f}")
-        print(f"Spearman p-value: {s_corr[1]:.3f}")
-        print(f"MSE: {mse:.3f}")
-        print(f"MAE: {mae:.3f}")
-        print(f"RMSE: {rmse:.3f}")
-
-    if save_data:
-        # creating stats csv if it doesnt exist or empty/incomplete header
-        if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
-            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-            stats.set_index('run', inplace=True)
-            stats.to_csv(csv_file)
-
-        # replacing existing record if run_num already exists
-        stats = pd.read_csv(csv_file, index_col=0)
-        stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
-        stats.to_csv(csv_file)    
-    plt.clf()
-    
     ############ display train val plot ###########
     if logs is not None: 
         ax = plt.figure().gca()
@@ -188,5 +179,22 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=Tr
         plt.ylabel('Loss')
         if save_figs: plt.savefig(f'{save_path}/{model_key}_loss{dataset}.png')
         if show: plt.show()
+    plt.clf()
+    
+    ########### saving metrics to csv file ###########
+    # get metrics:
+    c_index, p_corr, s_corr, mse, mae, rmse = get_metrics(y_true, y_pred, show)
+    
+    if save_data:
+        # creating stats csv if it doesnt exist or empty/incomplete header
+        if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
+            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+            stats.set_index('run', inplace=True)
+            stats.to_csv(csv_file)
+
+        # replacing existing record if run_num already exists
+        stats = pd.read_csv(csv_file, index_col=0)
+        stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
+        stats.to_csv(csv_file)    
     
     return c_index, p_corr, s_corr, mse, mae, rmse
