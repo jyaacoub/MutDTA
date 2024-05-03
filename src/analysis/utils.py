@@ -2,6 +2,7 @@ from typing import Tuple
 from collections import OrderedDict
 from scipy.stats import ttest_ind
 import pandas as pd
+import numpy as np
 
 
 def count_missing_res(pdb_file: str) -> Tuple[int,int]:
@@ -67,7 +68,7 @@ def get_mut_count(df):
     df['n_mut'] = n_mut
     return df
 
-def generate_markdown(results, names=None, verbose=False, thresh_sig=False):
+def generate_markdown(results, names=None, verbose=False, thresh_sig=False, cindex=False):
     """
     generates a markdown given a list or single df containing metrics from get_metrics
     
@@ -81,21 +82,26 @@ def generate_markdown(results, names=None, verbose=False, thresh_sig=False):
     n_groups = len(results)
     names = names if names else [str(i) for i in range(n_groups)]
     # Convert results to DataFrame
-    results_df = [None for i in range(n_groups)]
+    results_df = [None for _ in range(n_groups)]
     md_table = None
+    cols = ['cindex'] if cindex else []
+    cols += ['pcorr', 'scorr', 'mse', 'mae', 'rmse']
     for i, r in enumerate(results):
-        df = pd.DataFrame(r, columns=['pcorr', 'scorr', 'mse', 'mae', 'rmse'])
+        df = pd.DataFrame(r, columns=cols)
 
-        mean = df.mean()
-        std = df.std()
+        mean = df.mean(numeric_only=True)
+        std = df.std(numeric_only=True)
         results_df[i] = df
         
+        # calculate standard error:
+        se = std / np.sqrt(len(df))
+        
         # formating for markdown table:
-        combined = mean.map(lambda x: f"{x:.3f}") + " $\pm$ " + std.map(lambda x: f"{x:.3f}")
+        combined = mean.map(lambda x: f"{x:.3f}") + " $\pm$ " + se.map(lambda x: f"{x:.3f}")
         md_table = combined if md_table is None else pd.concat([md_table, combined], axis=1)
 
     if n_groups == 2: # no support for sig  if groups are more than 2
-        # T-tests for significance
+        # two-sided t-tests for significance
         ttests = {col: ttest_ind(results_df[0][col], results_df[1][col]) for col in results_df[0].columns}
         if thresh_sig:
             sig = pd.Series({col: '*' if ttests[col].pvalue < 0.05 else '' for col in results_df[0].columns})
@@ -103,7 +109,7 @@ def generate_markdown(results, names=None, verbose=False, thresh_sig=False):
             sig =pd.Series({col: f"{ttests[col].pvalue:.4f}" for col in results_df[0].columns})
 
         md_table = pd.concat([md_table, sig], axis=1)
-        md_table.columns = [*names, 'Sig']
+        md_table.columns = [*names, 'p-val']
     else:
         md_table.columns = names
 

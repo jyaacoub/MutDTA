@@ -498,6 +498,65 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
 #######################################################################################################
 ##################################### MUTATION ANALYSIS RELATED FIGS: #################################
 #######################################################################################################
+def predictive_performance(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    TRAIN_DATA_P = lambda set: f'{cfg.DATA_ROOT}/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
+    NORMALIZE = True,
+    n_models=5,
+    compare_overlap=False,
+    verbose=True,
+    plot=False,
+    ):
+    df_t = pd.Index.append(pd.read_csv(TRAIN_DATA_P('train'), index_col=0).index, 
+                        pd.read_csv(TRAIN_DATA_P('val'), index_col=0).index)
+    df_t = df_t.str.upper()
+
+    results_with_overlap = []
+    results_without_overlap = []
+
+    for i in range(n_models):
+        df = pd.read_csv(MODEL(i), index_col=0).dropna()
+        df['pdb'] = df['prot_id'].str.split('_').str[0]
+        if NORMALIZE:
+            mean_df = df[['actual','pred']].mean(axis=0, numeric_only=True)
+            std_df = df[['actual','pred']].std(axis=0, numeric_only=True)
+            
+            df[['actual','pred']] = (df[['actual','pred']] - mean_df) / std_df # z-normalization
+
+        # with overlap
+        cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(df['actual'], df['pred'])
+        results_with_overlap.append([cindex, p_corr[0], s_corr[0], mse, mae, rmse])
+
+        # without overlap
+        df_no_overlap = df[~(df['pdb'].isin(df_t))]
+        cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(df_no_overlap['actual'], df_no_overlap['pred'])
+        results_without_overlap.append([cindex, p_corr[0], s_corr[0], mse, mae, rmse])
+
+        if i==0 and plot:
+            n_plots = int(compare_overlap)+1
+            fig = plt.figure(figsize=(14,5*n_plots))
+            axes = fig.subplots(n_plots,1)
+            ax = axes[0] if compare_overlap else axes
+            
+            sns.histplot(df_no_overlap['actual'], kde=True, ax=ax, alpha=0.5, label='True pkd')
+            sns.histplot(df_no_overlap['pred'], kde=True, ax=ax, alpha=0.5, label='Predicted pkd', color='orange')
+            ax.set_title(f"{'Normalized 'if NORMALIZE else ''} pkd distribution")
+            ax.legend()
+            
+            if compare_overlap:
+                sns.histplot(df_no_overlap['actual'], kde=True, ax=axes[1], alpha=0.5, label='True pkd')
+                sns.histplot(df_no_overlap['pred'], kde=True, ax=axes[1], alpha=0.5, label='Predicted pkd', color='orange')
+                axes[1].set_title(f"{'Normalized 'if NORMALIZE else ''}  pkd distribution (no overlap)")
+                axes[1].legend()
+
+    if compare_overlap:
+        return generate_markdown([results_with_overlap, results_without_overlap], names=['with overlap', 'without overlap'], 
+                             cindex=True,verbose=verbose)
+    
+    return generate_markdown([results_without_overlap], names=['mean $\pm$ se'], cindex=True, verbose=verbose)
+
+    
+
 def get_dpkd(df, pkd_col='pkd', normalize=False) -> np.ndarray:
     """ 
     2. Mutation impact analysis - Delta pkd given df containing wt and mutated proteins and their pkd values
@@ -605,7 +664,7 @@ def tbl_stratified_dpkd_metrics(
 
 def tbl_dpkd_metrics_overlap(
     MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
-    TRAIN_DATA_P = lambda set: f'/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
+    TRAIN_DATA_P = lambda set: f'{cfg.DATA_ROOT}/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
     NORMALIZE = True,
     verbose=True,
     plot=False,
@@ -662,6 +721,54 @@ def tbl_dpkd_metrics_n_mut(
 
     return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_mut_count,
                                        conditions=conditions, names=names, verbose=verbose, plot=plot)
+
+def tbl_dpkd_metrics_in_binding(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    RAW_PLT_CSV=f"{cfg.DATA_ROOT}/PlatinumDataset/raw/platinum_flat_file.csv",
+    NORMALIZE = True,
+    n_models=5,
+    verbose=True,
+    plot=False,
+    ):
+    """Generates a table comapring the metrics for mutations in the pocket and not in the pocket"""
+    # add in_binding info to df
+    def get_in_binding(df, dfr):
+        """
+        df is the predicted csv with index as <raw_idx>_wt (or *_mt) where raw_idx 
+        corresponds to an index in dfr which contains the raw data for platinum including 
+        ('mut.in_binding_site')
+            - 0: wildtype rows
+            - 1: in pocket
+            - 2: outside of pocket
+        """
+        in_pocket = dfr[dfr['mut.in_binding_site'] == 'YES'].index   
+        pclass = []
+        for code in df.index:
+            if '_wt' in code:
+                pclass.append(0)
+            elif int(code.split('_')[0]) in in_pocket:
+                pclass.append(1)
+            else:
+                pclass.append(2)
+                
+        df['in_pocket'] = pclass
+        return df
+
+    conditions = ['(in_pocket == 0) | (in_pocket == 1)', '(in_pocket == 0) | (in_pocket == 2)']
+    names = ['mutation in pocket', 'mutation NOT in pocket']
+
+    dfr = pd.read_csv(RAW_PLT_CSV, index_col=0)
+    
+    dfp = pd.read_csv(MODEL(0), index_col=0)
+    df = get_in_binding(dfp, dfr)
+    if verbose: 
+        cnts = df.in_pocket.value_counts()
+        cnts.index = ['wt', 'pckt', 'not pckt']
+        cnts.name = "counts"
+        print(cnts.to_markdown(), end="\n\n")
+    
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models=n_models, df_transform=get_in_binding,
+                                        conditions=conditions, names=names, verbose=verbose, plot=plot, dfr=dfr)
 
 ### 3. significant mutations as a classification problem
 def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plot=True, show_plot=False, ax=None):
