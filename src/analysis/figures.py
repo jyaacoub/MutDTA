@@ -555,8 +555,6 @@ def predictive_performance(
     
     return generate_markdown([results_without_overlap], names=['mean $\pm$ se'], cindex=True, verbose=verbose)
 
-    
-
 def get_dpkd(df, pkd_col='pkd', normalize=False) -> np.ndarray:
     """ 
     2. Mutation impact analysis - Delta pkd given df containing wt and mutated proteins and their pkd values
@@ -660,7 +658,6 @@ def tbl_stratified_dpkd_metrics(
             results[j].append([p_corr[0], s_corr[0], mse, mae, rmse])
 
     return generate_markdown(results, names=names, verbose=verbose)
-
 
 def tbl_dpkd_metrics_overlap(
     MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
@@ -783,7 +780,7 @@ def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plo
     # identify significance threshold seperately:
     mean_dpkd = np.mean(dpkd, axis=0)
     std_dpkd = np.std(dpkd, axis=0)
-    sig_thresh = mean_dpkd + std* std_dpkd
+    sig_thresh = mean_dpkd + std* std_dpkd # basically same effect as z-normalization (x-mean)/std
 
     # Mark observed mutations as significant or not
     sig_dpkd = abs(dpkd) > sig_thresh
@@ -798,8 +795,8 @@ def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plo
 
     # Calculate and print TPR and TNR
     tn, fp, fn, tp = conf_matrix.ravel()
-    tpr = tp / (tp + fn)
-    tnr = tn / (tn + fp)
+    tpr = 0.0 if tp == 0 else tp / (tp + fn)
+    tnr = 0.0 if tn == 0.0 else tn / (tn + fp)
     if verbose:
         print(f"True Positive Rate (TPR): {tpr:.2f}")
         print(f"True Negative Rate (TNR): {tnr:.2f}")

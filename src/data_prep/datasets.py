@@ -941,6 +941,7 @@ class DavisKibaDataset(BaseDataset):
     
     
 class PlatinumDataset(BaseDataset):
+    # website: https://biosig.lab.uq.edu.au/platinum/
     CSV_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_flat_file.csv'
     PBD_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_processed_pdb_files.tar.gz'
     def __init__(self, save_root: str, data_root: str=None, 
