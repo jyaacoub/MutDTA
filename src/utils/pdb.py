@@ -222,20 +222,21 @@ def _pdb2uniprot(pdb_id, api="https://www.ebi.ac.uk/pdbe/api/mappings/uniprot"):
     return list(d[pdb_id]['UniProt'].keys())[0], d[pdb_id]['UniProt']
 
 def pdb2uniprot(pdb_ids:Iterable, api="https://www.ebi.ac.uk/pdbe/api/mappings/uniprot", 
-                max_workers=None):
+                max_workers=None) -> dict:
     """
     Gets uniprot ids from a list of pdb ids.
     
     Max_workers defaults to None, which will use the ThreadPoolExecutor's default value.
         - That is the number of cores on your machine x5.
     """
-    uniprots = []
+    uniprots = {}
+    pdb_ids = {pid.lower() for pid in pdb_ids}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:  # You can adjust the number of workers based on your environment
         future_to_pid = {executor.submit(_pdb2uniprot, pid): pid for pid in pdb_ids}
         for future in tqdm(as_completed(future_to_pid), total=len(pdb_ids)):
             result = future.result()
             if result:
-                uniprots.append(result[0])
+                uniprots[future_to_pid[future]] = result[0]
     return uniprots
     
     
