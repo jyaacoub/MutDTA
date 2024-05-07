@@ -1,7 +1,8 @@
-import os
-import math
+import os, math, requests
 from typing import Iterable
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm
 
 def merge_pdb(files:Iterable[str], pdb_fp:str=None,overwrite=False):
     """
@@ -201,6 +202,43 @@ def reset_numbering(fpi, fpo, rename_chain=None, model_n_max=20):
     with open(fpo, 'w') as fo:
         fo.write(lines)
                 
+def _pdb2uniprot(pdb_id, api="https://www.ebi.ac.uk/pdbe/api/mappings/uniprot"):
+    """
+    Gets the uniprot id from a pdb id. returns (uniprot_id, uniprot_dict)
+    Returns None if the pdb_id is not found.
+    """
+    pdb_id = pdb_id.lower()
+    url = f"{api}/{pdb_id}"
+    resp = requests.get(url)
+    if resp.status_code >= 400:
+        return None
+    d = resp.json()
+    
+    k = list(d.keys())
+    if len(k) == 0:
+        return None
+    assert pdb_id == k[0]
+    
+    return list(d[pdb_id]['UniProt'].keys())[0], d[pdb_id]['UniProt']
+
+def pdb2uniprot(pdb_ids:Iterable, api="https://www.ebi.ac.uk/pdbe/api/mappings/uniprot", 
+                max_workers=None):
+    """
+    Gets uniprot ids from a list of pdb ids.
+    
+    Max_workers defaults to None, which will use the ThreadPoolExecutor's default value.
+        - That is the number of cores on your machine x5.
+    """
+    uniprots = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:  # You can adjust the number of workers based on your environment
+        future_to_pid = {executor.submit(_pdb2uniprot, pid): pid for pid in pdb_ids}
+        for future in tqdm(as_completed(future_to_pid), total=len(pdb_ids)):
+            result = future.result()
+            if result:
+                uniprots.append(result[0])
+    return uniprots
+    
+    
 
 if __name__ == '__main__':
     # MB0_all = '/cluster/home/t122995uhn/projects/MYC-PNUTS/MB0/MB0_all.pdb'
