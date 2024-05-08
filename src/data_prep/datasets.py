@@ -1073,7 +1073,7 @@ class PlatinumDataset(BaseDataset):
         # (see https://github.com/jyaacoub/MutDTA/issues/27)
         os.makedirs(self.raw_paths[2], exist_ok=True)
         print('Downloading SDF files for ligands.')
-        Downloader.download_SDFs(ligand_names=df_raw['affin.lig_id'].unique(),
+        Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
                                 save_dir=self.raw_paths[2])
         
         # Fixing smiles in csv file using downloaded sdf files        

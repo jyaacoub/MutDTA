@@ -146,21 +146,44 @@ class Downloader:
         return Downloader.download(UniProtID, save_path=save_path, url=url)
     
     @staticmethod
-    def download_SDFs(ligand_names: List[str], 
-                      save_dir='./data/structures/ligands/', **kwargs) -> dict:
+    def download_SDFs(ligand_ids: List[str],
+                      save_dir='./data/structures/ligands/',
+                      **kwargs) -> dict:
         """
         Wrapper of `Downloader.download` for downloading SDF files. 
         Fetches SDF files from 
         https://files.rcsb.org/ligands/download/{ligand_name}_ideal.sdf.
         
-        where ligand name is the name of the ligand.
-        """
-        save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')
-        url = lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'
+        Where ligand_id is either the CID, CHEMBL id, or simply the ligand name. Will look at the first 
+        ligand_id in the list and determine which type it is.
         
-        return Downloader.download(ligand_names, save_path=save_path, url=url, 
+        ## Different urls for different databases
+        For CID we can use the following url (identifiable by the fact that it is a number)
+            - https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/CID/11314340/record/SDF?record_type=3d
+        
+        For CHEMBL ids we can use the following url (identifiable by the fact that it starts with "CHEMBL")
+            - https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/xref/registryID/CHEMBL390156/record/sdf?record_type=3d
+        
+        For ligand names we can use the following url 
+            - https://files.rcsb.org/ligands/download/{ligand_name}_ideal.sdf. (e.g.: NLG_ideal.sdf)
+            OR
+            - https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{ligand_name}/record/SDF?record_type=3d
+        """
+        urls = {'CID': lambda x: f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/CID/{x}/record/SDF?record_type=3d',
+                'CHEMBL': lambda x: f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/xref/registryID/{x}/record/sdf?record_type=3d',
+                'name': lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'}
+        
+        lid = ligand_ids[0]
+        if lid.isdigit():
+            url = urls['CID']
+        elif lid.startswith('CHEMBL'):
+            url = urls['CHEMBL']
+        else:
+            url = urls['name']
+        
+        save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')        
+        return Downloader.download(ligand_ids, save_path=save_path, url=url, 
                                    tqdm_desc='Downloading ligand sdfs', **kwargs)
-    
 
 if __name__ == '__main__':
     # downloading pdbs from X.csv list

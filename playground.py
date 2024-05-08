@@ -1,5 +1,9 @@
 #%%
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from src.data_prep.downloaders import Downloader
+
+Downloader.download_SDFs(['CHEMBL245769', 'CHEMBL55788'], save_dir='./')
+
+#%%
 import pandas as pd
 
 df = pd.read_csv("../data/TCGA_BRCA_Mutations.csv")
