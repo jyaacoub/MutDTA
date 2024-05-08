@@ -4,7 +4,7 @@ import os
 import torch
 import pandas as pd
 
-from src.analysis.metrics import get_metrics
+from src.analysis.metrics import get_save_metrics
 from src.train_test.training import test
 from src.utils.loader import Loader
 from src.utils.arg_parse import parse_train_test_args
@@ -78,7 +78,7 @@ if args.save_pred_test:
     df.to_csv(f'{out_dir}/{MODEL_KEY}_testPred.csv')
 
 print(f'# Test loss: {loss}')
-get_metrics(actual, pred,
+get_save_metrics(actual, pred,
             save_figs=False,
             save_path=media_save_p,
             model_key=MODEL_KEY,
@@ -89,7 +89,7 @@ get_metrics(actual, pred,
 #%% Run model on val set
 loss, pred, actual = test(model, loaders['val'], device)
 print(f'# Val loss: {loss}')
-get_metrics(actual, pred,
+get_save_metrics(actual, pred,
             save_figs=False,
             save_path=media_save_p,
             model_key=MODEL_KEY,

@@ -150,8 +150,10 @@ class Downloader:
                       save_dir='./data/structures/ligands/', **kwargs) -> dict:
         """
         Wrapper of `Downloader.download` for downloading SDF files. 
-        Fetches SDF files from
+        Fetches SDF files from 
         https://files.rcsb.org/ligands/download/{ligand_name}_ideal.sdf.
+        
+        where ligand name is the name of the ligand.
         """
         save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')
         url = lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'

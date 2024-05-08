@@ -1,4 +1,4 @@
-from src.analysis.metrics import get_metrics
+from src.analysis.metrics import get_save_metrics
 from src.analysis.utils import count_missing_res
 
 
@@ -10,7 +10,7 @@ if __name__ == '__main__':
     import pandas as pd
     import numpy as np
     import random, os
-    from src.analysis.metrics import get_metrics
+    from src.analysis.metrics import get_save_metrics
 
 
     # cindex:
@@ -57,7 +57,7 @@ if __name__ == '__main__':
         log_y = -np.log(y*1e-6)
         log_z = -np.log(z*1e-6)
 
-        get_metrics(log_y, log_z, 
+        get_save_metrics(log_y, log_z, 
                     save_figs=save,
                     save_path=save_path,
                     model_key=f'{run_num}',

@@ -32,7 +32,7 @@ from src.utils import config as cfg # sets up env vars
 
 from src.train_test.training import train, test, CheckpointSaver
 from src.train_test.utils import  print_device_info, debug
-from src.analysis import get_metrics
+from src.analysis import get_save_metrics
 from src.utils.loader import Loader
 
 # %%
@@ -125,7 +125,7 @@ for (MODEL, DATA,
     # testing
     loss, pred, actual = test(model, loaders['test'], device)
     print(f'# Test loss: {loss}')
-    get_metrics(actual, pred,
+    get_save_metrics(actual, pred,
                 save_figs=SAVE_FIGS,
                 save_path=media_save_p,
                 model_key=MODEL_KEY,
@@ -138,7 +138,7 @@ for (MODEL, DATA,
     # validation
     loss, pred, actual = test(model, loaders['val'], device)
     print(f'# Val loss: {loss}')
-    get_metrics(actual, pred,
+    get_save_metrics(actual, pred,
                 save_figs=SAVE_FIGS,
                 save_path=media_save_p,
                 model_key=MODEL_KEY,

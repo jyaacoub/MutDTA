@@ -1,42 +1,25 @@
-# %%
-import logging
-from typing import OrderedDict
+#%%
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import pandas as pd
 
-import seaborn as sns
-from matplotlib import pyplot as plt
-from statannotations.Annotator import Annotator
-
-from src.analysis.figures import prepare_df, custom_fig, fig_combined
-
-df = prepare_df()
-sel_dataset = 'PDBbind'
-exclude = []
-sel_col = 'cindex'
-# %%
-
-# models to plot:
-# - Original model with (nomsa, binary) and (original,  binary) features for protein and ligand respectively
-# - Aflow models with   (nomsa, aflow*) and (original,  binary) # x2 models here (aflow and aflow_ring3)
-# - GVP protein model   (gvp,   binary) and (original,  binary)
-# - GVP ligand model    (nomsa, binary) and (gvp,       binary)
-
-models = {
-    'DG': ('nomsa', 'binary', 'original', 'binary'),
-    'aflow': ('nomsa', 'aflow', 'original', 'binary'),
-    'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
-    # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
-    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
-    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
-    'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
-}
-
-# custom_fig(df, models, sel_dataset, sel_col)
+df = pd.read_csv("../data/TCGA_BRCA_Mutations.csv")
+df = df.loc[df['SWISSPROT'].dropna().index]
+df[['Gene', 'SWISSPROT']].head()
 
 # %%
-fig, axes = fig_combined(df, datasets=['PDBbind'], fig_callable=custom_fig,
-             models=models, metrics=['pearson', 'cindex', 'mse', 'mae'],
-             fig_scale=(8,5))
-plt.xticks(rotation=45)
+from src.utils.pdb import pdb2uniprot
+df2 = pd.read_csv("../data/PlatinumDataset/nomsa_binary_original_binary/full/cleaned_XY.csv", index_col=0)
+df2['pdb_id'] = df2.prot_id.str.split("_").str[0]
 
+uniprots = pdb2uniprot(df2.pdb_id.unique())
+df_pid = pd.DataFrame(list(uniprots.items()), columns=['pdbID', 'uniprot'])
+# %%
+# find overlap between uniprots and swissprot ids
+uniprots = set(uniprots) # convert to set for faster lookup
+df['uniprot'] = df['SWISSPROT'].str.split('.').str[0]
+# Merge the original df with uni_to_pdb_df
+df = df.merge(df_pid, on='uniprot', how='left')
 
+# %%
+df[~df['pdbID'].isna()]
 # %%

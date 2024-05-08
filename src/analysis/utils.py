@@ -1,5 +1,8 @@
 from typing import Tuple
 from collections import OrderedDict
+from scipy.stats import ttest_ind
+import pandas as pd
+import numpy as np
 
 
 def count_missing_res(pdb_file: str) -> Tuple[int,int]:
@@ -50,6 +53,70 @@ def count_missing_res(pdb_file: str) -> Tuple[int,int]:
     
     return num_gaps, num_missing
 
+###################################
+#### FOR MUTATION ANALYSIS ########
+def get_mut_count(df):
+    """creates column called n_mut for the number of mutations a protein has depending on its id"""
+    df['pdb'] = df['prot_id'].str.split('_').str[0]
+    n_mut = []
+    for code, prot_id in df[['prot_id']].iterrows():
+        if '_wt' in code:
+            n_mut.append(0)
+        else:
+            n_mut.append(len(prot_id[0].split('-')))
+            
+    df['n_mut'] = n_mut
+    return df
+
+def generate_markdown(results, names=None, verbose=False, thresh_sig=False, cindex=False):
+    """
+    generates a markdown given a list or single df containing metrics from get_metrics
+    
+    example usage:
+    ```
+        _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd1, pred_dpkd1)
+        result = [[p_corr[0], s_corr[0], mse, mae, rmse]]
+        generate_markdown(result)
+    ```
+    """
+    n_groups = len(results)
+    names = names if names else [str(i) for i in range(n_groups)]
+    # Convert results to DataFrame
+    results_df = [None for _ in range(n_groups)]
+    md_table = None
+    cols = ['cindex'] if cindex else []
+    cols += ['pcorr', 'scorr', 'mse', 'mae', 'rmse']
+    for i, r in enumerate(results):
+        df = pd.DataFrame(r, columns=cols)
+
+        mean = df.mean(numeric_only=True)
+        std = df.std(numeric_only=True)
+        results_df[i] = df
+        
+        # calculate standard error:
+        se = std / np.sqrt(len(df))
+        
+        # formating for markdown table:
+        combined = mean.map(lambda x: f"{x:.3f}") + " $\pm$ " + se.map(lambda x: f"{x:.3f}")
+        md_table = combined if md_table is None else pd.concat([md_table, combined], axis=1)
+
+    if n_groups == 2: # no support for sig  if groups are more than 2
+        # two-sided t-tests for significance
+        ttests = {col: ttest_ind(results_df[0][col], results_df[1][col]) for col in results_df[0].columns}
+        if thresh_sig:
+            sig = pd.Series({col: '*' if ttests[col].pvalue < 0.05 else '' for col in results_df[0].columns})
+        else:
+            sig =pd.Series({col: f"{ttests[col].pvalue:.4f}" for col in results_df[0].columns})
+
+        md_table = pd.concat([md_table, sig], axis=1)
+        md_table.columns = [*names, 'p-val']
+    else:
+        md_table.columns = names
+
+    md_output = md_table.to_markdown()
+    if verbose: print(md_output)
+    return md_table
+
 if __name__ == '__main__':
     #NOTE: the following is code for stratifying AutoDock Vina results by 
     # missing residues to identify if there is a correlation between missing 
@@ -62,7 +129,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from tqdm import tqdm
 
-    from src.analysis import get_metrics, count_missing_res
+    from src.analysis import get_save_metrics, count_missing_res
     #%% 
     pdb_path = lambda x: f'/home/jyaacoub/projects/data/refined-set/{x}/{x}_protein.pdb'
 
@@ -119,7 +186,7 @@ if __name__ == '__main__':
         df_b = bins[i][1]
         pkd_y, pkd_z = df_b['actual_pkd'].to_numpy(), df_b['vina_pkd'].to_numpy()
         print(f'\nBin {i}, size: {len(df_b)}, {col}: {bins[i][0]}')
-        metrics.append(get_metrics(pkd_y, pkd_z, save_figs=False, show=False))
+        metrics.append(get_save_metrics(pkd_y, pkd_z, save_figs=False, show=False))
     print("sample metrics:", *metrics[0])
 
     # %%

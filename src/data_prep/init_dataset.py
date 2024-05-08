@@ -61,7 +61,12 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                 # position frequency matrix creation -> important for msa feature
                 create_pfm_np_files(f'{data_root}/{data}/aln', processes=4)
             if 'af_conf_dir' not in kwargs:
-                kwargs['af_conf_dir'] = f'../colabfold/{data}_af2_out/'
+                if EDGE in cfg.OPT_REQUIRES_AFLOW_CONF:
+                    kwargs['af_conf_dir'] = f'/{data}/alphaflow_io/out_pdb_MD-distilled/'
+                else:
+                    kwargs['af_conf_dir'] = f'../colabfold/{data}_af2_out/'
+                
+                
             dataset = DavisKibaDataset(
                     save_root=f'{data_root}/DavisKibaDataset/{data}/',
                     data_root=f'{data_root}/{data}/',
@@ -92,7 +97,9 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                     ligand_edge=ligand_edge,
                     **kwargs
                     )
-        elif data == 'Platinum':
+        elif data == 'platinum':
+            if 'af_conf_dir' not in kwargs:
+                kwargs['af_conf_dir'] = f'{data_root}/PlatinumDataset/raw/alphaflow_io/out_pdb_MD-distilled/'
             dataset = PlatinumDataset(
                 save_root=f'{data_root}/PlatinumDataset/',
                 data_root=f'{data_root}/PlatinumDataset/raw',
@@ -109,12 +116,12 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
             raise ValueError(f"Invalid data type {data}, pick from {cfg.DATA_OPT.list()}.")
         
         # saving training, validation, and test sets
+        test_split = 1 - train_split - val_split
         if k_folds is None:
             train_loader, val_loader, test_loader = train_val_test_split(dataset, 
                                     train_split=train_split, val_split=val_split, 
                                     random_seed=random_seed, split_by_prot=not pro_overlap)
         else:
-            test_split = 1 - train_split - val_split
             assert test_split > 0, f"Invalid train/val/test split: {train_split}/{val_split}/{test_split}"
             assert not pro_overlap, f"No support for overlapping proteins with k-folds rn."
             train_loader, val_loader, test_loader = balanced_kfold_split(dataset, 
@@ -125,13 +132,14 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
         if pro_overlap:
             subset_names = [s+'-overlap' for s in subset_names]
         
-        if k_folds is None:
-            dataset.save_subset(train_loader, subset_names[0])
-            dataset.save_subset(val_loader, subset_names[1])
-        else:
-            # loops through all k folds and saves as train1, train2, etc.
-            dataset.save_subset_folds(train_loader, subset_names[0])
-            dataset.save_subset_folds(val_loader, subset_names[1])
+        if test_split < 1: # for datasets that are purely for testing we skip this section
+            if k_folds is None:
+                dataset.save_subset(train_loader, subset_names[0])
+                dataset.save_subset(val_loader, subset_names[1])
+            else:
+                # loops through all k folds and saves as train1, train2, etc.
+                dataset.save_subset_folds(train_loader, subset_names[0])
+                dataset.save_subset_folds(val_loader, subset_names[1])
             
         dataset.save_subset(test_loader, subset_names[2])
             

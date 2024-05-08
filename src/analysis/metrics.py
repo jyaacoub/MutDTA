@@ -72,12 +72,42 @@ try:
 except:
     pass
 
-def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True, 
+def get_metrics(y_true, y_pred, verbose=False):
+    # get metrics:
+    try:
+        # cindex throws zero division error if all values are the same
+        c_index = concordance_index(y_true, y_pred)
+    except ZeroDivisionError:
+        c_index = -1
+        print('ZeroDivisionError: cindex set to -1')
+        
+    p_corr = pearsonr(y_true, y_pred)
+    s_corr = spearmanr(y_true, y_pred)
+
+    # error
+    mse = np.mean((y_true-y_pred)**2)
+    mae = np.mean(np.abs(y_true-y_pred))
+    rmse = np.sqrt(mse)
+    
+    if verbose:
+        print(f"Concordance index: {c_index:.3f}")
+        print(f"Pearson correlation: {p_corr[0]:.3f}")
+        print(f"Pearson p-value: {p_corr[1]:.3f}")
+        print(f"Spearman correlation: {s_corr[0]:.3f}")
+        print(f"Spearman p-value: {s_corr[1]:.3f}")
+        print(f"MSE: {mse:.3f}")
+        print(f"MAE: {mae:.3f}")
+        print(f"RMSE: {rmse:.3f}")
+   
+
+    return c_index, p_corr, s_corr, mse, mae, rmse
+
+def get_save_metrics(y_true: np.array, y_pred: np.array, save_figs=True, save_data=True,
                 save_path='results/model_media',
-                model_key='trained_davis_test',
+                model_key='Predictions',
                 csv_file='results/model_media/DGraphDTA_stats.csv',
                 show=True,
-                title_prefix='', 
+                title_prefix='', title_postfix='affinity values (pkd)',
                 dataset='test', # for discriminating between test and val
                 logs=None) -> Tuple[Number]:
     """
@@ -110,67 +140,30 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True,
     """
     dataset = '' if dataset == 'test' else dataset # To maintain compatibility with prev figs
     
+    ############ plot histogram of data distribution of pred and true #################
     plt.clf()
     plt.hist(y_true, bins=10, alpha=0.5)
     plt.hist(y_pred, bins=10, alpha=0.5)
     plt.legend(['Experimental', model_key])
-    plt.title(f'{title_prefix}Histogram of affinity values (pkd)')
+    plt.title(f'{title_prefix}Histogram of {title_postfix}')
     if save_figs: plt.savefig(f'{save_path}/{model_key}_his{dataset}.png')
     if show: plt.show()
     plt.clf()
 
-    # scatter plot of affinity values
+    ################ scatter plot of affinity values x=true y=pred ###############
     # fitting a line
     m, b = np.polyfit(y_true, y_pred, 1)
     plt.scatter(y_true, y_pred, alpha=0.5)
     plt.plot(y_true, m*y_true + b, color='black', alpha=0.8)
     plt.xlabel('Experimental affinity value')
     plt.ylabel(f'{model_key} prediction')
-    plt.title(f'{title_prefix}Scatter plot of affinity values (pkd)')
+    plt.grid(True)
+    plt.title(f'{title_prefix}Scatter plot of {title_postfix}')
 
     if save_figs: plt.savefig(f'{save_path}/{model_key}_scatter{dataset}.png')
     if show: plt.show()
     plt.clf()
 
-    ########### saving metrics to csv file ###########
-    # get metrics:
-    try:
-        # cindex throws zero division error if all values are the same
-        c_index = concordance_index(y_true, y_pred)
-    except ZeroDivisionError:
-        c_index = -1
-        print('ZeroDivisionError: cindex set to -1')
-        
-    p_corr = pearsonr(y_true, y_pred)
-    s_corr = spearmanr(y_true, y_pred)
-
-    # error
-    mse = np.mean((y_true-y_pred)**2)
-    mae = np.mean(np.abs(y_true-y_pred))
-    rmse = np.sqrt(mse)
-    
-    if show:
-        print(f"Concordance index: {c_index:.3f}")
-        print(f"Pearson correlation: {p_corr[0]:.3f}")
-        print(f"Pearson p-value: {p_corr[1]:.3f}")
-        print(f"Spearman correlation: {s_corr[0]:.3f}")
-        print(f"Spearman p-value: {s_corr[1]:.3f}")
-        print(f"MSE: {mse:.3f}")
-        print(f"MAE: {mae:.3f}")
-        print(f"RMSE: {rmse:.3f}")
-
-    # creating stats csv if it doesnt exist or empty/incomplete header
-    if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
-        stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
-        stats.set_index('run', inplace=True)
-        stats.to_csv(csv_file)
-
-    # replacing existing record if run_num already exists
-    stats = pd.read_csv(csv_file, index_col=0)
-    stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
-    stats.to_csv(csv_file)    
-    plt.clf()
-    
     ############ display train val plot ###########
     if logs is not None: 
         ax = plt.figure().gca()
@@ -186,8 +179,22 @@ def get_metrics(y_true: np.array, y_pred: np.array, save_figs=True,
         plt.ylabel('Loss')
         if save_figs: plt.savefig(f'{save_path}/{model_key}_loss{dataset}.png')
         if show: plt.show()
+    plt.clf()
+    
+    ########### saving metrics to csv file ###########
+    # get metrics:
+    c_index, p_corr, s_corr, mse, mae, rmse = get_metrics(y_true, y_pred, show)
+    
+    if save_data:
+        # creating stats csv if it doesnt exist or empty/incomplete header
+        if not os.path.exists(csv_file) or os.path.getsize(csv_file) < 40:
+            stats = pd.DataFrame(columns=['run', 'cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse'])
+            stats.set_index('run', inplace=True)
+            stats.to_csv(csv_file)
+
+        # replacing existing record if run_num already exists
+        stats = pd.read_csv(csv_file, index_col=0)
+        stats.loc[model_key] = [c_index, p_corr[0], s_corr[0], mse, mae, rmse]
+        stats.to_csv(csv_file)    
     
     return c_index, p_corr, s_corr, mse, mae, rmse
-
-
-# %%

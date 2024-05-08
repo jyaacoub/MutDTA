@@ -394,11 +394,12 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             try:
                 pro_cmap = np.load(self.cmap_p(prot_id))
                 # updated_seq is for updated foldseek 3di combined seq
+                aln_file = self.aln_p(code) if node_feat in cfg.OPT_REQUIRES_MSA_ALN else None
                 updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
                                                                     contact_map=pro_cmap,
                                                                     threshold=self.cmap_threshold, 
                                                                     pro_feat=node_feat, 
-                                                                    aln_file=self.aln_p(code),
+                                                                    aln_file=aln_file,
                                                                     # For foldseek feats
                                                                     pdb_fp=self.pdb_p(code),
                                                                     pddlt_fp=self.pddlt_p(code))
@@ -940,6 +941,7 @@ class DavisKibaDataset(BaseDataset):
     
     
 class PlatinumDataset(BaseDataset):
+    # website: https://biosig.lab.uq.edu.au/platinum/
     CSV_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_flat_file.csv'
     PBD_LINK = 'https://biosig.lab.uq.edu.au/platinum/static/platinum_processed_pdb_files.tar.gz'
     def __init__(self, save_root: str, data_root: str=None, 
@@ -976,19 +978,36 @@ class PlatinumDataset(BaseDataset):
         super().__init__(save_root, data_root, None, cmap_threshold, 
                          feature_opt, *args, **kwargs)
     
+    def af_conf_files(self, pid, map=True) -> list[str]:
+        """
+        Multiple confirmations are needed to generate edge attributes/weights 
+        (see cfg.OPT_REQUIRES_CONF)
+        """
+        if self.df is not None and pid in self.df.index:
+            pid = self.df.loc[pid]['prot_id']
+            
+        if self.alphaflow:
+            fp = f'{self.af_conf_dir}/{pid}.pdb'
+            fp = fp if os.path.exists(fp) else None
+            return fp
+            
+        return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
+    
+    def sdf_p(self, code) -> str:
+        """Needed for gvp ligand branch (uses coordinate info)"""
+        lig_id = self.df.loc[code].lig_id
+        return os.path.join(self.raw_paths[2], f'{lig_id}.sdf')
+    
     def pdb_p(self, code):
-        code = code.split('_')[0] # removing additional information for mutations.
+        # code = code.split('_')[0] # removing additional information for mutations.
+        # no need to remove mutation information since that is curtial for the pdb id
         return os.path.join(self.raw_paths[1], f'{code}.pdb')
     
-    def cmap_p(self, code, map=True): 
-        # map is important so that we map the provided code to the correct pdb ID
-        if map:
-            code = self.df.loc[code]['prot_id']
-        return os.path.join(self.raw_dir, 'contact_maps', f'{code}.npy')
+    def cmap_p(self, prot_id):
+        return os.path.join(self.raw_dir, 'contact_maps', f'{prot_id}.npy')
     
     def aln_p(self, code):
-        return None # no support for MSA alignments
-        # raise NotImplementedError('Platinum dataset does not have MSA alignments.')
+        raise NotImplementedError('Platinum dataset does not have MSA alignments.')
     
     @property
     def raw_file_names(self):
@@ -1069,7 +1088,15 @@ class PlatinumDataset(BaseDataset):
         
         It creates a XY.csv file that contains the binding data and the sequences for 
         both ligand and proteins. with the following columns: 
-        code,SMILE,pkd,prot_seq
+        code,prot_id,lig_id,SMILE,pkd,prot_seq
+            - code: unique identifier for each protein in the dataset (wild type and 
+                    mutated have the same id with "_mt" or "_wt" suffix)
+            - prot_id: unique identifier for each protein in the dataset
+                       wt is just "{pdbid}_wt" and mt is "{pdbid}_mt-<mut1>-<mut2>..."
+            - lig_id: unique identifier for each ligand in the dataset (from raw data)
+            - SMILE: ligand smiles
+            - pkd: binding affinity
+            - prot_seq: protein sequence
         
         It generates and saves contact maps for each protein in the dataset.
         
@@ -1080,24 +1107,30 @@ class PlatinumDataset(BaseDataset):
         pd.DataFrame
             The XY.csv dataframe.
         """
+        ### LOAD UP RAW CSV FILE + adjust values###
         df_raw = pd.read_csv(self.raw_paths[0])
-        os.makedirs(os.path.join(self.raw_dir, 'contact_maps'), exist_ok=True)
         # fixing pkd values for binding affinity
         df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
                                                       expand=False).astype(float)
         # adjusting units for binding data from nM to pKd:
         df_raw['affin.k_mt'] = -np.log10(df_raw['affin.k_mt']*1e-9)
         df_raw['affin.k_wt'] = -np.log10(df_raw['affin.k_wt']*1e-9)
-        # Getting sequences and cmaps:
+        
+        ### GETTING SEQUENCES AND CMAPS ###
+        os.makedirs(os.path.join(self.raw_dir, 'contact_maps'), exist_ok=True)
         prot_seq = {}
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Getting sequences and cmaps',
                            total=len(df_raw)):
+            # NOTE: wild type and mutated sequences are processed in same iteration
+            # but they are saved as SEPARATE ENTRIES in the final dataframe.
+            
             muts = row['mutation'].split('/') # split to account for multiple point mutations
             pdb_wt = row['mut.wt_pdb']
             pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
-            # Check if PDBs available
+            
+            # Check if PDBs available (need at least 1 for sequence info)
             missing_wt = pdb_wt == 'NO'
             missing_mt = pdb_mt == 'NO'
             assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
@@ -1125,12 +1158,12 @@ class PlatinumDataset(BaseDataset):
                     mt_id = f'{pdb_wt}_{"-".join(muts)}'
                     chain_mt = chain_wt
                 
-                # Getting and saving cmaps under the unique prot_ID
-                if not os.path.isfile(self.cmap_p(wt_id, map=False)):
-                    np.save(self.cmap_p(wt_id, map=False), chain_wt.get_contact_map())
+                # Getting and saving cmaps under the unique protein ID
+                if not os.path.isfile(self.cmap_p(wt_id)):
+                    np.save(self.cmap_p(wt_id), chain_wt.get_contact_map())
                 
-                if not os.path.isfile(self.cmap_p(mt_id, map=False)):
-                    np.save(self.cmap_p(mt_id, map=False), chain_mt.get_contact_map())
+                if not os.path.isfile(self.cmap_p(mt_id)):
+                    np.save(self.cmap_p(mt_id), chain_mt.get_contact_map())
                 
             except Exception as e:
                 raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e
@@ -1148,6 +1181,6 @@ class PlatinumDataset(BaseDataset):
         df = pd.DataFrame.from_dict(prot_seq, orient='index', 
                                         columns=['prot_id', 'lig_id', 
                                                  'pkd', 'SMILE', 'prot_seq'])
-        df.index.name = 'code'
+        df.index.name = 'code'        
         df.to_csv(self.processed_paths[0])
         return df

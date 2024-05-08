@@ -1,6 +1,7 @@
 from collections import Counter, OrderedDict
 import logging
 import os, pickle, json
+import functools
 
 import pandas as pd
 import numpy as np
@@ -9,9 +10,14 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 from statannotations.Annotator import Annotator
+from scipy.stats import ttest_ind
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 from src.utils import config as cfg
 from src.utils.loader import Loader
+from src.analysis.metrics import get_metrics
+from src.analysis.utils import generate_markdown, get_mut_count
+
 
 def fig0_dataPro_overlap(data:str='davis', data_root:str=cfg.DATA_ROOT, verbose=False):
     data_path = f'{data_root}/{data}'
@@ -489,6 +495,372 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     
     return df
 
+#######################################################################################################
+##################################### MUTATION ANALYSIS RELATED FIGS: #################################
+#######################################################################################################
+def predictive_performance(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    TRAIN_DATA_P = lambda set: f'{cfg.DATA_ROOT}/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
+    NORMALIZE = True,
+    n_models=5,
+    compare_overlap=False,
+    verbose=True,
+    plot=False,
+    ):
+    df_t = pd.Index.append(pd.read_csv(TRAIN_DATA_P('train'), index_col=0).index, 
+                        pd.read_csv(TRAIN_DATA_P('val'), index_col=0).index)
+    df_t = df_t.str.upper()
+
+    results_with_overlap = []
+    results_without_overlap = []
+
+    for i in range(n_models):
+        df = pd.read_csv(MODEL(i), index_col=0).dropna()
+        df['pdb'] = df['prot_id'].str.split('_').str[0]
+        if NORMALIZE:
+            mean_df = df[['actual','pred']].mean(axis=0, numeric_only=True)
+            std_df = df[['actual','pred']].std(axis=0, numeric_only=True)
+            
+            df[['actual','pred']] = (df[['actual','pred']] - mean_df) / std_df # z-normalization
+
+        # with overlap
+        cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(df['actual'], df['pred'])
+        results_with_overlap.append([cindex, p_corr[0], s_corr[0], mse, mae, rmse])
+
+        # without overlap
+        df_no_overlap = df[~(df['pdb'].isin(df_t))]
+        cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(df_no_overlap['actual'], df_no_overlap['pred'])
+        results_without_overlap.append([cindex, p_corr[0], s_corr[0], mse, mae, rmse])
+
+        if i==0 and plot:
+            n_plots = int(compare_overlap)+1
+            fig = plt.figure(figsize=(14,5*n_plots))
+            axes = fig.subplots(n_plots,1)
+            ax = axes[0] if compare_overlap else axes
+            
+            sns.histplot(df_no_overlap['actual'], kde=True, ax=ax, alpha=0.5, label='True pkd')
+            sns.histplot(df_no_overlap['pred'], kde=True, ax=ax, alpha=0.5, label='Predicted pkd', color='orange')
+            ax.set_title(f"{'Normalized 'if NORMALIZE else ''} pkd distribution")
+            ax.legend()
+            
+            if compare_overlap:
+                sns.histplot(df_no_overlap['actual'], kde=True, ax=axes[1], alpha=0.5, label='True pkd')
+                sns.histplot(df_no_overlap['pred'], kde=True, ax=axes[1], alpha=0.5, label='Predicted pkd', color='orange')
+                axes[1].set_title(f"{'Normalized 'if NORMALIZE else ''}  pkd distribution (no overlap)")
+                axes[1].legend()
+
+    if compare_overlap:
+        return generate_markdown([results_with_overlap, results_without_overlap], names=['with overlap', 'without overlap'], 
+                             cindex=True,verbose=verbose)
+    
+    return generate_markdown([results_without_overlap], names=['mean $\pm$ se'], cindex=True, verbose=verbose)
+
+def get_dpkd(df, pkd_col='pkd', normalize=False) -> np.ndarray:
+    """ 
+    2. Mutation impact analysis - Delta pkd given df containing wt and mutated proteins and their pkd values
+    
+    returns dpkd numpy array of shape (n,)
+    """
+    wt_df = df[df.index.str.contains("_wt")]
+    mt_df = df[df.index.str.contains("_mt")]
+    
+    dpkd= []
+    missing_wt = 0
+    for m in mt_df.index:
+        i_wt = m.split('_')[0] + '_wt'
+        if i_wt not in wt_df.index:
+            missing_wt += 1
+            continue
+        else:
+            wt_pkd = wt_df.loc[i_wt][pkd_col]
+            dpkd.append((wt_pkd - mt_df.loc[m][pkd_col]))
+
+    dpkd = np.array(dpkd)
+    
+    if normalize:    
+        # identify significance threshold seperately:
+        mean_dpkd = np.mean(dpkd, axis=0)
+        std_dpkd = np.std(dpkd, axis=0)
+        
+        dpkd = (dpkd - mean_dpkd) / std_dpkd # z-normalization        
+    return dpkd
+
+def fig_dpkd_dist(df, pkd_cols=['pred', 'actual'], normalize=False, show_plot=True, ax=None,) -> tuple[np.ndarray]:
+    """ 
+    2. Mutation impact analysis - Delta pkd distribution visualized overlayed pred and true distributions
+    
+    returns pred_dpkd, true_dpkd, and axes for the plot
+    """
+    assert len(pkd_cols) == 2
+    
+    pred_dpkd = get_dpkd(df, pkd_cols[0], normalize)
+    true_dpkd = get_dpkd(df, pkd_cols[1], normalize)
+        
+    ax = sns.histplot(true_dpkd, kde=True, ax=ax, alpha=0.5, label='True Δpkd')#, color='blue')
+    sns.histplot(pred_dpkd, kde=True, ax=ax, alpha=0.5, label='Predicted Δpkd', color='orange')
+    ax.set_title(f"{'Normalized 'if normalize else ''}Δpkd distribution")
+    ax.legend()
+    if show_plot: plt.show()
+    return pred_dpkd, true_dpkd, ax
+
+def tbl_stratified_dpkd_metrics(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    NORMALIZE=True,
+    n_models=5,
+    df_transform=get_mut_count, # transformation to apply to df before condition for grouping
+    conditions = ["(n_mut == 1) | (n_mut == 0)", "(n_mut > 1) | (n_mut == 0)"],
+    names = ['single mutation', '2+ mutations'],
+    verbose=True,
+    plot=False,
+    **kwargs,
+    ):
+    """
+    Generates markdown table for stratified results given some transform and conditions to performn on df for grouping.
+
+    Args:
+        `MODEL` (callable, optional): function to give path to model predictions. Defaults to lambdai:f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv".
+        `NORMALIZE` (bool, optional): Whether or not to scale predictions and truths before getting metrics. Defaults to True.
+        `n_models` (int, optional): number of models to get data from (calls MODEL(i)). Defaults to 5.
+        `df_transform` (callable, optional): returns a modified version of the predictions csv. Defaults to get_mut_count.
+        `conditions`(list, optional): conditions to df.query() for grouping. Defaults to ["(n_mut == 1) | (n_mut == 0)", "(n_mut > 1) | (n_mut == 0)"].
+        `names` (list, optional): names of each group. Defaults to ['single mutation', '2+ mutations'].
+        `verbose` (bool, optional): Defaults to True.
+        `plot` (bool, optional): Defaults to False.
+        `**kwargs`: any additional args for the df_transform.
+
+    Returns:
+        pd.Dataframe: the table containing mean metrics and std for each group.
+    """
+
+    results = [[] for _ in range(len(conditions))]
+    for i in range(n_models):
+        df = pd.read_csv(MODEL(i), index_col=0).dropna()
+        df['pdb'] = df['prot_id'].str.split('_').str[0]
+        df = df_transform(df, **kwargs)
+        
+        if i == 0 and plot:
+            fig = plt.figure(figsize=(14,5*len(conditions)))
+            axes = fig.subplots(len(conditions),1)
+        
+        # must include 0 in both cases since they are the wildtype reference 
+        for j, c in enumerate(conditions):
+            grp = df.query(c)
+            true_dpkd1 = get_dpkd(grp, 'actual', NORMALIZE)
+            pred_dpkd1 = get_dpkd(grp, 'pred', NORMALIZE)
+            
+            if i==0 and plot:
+                sns.histplot(true_dpkd1, kde=True, ax=axes[j], alpha=0.5, label='True Δpkd')
+                sns.histplot(pred_dpkd1, kde=True, ax=axes[j], alpha=0.5, label='Predicted Δpkd', color='orange')
+                axes[j].set_title(f"{'Normalized 'if NORMALIZE else ''}Δpkd distribution {names[j]}")
+                axes[j].legend()
+
+            _, p_corr, s_corr, mse, mae, rmse = get_metrics(true_dpkd1, pred_dpkd1)
+            results[j].append([p_corr[0], s_corr[0], mse, mae, rmse])
+
+    return generate_markdown(results, names=names, verbose=verbose)
+
+def tbl_dpkd_metrics_overlap(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    TRAIN_DATA_P = lambda set: f'{cfg.DATA_ROOT}/PDBbindDataset/nomsa_aflow_gvp_binary/{set}0/cleaned_XY.csv',
+    NORMALIZE = True,
+    verbose=True,
+    plot=False,
+    n_models=5,
+    ):
+    """
+    2. Reports mean +- standard deviation with t-test significance of with/without overlap of training data from the 5-fold CV. 
+    """
+    
+    df_t = pd.Index.append(pd.read_csv(TRAIN_DATA_P('train'), index_col=0).index, 
+                        pd.read_csv(TRAIN_DATA_P('val'), index_col=0).index)
+    df_t = df_t.str.upper()
+    def get_in_train(df, training_set_df):
+        df['in_train'] = df['pdb'].isin(training_set_df)
+        return df
+
+    conditions = ['(not in_train) | in_train', 'not in_train']
+    names = ['with overlap', 'without overlap']
+
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_in_train, 
+                                       conditions=conditions, names=names, verbose=verbose, plot=plot, training_set_df=df_t)
+    
+def tbl_dpkd_metrics_n_mut(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    NORMALIZE = True,
+    n_models=5,
+    conditions=[1,2],
+    verbose=True,
+    plot=False,
+    ):
+    """
+    Conditions are the grouping for number of mutations with the last entry being all above that number:
+    e.g.:
+    conditions = [1,2]
+    
+    means we have two groups: single mutations and those with multiple (2+) mutations
+    
+    Any inbetween are considered as exact matches
+    so conditions = [1,2,3]
+    would mean 3 groups: exactly 1 mutation, exactly 2 mutations, and 3 or more mutations
+    
+    """
+    names = []
+    for i, c in enumerate(conditions):
+        if i == len(conditions)-1:
+            q = f"(n_mut >= {c}) | (n_mut == 0)"
+            n = f"{c}+ mutations"
+        else:
+            q = f"(n_mut == {c}) | (n_mut == 0)"
+            n = f"{c} mutations"
+        
+        conditions[i] = q
+        names.append(n)
+
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models, df_transform=get_mut_count,
+                                       conditions=conditions, names=names, verbose=verbose, plot=plot)
+
+def tbl_dpkd_metrics_in_binding(
+    MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv",
+    RAW_PLT_CSV=f"{cfg.DATA_ROOT}/PlatinumDataset/raw/platinum_flat_file.csv",
+    NORMALIZE = True,
+    n_models=5,
+    verbose=True,
+    plot=False,
+    ):
+    """Generates a table comapring the metrics for mutations in the pocket and not in the pocket"""
+    # add in_binding info to df
+    def get_in_binding(df, dfr):
+        """
+        df is the predicted csv with index as <raw_idx>_wt (or *_mt) where raw_idx 
+        corresponds to an index in dfr which contains the raw data for platinum including 
+        ('mut.in_binding_site')
+            - 0: wildtype rows
+            - 1: in pocket
+            - 2: outside of pocket
+        """
+        in_pocket = dfr[dfr['mut.in_binding_site'] == 'YES'].index   
+        pclass = []
+        for code in df.index:
+            if '_wt' in code:
+                pclass.append(0)
+            elif int(code.split('_')[0]) in in_pocket:
+                pclass.append(1)
+            else:
+                pclass.append(2)
+                
+        df['in_pocket'] = pclass
+        return df
+
+    conditions = ['(in_pocket == 0) | (in_pocket == 1)', '(in_pocket == 0) | (in_pocket == 2)']
+    names = ['mutation in pocket', 'mutation NOT in pocket']
+
+    dfr = pd.read_csv(RAW_PLT_CSV, index_col=0)
+    
+    dfp = pd.read_csv(MODEL(0), index_col=0)
+    df = get_in_binding(dfp, dfr)
+    if verbose: 
+        cnts = df.in_pocket.value_counts()
+        cnts.index = ['wt', 'pckt', 'not pckt']
+        cnts.name = "counts"
+        print(cnts.to_markdown(), end="\n\n")
+    
+    return tbl_stratified_dpkd_metrics(MODEL, NORMALIZE, n_models=n_models, df_transform=get_in_binding,
+                                        conditions=conditions, names=names, verbose=verbose, plot=plot, dfr=dfr)
+
+### 3. significant mutations as a classification problem
+def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plot=True, show_plot=False, ax=None):
+    """For 3. significant mutation impact analysis"""
+    dpkd = []
+    # filter out nan vals
+    for y,p in zip(true_dpkd, pred_dpkd):
+        if not (np.isnan(y) or np.isnan(p)):
+            dpkd.append((y,p))
+    dpkd = np.array(dpkd)
+    
+    # identify significance threshold seperately:
+    mean_dpkd = np.mean(dpkd, axis=0)
+    std_dpkd = np.std(dpkd, axis=0)
+    sig_thresh = mean_dpkd + std* std_dpkd # basically same effect as z-normalization (x-mean)/std
+
+    # Mark observed mutations as significant or not
+    sig_dpkd = abs(dpkd) > sig_thresh
+    conf_matrix = confusion_matrix(sig_dpkd[:,0], sig_dpkd[:,1])
+
+    if plot:
+        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, 
+                                    display_labels=["significant", "not significant"])
+        disp.plot(cmap=plt.cm.Blues, ax=ax)
+        disp.ax_.set_title('Confusion Matrix for Mutation Significance')
+        if show_plot: plt.show()
+
+    # Calculate and print TPR and TNR
+    tn, fp, fn, tp = conf_matrix.ravel()
+    tpr = 0.0 if tp == 0 else tp / (tp + fn)
+    tnr = 0.0 if tn == 0.0 else tn / (tn + fp)
+    if verbose:
+        print(f"True Positive Rate (TPR): {tpr:.2f}")
+        print(f"True Negative Rate (TNR): {tnr:.2f}")
+    return conf_matrix, tpr, tnr
+
+
+def generate_roc_curve(true_dpkd, pred_dpkd, thres_range=(0,5), step=0.1):
+    """3. significant mutation impact analysis"""
+    
+    # Define a range of standard deviations to use as thresholds
+    std_values = np.arange(thres_range[0], thres_range[1], step)
+    tprs = []
+    fprs = []
+    distances = []
+    best_threshold = None
+    min_distance = float('inf')  # Initialize with infinity
+
+    # Store indices for std = 1.0 and std = 2.0
+    index_std_1 = None
+    index_std_2 = None
+
+    for i, std in enumerate(std_values):
+        # Use the confusion matrix function to get performance metrics at each threshold
+        conf_matrix, tpr, tnr = fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=std, 
+                                                              verbose=False, plot=False, show_plot=False)
+        fpr = 1 - tnr
+        tprs.append(tpr)
+        fprs.append(fpr)
+        
+        # Calculate the Euclidean distance from the top-left corner (0,1)
+        distance = np.sqrt((0 - fpr) ** 2 + (1 - tpr) ** 2)
+        distances.append(distance)
+        if distance < min_distance:
+            min_distance = distance
+            best_threshold = std
+            best_tpr = tpr
+            best_fpr = fpr
+        
+        # Check if the current std is 1.0 or 2.0
+        if np.isclose(std, 1.0, atol=0.05):
+            index_std_1 = i
+        elif np.isclose(std, 2.0, atol=0.05):
+            index_std_2 = i
+
+    # Plot the ROC curve
+    plt.figure(figsize=(16, 12))
+    plt.plot(fprs, tprs, marker='o', linestyle='-', color='b', label='ROC Curve')
+    plt.plot([0, 1], [0, 1], 'k--', label='No Skill Line')  # diagonal line for reference
+    
+    # Highlight the best point
+    plt.scatter([best_fpr], [best_tpr], color='red', s=150, edgecolors='k', label=f'Best Threshold (STD={best_threshold:.1f})')
+    # Highlight specific std points
+    plt.scatter([fprs[index_std_1]], [tprs[index_std_1]], color='green', s=150, edgecolors='k', label='STD=1.0')
+    plt.scatter([fprs[index_std_2]], [tprs[index_std_2]], color='purple', s=150, edgecolors='k', label='STD=2.0')
+    
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+    print(f"Best threshold: {best_threshold} with minimum distance: {min_distance}")
+    return std_values, tprs, fprs, best_threshold
 
 if __name__ == '__main__':
     # %%
