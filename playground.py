@@ -1,61 +1,60 @@
-#%%
+#%% 1-2. download TCGA and gather proteins for dbs 
 import os
 import pandas as pd
-from src.data_prep.processors import Processor
-root_dir = '../data/DavisKibaDataset/davis'
-df = pd.read_csv(f"{root_dir}/nomsa_binary_original_binary/full/XY.csv")
 
-df_unique = df.loc[df[['code']].drop_duplicates().index]
-df_unique.drop(['SMILE', 'pkd', 'prot_id'], axis=1, inplace=True)
-df_unique['code'] = df_unique['code'].str.upper()
-df_unique.columns = ['Gene name', 'prot_seq']
-#%%
-df_mart = pd.read_csv('../downloads/biomart_hsapiens.tsv', sep='\t')
-df_mart = df_mart.loc[df_mart[['Gene name', 'UniProtKB/Swiss-Prot ID']].dropna().index]
-df_mart['Gene name'] = df_mart['Gene name'].str.upper()
-df_mart = df_mart.drop_duplicates(subset=['UniProtKB/Swiss-Prot ID'])
+df_prots = pd.read_csv('../downloads/all_prots.csv')
+df_tcga = pd.read_csv('../downloads/TCGA_ALL.maf', sep='\t')
 
-#%%
-dfm = df_unique.merge(df_mart, on='Gene name', how='left')
+#%% 3. Pre filtering
+import matplotlib.pyplot as plt
+df_tcga = df_tcga[df_tcga['Variant_Classification'] == 'Missense_Mutation']
+df_tcga['seq_len'] = pd.to_numeric(df_tcga['Protein_position'].str.split('/').str[1])
+df_tcga = df_tcga[df_tcga['seq_len'] < 5000]
+df_tcga['seq_len'].plot.hist(bins=100, title="sequence length histogram capped at 5K")
+plt.show()
+df_tcga = df_tcga[df_tcga['seq_len'] < 1200]
+df_tcga['seq_len'].plot.hist(bins=100, title="sequence length after capped at 1.2K")
 
-dfm[['Gene name', 'UniProtKB/Swiss-Prot ID']].to_csv('../downloads/davis_biomart_matches.csv')
-#%%
+#%% 4. Merging df_prots with TCGA
+df_tcga['uniprot'] = df_tcga['SWISSPROT'].str.split('.').str[0]
 
+dfm = df_tcga.merge(df_prots[df_prots.db != 'davis'], 
+                    left_on='uniprot', right_on='prot_id', how='inner')
+
+# for davis we have to merge on HUGO_SYMBOLS
+dfm_davis = df_tcga.merge(df_prots[df_prots.db == 'davis'], 
+                          left_on='Hugo_Symbol', right_on='prot_id', how='inner')
+
+dfm = pd.concat([dfm,dfm_davis], axis=0)
+
+del dfm_davis # to save mem
+
+# %% 5. Post filtering step
+# 5.1. Filter for only those sequences with matching sequence length (to get rid of nonmatched isoforms)
+# seq_len_x is from tcga, seq_len_y is from our dataset 
+tmp = len(dfm)
+dfm = dfm[dfm.seq_len_x == dfm.seq_len_y]
+print(f"Filter #1 (seq_len)     : {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
+
+# 5.2. Filter out those that dont have the same reference seq according to the "Protein_position" and "Amino_acids" col
+# - reference sequence is in colum "prot_seq" 
+# - `56-Protein_position` tells us `<mutation location>/seqlen`
+# 	- Match only proteins that have matching `seqlen`
+# - `57-Amino_acids` tells us `<reference AA>/<mutated AA>`. 
+# 	- match only proteins with the same `reference AA` at `mutation location` (see above)
+ 
+# Extract mutation location and reference amino acid from 'Protein_position' and 'Amino_acids' columns
+dfm['mt_loc'] = pd.to_numeric(dfm['Protein_position'].str.split('/').str[0])
+dfm[['ref_AA', 'mt_AA']] = dfm['Amino_acids'].str.split('/', expand=True)
+
+dfm['db_AA'] = dfm.apply(lambda row: row['prot_seq'][row['mt_loc']-1], axis=1)
+                         
+# Filter #2: Match proteins with the same reference amino acid at the mutation location
+tmp = len(dfm)
+dfm = dfm[dfm['db_AA'] == dfm['ref_AA']]
+print(f"Filter #2 (ref_AA match): {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
+
+# %% final seq len distribution
+df_tcga['seq_len'].plot.hist(bins=100, title='TCGA final filtering for db matches')
 
 # %%
-from src.utils.pdb import pdb2uniprot
-
-for root_dir in ['../data/PDBbindDataset', '../data/DavisKibaDataset/davis', 
-                 '../data/DavisKibaDataset/kiba', '../data/PlatinumDataset']:
-    print(root_dir)
-    DB = {root_dir.split("/")[-1]}
-    fp = f'../downloads/{DB}_pids.csv'
-    if not os.path.exists(fp):
-        df2 = pd.read_csv(f"{root_dir}/nomsa_binary_original_binary/full/XY.csv", index_col=0)
-        df2['pdb_id'] = df2.prot_id.str.split("_").str[0]
-        df2 = df2[['pdb_id']]
-
-        df2.to_csv(f'../downloads/{DB}_pids.csv')
-    else:
-        df2 = pd.read_csv(fp, index_col=0)
-        
-    if DB == 'PlatinumDataset': # needs internet connection to run
-        uniprots = pdb2uniprot(df2.pdb_id.unique())
-        df_pid = pd.DataFrame(list(uniprots.items()), columns=['pdbID', 'uniprot'])
-
-        df_pid.to_csv(f'../downloads/{DB}_uniprot.csv')
-    
-
-# %%
-exit()
-# find overlap between uniprots and swissprot ids
-uniprots = set(uniprots) # convert to set for faster lookup
-df['uniprot'] = df['SWISSPROT'].str.split('.').str[0]
-# Merge the original df with uni_to_pdb_df
-df = df.merge(df_pid, on='uniprot', how='left')
-
-# %%
-df[~df['pdbID'].isna()]
-# %%
-
-
