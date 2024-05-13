@@ -39,7 +39,11 @@ del dfm_davis # to save mem
 # 5.1. Filter for only those sequences with matching sequence length (to get rid of nonmatched isoforms)
 # seq_len_x is from tcga, seq_len_y is from our dataset 
 tmp = len(dfm)
-dfm = dfm[dfm.seq_len_x == dfm.seq_len_y]
+print(dfm.db.value_counts())
+# allow for some error due to missing amino acids from pdb file in PDBbind dataset
+#   - assumption here is that isoforms will differ by more than 50 amino acids
+dfm = dfm[(dfm.seq_len_y <= dfm.seq_len_x) & (dfm.seq_len_x<= dfm.seq_len_y+50)]
+print(dfm.db.value_counts())
 print(f"Filter #1 (seq_len)     : {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
 
 # 5.2. Filter out those that dont have the same reference seq according to the "Protein_position" and "Amino_acids" col
@@ -51,6 +55,7 @@ print(f"Filter #1 (seq_len)     : {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
  
 # Extract mutation location and reference amino acid from 'Protein_position' and 'Amino_acids' columns
 dfm['mt_loc'] = pd.to_numeric(dfm['Protein_position'].str.split('/').str[0])
+dfm = dfm[dfm['mt_loc'] < dfm['seq_len_y']]
 dfm[['ref_AA', 'mt_AA']] = dfm['Amino_acids'].str.split('/', expand=True)
 
 dfm['db_AA'] = dfm.apply(lambda row: row['prot_seq'][row['mt_loc']-1], axis=1)
@@ -58,9 +63,29 @@ dfm['db_AA'] = dfm.apply(lambda row: row['prot_seq'][row['mt_loc']-1], axis=1)
 # Filter #2: Match proteins with the same reference amino acid at the mutation location
 tmp = len(dfm)
 dfm = dfm[dfm['db_AA'] == dfm['ref_AA']]
+print(dfm.db.value_counts())
 print(f"Filter #2 (ref_AA match): {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
 
 # %% final seq len distribution
-df_tcga['seq_len'].plot.hist(bins=100, title='TCGA final filtering for db matches')
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
 
+n_bins = 25
+lengths = dfm.seq_len_x
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+
+# Plot histogram
+n, bins, patches = ax.hist(lengths, bins=n_bins, color='blue', alpha=0.7)
+ax.set_title('TCGA final filtering for db matches')
+
+# Add counts to each bin
+for count, x, patch in zip(n, bins, patches):
+    ax.text(x + 0.5, count, str(int(count)), ha='center', va='bottom')
+
+ax.set_xlabel('Sequence Length')
+ax.set_ylabel('Frequency')
+
+plt.tight_layout()
+plt.show()
 # %%
