@@ -3,6 +3,7 @@ from collections import OrderedDict
 from scipy.stats import ttest_ind
 import pandas as pd
 import numpy as np
+from src import config as cfg
 
 
 def count_missing_res(pdb_file: str) -> Tuple[int,int]:
@@ -116,6 +117,26 @@ def generate_markdown(results, names=None, verbose=False, thresh_sig=False, cind
     md_output = md_table.to_markdown()
     if verbose: print(md_output)
     return md_table
+
+def combine_dataset_pids(data_dir=cfg.DATA_ROOT, target='nomsa_binary_original_binary', subset='full'):
+    df_all = None
+    dbs = ['PDBbindDataset', 'DavisKibaDataset/davis', 'DavisKibaDataset/kiba']
+    dbs = [f'{data_dir}/{d}' for d in dbs]
+    for root_dir in dbs:
+        print(root_dir)
+        DB = root_dir.split("/")[-1]
+                    
+        df = pd.read_csv(f"{root_dir}/nomsa_binary_original_binary/{subset}/XY.csv", index_col=0)
+        df['pdb_id'] = df.prot_id.str.split("_").str[0]
+        df = df[['prot_id', 'prot_seq']].drop_duplicates(subset='prot_id')
+        df['seq_len'] = df['prot_seq'].str.len()
+        df['db'] = DB
+        df.reset_index(inplace=True)
+        df = df[['db','code', 'prot_id', 'seq_len', 'prot_seq']] # reorder them.
+        df.index.name = 'db_idx'
+        df_all = df if df_all is None else pd.concat([df_all, df], axis=0)
+    
+    return df_all
 
 if __name__ == '__main__':
     #NOTE: the following is code for stratifying AutoDock Vina results by 

@@ -1,12 +1,18 @@
-#%% 1-2. download TCGA and gather proteins for dbs 
+#%%
+# steps for matching prots from TCGA to our dataset 
+# (see https://github.com/jyaacoub/MutDTA/issues/95#issuecomment-2107780527)
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
 
-df_prots = pd.read_csv('../downloads/all_prots.csv')
+#%% 1. gather relevant proteins to match with tcga
+from src.analysis.utils import combine_dataset_pids
+df_prots = combine_dataset_pids(subset='test')
+
+#%% 2. Download ALL TCGA projects as a single MAF 
 df_tcga = pd.read_csv('../downloads/TCGA_ALL.maf', sep='\t')
 
 #%% 3. Pre filtering
-import matplotlib.pyplot as plt
 df_tcga = df_tcga[df_tcga['Variant_Classification'] == 'Missense_Mutation']
 df_tcga['seq_len'] = pd.to_numeric(df_tcga['Protein_position'].str.split('/').str[1])
 df_tcga = df_tcga[df_tcga['seq_len'] < 5000]
