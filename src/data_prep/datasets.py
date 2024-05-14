@@ -447,9 +447,10 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         processed_ligs = {}
         errors = []
         if node_feat == cfg.LIG_FEAT_OPT.gvp:
-            for code, lig_seq in tqdm(df['SMILE'].items(), desc='Creating ligand graphs', 
+            for code, (lig_seq, lig_id) in tqdm(df[['SMILE', 'lig_id']].iterrows(), desc='Creating ligand graphs', 
                                       total=len(df)):
-                processed_ligs[lig_seq] = GVPFeaturesLigand().featurize_as_graph(self.sdf_p(code))
+                processed_ligs[lig_seq] = GVPFeaturesLigand().featurize_as_graph(self.sdf_p(code, 
+                                                                                            lig_id=lig_id))
             return processed_ligs
         
         for lig_seq in tqdm(df['SMILE'].unique(), desc='Creating ligand graphs'):
@@ -506,11 +507,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             logging.info('Created cleaned_XY.csv file')
             
         
-        ###### Get Protein Graphs ######
-        processed_prots = self._create_protein_graphs(self.df, self.pro_feat_opt, self.pro_edge_opt)
-        
         ###### Get Ligand Graphs ######
         processed_ligs = self._create_ligand_graphs(self.df, self.ligand_feature, self.ligand_edge)
+        
+        ###### Get Protein Graphs ######
+        processed_prots = self._create_protein_graphs(self.df, self.pro_feat_opt, self.pro_edge_opt)
         
         ###### Save ######
         logging.info('Saving...')
@@ -562,7 +563,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
     def pdb_p(self, code):
         return os.path.join(self.data_root, code, f'{code}_protein.pdb')
     
-    def sdf_p(self, code):
+    def sdf_p(self, code, **kwargs):        
         return os.path.join(self.data_root, code, f'{code}_ligand.sdf')
     
     def cmap_p(self, pid):
@@ -632,7 +633,8 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         
         # Get binding data:
         df_binding = PDBbindProcessor.get_binding_data(self.raw_paths[0]) # _data.2020
-        df_binding.drop(columns=['resolution', 'release_year', 'lig_name'], inplace=True)
+        df_binding.drop(columns=['resolution', 'release_year'], inplace=True)
+        df_binding.rename({'lig_name':'lig_id'}, inplace=True)
         pdb_codes = df_binding.index # pdbcodes
         
         ############## validating codes #############
@@ -728,20 +730,22 @@ class DavisKibaDataset(BaseDataset):
                                                feature_opt=feature_opt, *args, **kwargs)
     
     def af_conf_files(self, code) -> list[str]:
-        """Davis has issues since prot_ids are not really that unique"""
-        # removing () from string since file names cannot include them and localcolabfold replaces them with _
+        """Davis has issues since prot_ids are not really unique"""
+        if self.alphaflow:
+            fp = f'{self.af_conf_dir}/{code}.pdb'
+            fp = fp if os.path.exists(fp) else None
+            return fp
+            
+        # removing () from string since localcolabfold replaces them with _
         code = re.sub(r'[()]', '_', code)
+        
         # localcolabfold has 'unrelaxed' as the first part after the code/ID.
         # output must be in out directory
-        
-        # TODO: fix this to work with alphaflow outputs
-        # if self.alphaflow:
-        #     fp = f'{self.af_conf_dir}/{pid}.pdb'
-        #     fp = fp if os.path.exists(fp) else None
-        #     return fp
-            
-        
         return glob(f'{self.af_conf_dir}/out?/{code}_unrelaxed*_alphafold2_ptm_model_*.pdb')    
+    
+    def sdf_p(self, code, lig_id):
+        # code is just a placeholder since other datasets (pdbbind) need it.
+        return os.path.join(self.data_root, 'lig_sdf', f'{lig_id}.sdf')
     
     def pdb_p(self, code, safe=True):
         code = re.sub(r'[()]', '_', code)
@@ -749,6 +753,9 @@ class DavisKibaDataset(BaseDataset):
         # af or some other method beforehand.
         if (self.pro_edge_opt not in cfg.OPT_REQUIRES_PDB) and \
             (self.pro_feat_opt not in cfg.OPT_REQUIRES_PDB): return None
+            
+        if self.alphaflow:
+            return self.af_conf_files(code)
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
@@ -862,11 +869,13 @@ class DavisKibaDataset(BaseDataset):
         prot_seq = list(prot_seq.values())
         
         # get ligand sequences (order is important since they are indexed by row in affinity matrix):
-        ligand_seq = json.load(open(self.raw_paths[1], 'r'), 
+        lig_dict = json.load(open(self.raw_paths[1], 'r'), 
                                object_hook=OrderedDict)
-        ligand_seq = list(ligand_seq.values())
+        lig_id = list(lig_dict.keys())
+        ligand_seq = list(lig_dict.values())
         
         # Get binding data:
+        # for davis this matrix should contain no nan values
         affinity_mat = pickle.load(open(self.raw_paths[2], 'rb'), encoding='latin1')
         lig_r, prot_c = np.where(~np.isnan(affinity_mat)) # index values corresponding to non-nan values
         
@@ -895,7 +904,7 @@ class DavisKibaDataset(BaseDataset):
                     # af_conf_files will be different for alphaflow (single file)
                     no_confs = [c for c in codes if (
                         (self.pdb_p(c, safe=False) is None) or # no highQ structure
-                            (Chain.get_model_count(self.af_conf_files(c)) < 5))] # only if not for foldseek
+                            (Chain.get_model_count(self.af_conf_files(c)) < 5))] # single file needs Chain.get_model_count
                 else:
                     no_confs = [c for c in codes if (
                         (self.pdb_p(c, safe=False) is None) or # no highQ structure
@@ -907,7 +916,7 @@ class DavisKibaDataset(BaseDataset):
             print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
            
         invalid_codes = set(no_aln + no_cmap + no_confs)
-        # filtering out invalid codes:
+        # filtering out invalid codes and storing their index vals.
         lig_r = [r for i,r in enumerate(lig_r) if codes[prot_c[i]] not in invalid_codes]
         prot_c = [c for c in prot_c if codes[c] not in invalid_codes]
         
@@ -916,7 +925,8 @@ class DavisKibaDataset(BaseDataset):
         # creating binding dataframe:
         #   code,SMILE,pkd,prot_seq
         df = pd.DataFrame({
-           'code': [codes[c] for c in prot_c], 
+           'code': [codes[c] for c in prot_c],
+           'lig_id': [lig_id[r] for r in lig_r],
            'SMILE': [ligand_seq[r] for r in lig_r],
            'prot_seq': [prot_seq[c] for c in prot_c]
         })
@@ -993,9 +1003,8 @@ class PlatinumDataset(BaseDataset):
             
         return glob(f'{self.af_conf_dir}/{pid}_model_*.pdb')
     
-    def sdf_p(self, code) -> str:
+    def sdf_p(self, code, lig_id) -> str:
         """Needed for gvp ligand branch (uses coordinate info)"""
-        lig_id = self.df.loc[code].lig_id
         return os.path.join(self.raw_paths[2], f'{lig_id}.sdf')
     
     def pdb_p(self, code):

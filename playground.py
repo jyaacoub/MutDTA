@@ -1,91 +1,25 @@
+#%% Building davis GVPL_aflow dataset
+from src.data_prep.init_dataset import create_datasets
+from src import config as cfg
+
+create_datasets(cfg.DATA_OPT.davis, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+                ligand_features=cfg.LIG_FEAT_OPT.gvp, ligand_edges=cfg.LIG_EDGE_OPT.binary,
+                k_folds=5)
+
+# %%
+from src.utils.loader import Loader
+
+l = Loader.load_DataLoaders(cfg.DATA_OPT.davis, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+                            ligand_feature=cfg.LIG_FEAT_OPT.gvp, ligand_edge=cfg.LIG_EDGE_OPT.binary,
+                            training_fold=0, batch_train=5)
+
+
 #%%
-# steps for matching prots from TCGA to our dataset 
-# (see https://github.com/jyaacoub/MutDTA/issues/95#issuecomment-2107780527)
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
+d = {'11314340': 'already downloaded', '24889392': 'already downloaded', '11409972': 'already downloaded', '11338033': 'already downloaded', '10184653': 'already downloaded', '5287969': 'already downloaded', '6450551': 'already downloaded', '11364421': 'already downloaded', '9926054': 'downloaded', '16007391': 'already downloaded', '5328940': 'already downloaded', '11234052': 'already downloaded', '11656518': 'already downloaded', '6918454': 'already downloaded', '156414': 'already downloaded', '9933475': 'already downloaded', '11626560': 'already downloaded', '3062316': 'already downloaded', '156422': 'already downloaded', '44150621': 'downloaded', '176167': 'already downloaded', '176870': 'already downloaded', '42642645': 'already downloaded', '11717001': 'already downloaded', '16725726': 'already downloaded', '11617559': 'already downloaded', '123631': 'already downloaded', '5291': 'already downloaded', '4908365': 'already downloaded', '11427553': 'already downloaded', '208908': 'already downloaded', '126565': 'already downloaded', '11485656': 'already downloaded', '9929127': 'already downloaded', '11712649': 'already downloaded', '10074640': 'already downloaded', '51004351': 'already downloaded', '11667893': 'already downloaded', '9915743': 'already downloaded', '644241': 'already downloaded', '447077': 'already downloaded', '10461815': 'already downloaded', '9884685': 'already downloaded', '24180719': 'already downloaded', '25243800': 'already downloaded', '10113978': 'already downloaded', '17755052': 'already downloaded', '11984591': 'downloaded', '153999': 'already downloaded', '25127112': 'downloaded', '176155': 'already downloaded', '24779724': 'already downloaded', '3025986': 'already downloaded', '10138260': 'already downloaded', '10127622': 'already downloaded', '216239': 'already downloaded', '44259': 'already downloaded', '5329102': 'already downloaded', '16038120': 'already downloaded', '10427712': 'already downloaded', '16722836': 'already downloaded', '3038522': 'already downloaded', '9926791': 'already downloaded', '5494449': 'already downloaded', '3038525': 'already downloaded', '3081361': 'already downloaded', '9809715': 'already downloaded', '151194': 'already downloaded'}
 
-#%% 1. gather relevant proteins to match with tcga
-from src.analysis.utils import combine_dataset_pids
-df_prots = combine_dataset_pids(subset='test')
-
-#%% 2. Download ALL TCGA projects as a single MAF 
-df_tcga = pd.read_csv('../downloads/TCGA_ALL.maf', sep='\t')
-
-#%% 3. Pre filtering
-df_tcga = df_tcga[df_tcga['Variant_Classification'] == 'Missense_Mutation']
-df_tcga['seq_len'] = pd.to_numeric(df_tcga['Protein_position'].str.split('/').str[1])
-df_tcga = df_tcga[df_tcga['seq_len'] < 5000]
-df_tcga['seq_len'].plot.hist(bins=100, title="sequence length histogram capped at 5K")
-plt.show()
-df_tcga = df_tcga[df_tcga['seq_len'] < 1200]
-df_tcga['seq_len'].plot.hist(bins=100, title="sequence length after capped at 1.2K")
-
-#%% 4. Merging df_prots with TCGA
-df_tcga['uniprot'] = df_tcga['SWISSPROT'].str.split('.').str[0]
-
-dfm = df_tcga.merge(df_prots[df_prots.db != 'davis'], 
-                    left_on='uniprot', right_on='prot_id', how='inner')
-
-# for davis we have to merge on HUGO_SYMBOLS
-dfm_davis = df_tcga.merge(df_prots[df_prots.db == 'davis'], 
-                          left_on='Hugo_Symbol', right_on='prot_id', how='inner')
-
-dfm = pd.concat([dfm,dfm_davis], axis=0)
-
-del dfm_davis # to save mem
-
-# %% 5. Post filtering step
-# 5.1. Filter for only those sequences with matching sequence length (to get rid of nonmatched isoforms)
-# seq_len_x is from tcga, seq_len_y is from our dataset 
-tmp = len(dfm)
-print(dfm.db.value_counts())
-# allow for some error due to missing amino acids from pdb file in PDBbind dataset
-#   - assumption here is that isoforms will differ by more than 50 amino acids
-dfm = dfm[(dfm.seq_len_y <= dfm.seq_len_x) & (dfm.seq_len_x<= dfm.seq_len_y+50)]
-print(dfm.db.value_counts())
-print(f"Filter #1 (seq_len)     : {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
-
-# 5.2. Filter out those that dont have the same reference seq according to the "Protein_position" and "Amino_acids" col
-# - reference sequence is in colum "prot_seq" 
-# - `56-Protein_position` tells us `<mutation location>/seqlen`
-# 	- Match only proteins that have matching `seqlen`
-# - `57-Amino_acids` tells us `<reference AA>/<mutated AA>`. 
-# 	- match only proteins with the same `reference AA` at `mutation location` (see above)
- 
-# Extract mutation location and reference amino acid from 'Protein_position' and 'Amino_acids' columns
-dfm['mt_loc'] = pd.to_numeric(dfm['Protein_position'].str.split('/').str[0])
-dfm = dfm[dfm['mt_loc'] < dfm['seq_len_y']]
-dfm[['ref_AA', 'mt_AA']] = dfm['Amino_acids'].str.split('/', expand=True)
-
-dfm['db_AA'] = dfm.apply(lambda row: row['prot_seq'][row['mt_loc']-1], axis=1)
-                         
-# Filter #2: Match proteins with the same reference amino acid at the mutation location
-tmp = len(dfm)
-dfm = dfm[dfm['db_AA'] == dfm['ref_AA']]
-print(dfm.db.value_counts())
-print(f"Filter #2 (ref_AA match): {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
-
-# %% final seq len distribution
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
-
-n_bins = 25
-lengths = dfm.seq_len_x
-fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-
-# Plot histogram
-n, bins, patches = ax.hist(lengths, bins=n_bins, color='blue', alpha=0.7)
-ax.set_title('TCGA final filtering for db matches')
-
-# Add counts to each bin
-for count, x, patch in zip(n, bins, patches):
-    ax.text(x + 0.5, count, str(int(count)), ha='center', va='bottom')
-
-ax.set_xlabel('Sequence Length')
-ax.set_ylabel('Frequency')
-
-plt.tight_layout()
-plt.show()
+for k,v in d.items():
+    if v != 'already downloaded':
+        print(k, v)
+        
+        
 # %%
