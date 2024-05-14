@@ -1,10 +1,11 @@
-from typing import Iterable, List
-import os
+from typing import Iterable, List, Callable
+import os, time
 import requests as r
 from io import StringIO
 from urllib.parse import quote
 
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class Downloader:
     @staticmethod
@@ -77,55 +78,78 @@ class Downloader:
             The file object.
         """
         return StringIO(r.get(url(ID)).text)
+    
+    @staticmethod  
+    def download_single_file(id: str, save_path: Callable[[str], str], url: Callable[[str], str], 
+                             url_backup: Callable[[str], str], max_retries=4) -> tuple:
+        """
+        Helper function to download a single file.
+        """
+        fp = save_path(id)
+        # Check if the file already exists
+        if os.path.isfile(fp):
+            return id, 'already downloaded'
+
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
         
+        def fetch_url(url):
+            retries = 0
+            while retries <= max_retries:
+                resp = r.get(url)
+                if resp.status_code == 503:
+                    wait_time = 2 ** retries  # Exponential backoff
+                    time.sleep(wait_time)
+                    retries += 1
+                else:
+                    return resp
+            return resp  # Return the last response after exhausting retries
+
+        resp = fetch_url(url(id))
+        if resp.status_code >= 400 and url_backup:
+            resp = fetch_url(url_backup(id))
+
+        if resp.status_code >= 400:
+            return id, resp.status_code
+        else:
+            with open(fp, 'w') as f:
+                f.write(resp.text)
+            return id, 'downloaded'    
+
     @staticmethod
     def download(IDs: Iterable[str], 
-                 save_path=lambda x:'./data/structures/ligands/{x}.sdf', 
-                 url=lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf',
-                 tqdm_desc='Downloading files',
-                 tqdm_disable=False) -> dict:
+                save_path=lambda x: f'./data/structures/ligands/{x}.sdf', 
+                url=lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf',
+                tqdm_desc='Downloading files',
+                url_backup=None, # for if the first url fails
+                tqdm_disable=False,
+                max_workers=None) -> dict:
         """
-        Generalized download function for downloading any file type from any site.
+        Generalized multithreaded download function for downloading any file type from any site.
         
-        URL and save_path are passed in as callable functions which accept a string (the ID)
-        and return a url or save path for that file.
-
         Parameters
         ----------
-        `IDs` : Iterable[str]
+        IDs : Iterable[str]
             List of IDs to download
-        `save_path` : Callable[[str], str], optional
+        save_path : Callable[[str], str], optional
             Callable fn that returns the save path for file, by default 
             lambda x :'./data/structures/ligands/{x}.sdf'
-        `url` : Callable[[str], str], optional
+        url : Callable[[str], str], optional
             Callable fn that returns the url to download file, by default 
             lambda x :f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'
-            
+        max_workers : int, optional
+            Number of threads to use for downloading files.
+        
         Returns
         -------
         dict
-            status of each ID (whether it was downloaded or not)        
+            status of each ID (whether it was downloaded or not)
         """
-        
         ID_status = {}
-        for id in tqdm(IDs, tqdm_desc, disable=tqdm_disable):
-            if id in ID_status: continue
-            fp = save_path(id)
-            # checking to make sure that we didnt already download file
-            if os.path.isfile(fp): 
-                ID_status[id] = 'already downloaded'
-                continue
-                
-            os.makedirs(os.path.dirname(fp), 
-                        exist_ok=True)
-            
-            resp = r.get(url(id))
-            if resp.status_code >= 400: 
-                ID_status[id] = resp.status_code
-            else:
-                with open(fp, 'w') as f:
-                    f.write(resp.text)
-                ID_status[id] = 'downloaded'
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(Downloader.download_single_file, id, save_path, url, url_backup): id for id in IDs}
+            for future in tqdm(as_completed(futures), desc=tqdm_desc, total=len(IDs), disable=tqdm_disable):
+                id, status = future.result()
+                ID_status[id] = status
         return ID_status
     
     @staticmethod
@@ -173,6 +197,7 @@ class Downloader:
                 'CHEMBL': lambda x: f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/xref/registryID/{x}/record/sdf?record_type=3d',
                 'name': lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'}
         
+        
         lid = ligand_ids[0]
         if lid.isdigit():
             url = urls['CID']
@@ -182,7 +207,8 @@ class Downloader:
             url = urls['name']
         
         save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')        
-        return Downloader.download(ligand_ids, save_path=save_path, url=url, 
+        url_backup=lambda x: url(x).split('?')[0]  # fallback to 2d conformer structure
+        return Downloader.download(ligand_ids, save_path=save_path, url=url, url_backup=url_backup,
                                    tqdm_desc='Downloading ligand sdfs', **kwargs)
 
 if __name__ == '__main__':
