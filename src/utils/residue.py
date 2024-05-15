@@ -194,6 +194,15 @@ class Chain:
     def __repr__(self):
         return f'<Chain {os.path.basename(self.pdb_file).split(".")[0]}:{self.t_chain}>'
         
+    def __iter__(self):
+        """
+        Generator function to iterate through all chains and return their sequences.
+        """
+        for cid in self._chains.keys():
+            self.t_chain = cid
+            self._seq = None  # Reset sequence cache
+            yield cid, self.getSequence()
+            
     def reset_attributes(self):
         self._seq = None        
         self._coords = None
@@ -228,8 +237,8 @@ class Chain:
         assert len(chain_ID) == 1, f"Invalid chain ID {chain_ID}"
         # reset so that they are updated on next getter calls
         self.reset_attributes()
-        self._t_chain = chain_ID        
-    
+        self._t_chain = chain_ID
+            
     @property
     def sequence(self) -> str:
         return self.getSequence()
