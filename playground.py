@@ -58,8 +58,8 @@ dfm = dfm[dfm['db_AA'] == dfm['ref_AA']]
 print(f"Filter #2 (ref_AA match): {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
 print('\n',dfm.db.value_counts())
 
-# %% final seq len distribution
 
+# %% final seq len distribution
 n_bins = 25
 lengths = dfm.seq_len_x
 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
@@ -78,4 +78,71 @@ ax.set_ylabel('Frequency')
 plt.tight_layout()
 plt.show()
 
+# %% Getting updated sequences
+def apply_mut(row):
+    ref_seq = list(row['prot_seq'])
+    ref_seq[row['mt_loc']-1] = row['mt_AA']
+    return ''.join(ref_seq)
+
+dfm['mt_seq'] = dfm.apply(apply_mut, axis=1)
+
+
+# %%
+dfm.to_csv("/cluster/home/t122995uhn/projects/data/tcga/tcga_maf_davis_pdbbind.csv")
+# %%
+from src.utils.seq_alignment import MSARunner
+from tqdm import tqdm
+import pandas as pd
+import os
+
+DATA_DIR = '/cluster/home/t122995uhn/projects/data/tcga'
+CSV = f'{DATA_DIR}/tcga_maf_davis_pdbbind.csv'
+N_CPUS= 6
+NUM_ARRAYS = 10
+array_idx = 0#${SLURM_ARRAY_TASK_ID}
+
+df = pd.read_csv(CSV, index_col=0)
+df.sort_values(by='seq_len_y', inplace=True)
+
+
+# %%
+for DB in df.db.unique():
+    print('DB', DB)
+    RAW_DIR = f'{DATA_DIR}/{DB}'
+    # should already be unique if these are proteins mapped form tcga!
+    unique_df = df[df['db'] == DB]
+    ########################## Get job partition
+    partition_size = len(unique_df) / NUM_ARRAYS
+    start, end = int(array_idx*partition_size), int((array_idx+1)*partition_size)
+
+    unique_df = unique_df[start:end]
+
+    #################################### create fastas
+    fa_dir = os.path.join(RAW_DIR, f'{DB}_fa')
+    fasta_fp = lambda idx,pid: os.path.join(fa_dir, f"{idx}-{pid}.fasta")
+    os.makedirs(fa_dir, exist_ok=True)
+    for idx, (prot_id, pro_seq) in tqdm(
+                    unique_df[['prot_id', 'prot_seq']].iterrows(), 
+                    desc='Creating fastas',
+                    total=len(unique_df)):
+        with open(fasta_fp(idx,prot_id), "w") as f:
+            f.write(f">{prot_id},{idx},{DB}\n{pro_seq}")
+
+    ##################################### Run hhblits
+    aln_dir = os.path.join(RAW_DIR, f'{DB}_aln')
+    aln_fp = lambda idx,pid: os.path.join(aln_dir, f"{idx}-{pid}.a3m")
+    os.makedirs(aln_dir, exist_ok=True)
+
+    # finally running
+    for idx, (prot_id, pro_seq) in tqdm(
+                    unique_df[['prot_id', 'mt_seq']].iterrows(), 
+                    desc='Running hhblits',
+                    total=len(unique_df)):
+        in_fp = fasta_fp(idx,prot_id)
+        out_fp = aln_fp(idx,prot_id)
+        
+        if not os.path.isfile(out_fp):
+            print(MSARunner.hhblits(in_fp, out_fp, n_cpus=N_CPUS, return_cmd=True))
+            break
+    
 # %%

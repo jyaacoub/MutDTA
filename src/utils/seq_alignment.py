@@ -9,10 +9,9 @@ from tqdm import tqdm
 
 
 class MSARunner(Processor):
-    hhsuite_bin_dir = '/cluster/tools/software/centos7/hhsuite/3.3.0/bin'
-    bin_hhblits = f'{hhsuite_bin_dir}/hhblits'
-    bin_hhfilter = f'{hhsuite_bin_dir}/hhfilter'
-    UniRef_dir = '/cluster/projects/kumargroup/mslobody/Protein_Communities/01_MSA/databases/UniRef30_2020_06'
+    UniRef_dir = cfg.UniRef_dir
+    bin_hhblits = f'{cfg.hhsuite_bin_dir}/hhblits'
+    bin_hhfilter = f'{cfg.hhsuite_bin_dir}/hhfilter'
 
     @staticmethod    
     def hhblits(f_in:str, f_out:str, n_cpus=6, n_iter:int=2,
@@ -216,20 +215,33 @@ class MMseq2Runner:
     
     
 if __name__ == '__main__':
-    from src.data_prep.datasets import BaseDataset
+    from src.utils.seq_alignment import MSARunner
+    from tqdm import tqdm
+    import pandas as pd
+    import os
     csv = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/nomsa_binary/full/XY.csv'
     df = pd.read_csv(csv, index_col=0)
     #################### Get unique proteins:
-    unique_df = BaseDataset.get_unique_prots(df)
-    
+    # sorting by sequence length before dropping so that we keep the longest protein sequence instead of just the first.
+    df['seq_len'] = df['prot_seq'].str.len()
+    df = df.sort_values(by='seq_len', ascending=False)
+
+    # create new numerated index col for ensuring the first unique uniprotID is fetched properly 
+    df.reset_index(drop=False, inplace=True)
+    unique_pro = df[['prot_id']].drop_duplicates(keep='first')
+
+    # reverting index to code-based index
+    df.set_index('code', inplace=True)
+    unique_df = df.iloc[unique_pro.index]
+
     ########################## Get job partition
-    num_arrays = 100
+    NUM_ARRAYS = 100
     array_idx = 0#${SLURM_ARRAY_TASK_ID}
-    partition_size = len(unique_df) / num_arrays
+    partition_size = len(unique_df) / NUM_ARRAYS
     start, end = int(array_idx*partition_size), int((array_idx+1)*partition_size)
-    
+
     unique_df = unique_df[start:end]
-    
+
     raw_dir = '/cluster/home/t122995uhn/projects/data/PlatinumDataset/raw'
 
     #################################### create fastas
