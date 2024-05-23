@@ -12,9 +12,9 @@ from src.data_prep.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDat
 from src.train_test.splitting import train_val_test_split, balanced_kfold_split
 
 def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:list[str]|str,
-                    pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
                     ligand_features:list[str]=['original'],
                     ligand_edges:list[str]=['binary'],
+                    pro_overlap:bool=False, data_root:str=cfg.DATA_ROOT, 
                     k_folds:int=None,
                     random_seed:int=0,
                     train_split:float=0.8,
@@ -62,7 +62,7 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                 create_pfm_np_files(f'{data_root}/{data}/aln', processes=4)
             if 'af_conf_dir' not in kwargs:
                 if EDGE in cfg.OPT_REQUIRES_AFLOW_CONF:
-                    kwargs['af_conf_dir'] = f'/{data}/alphaflow_io/out_pdb_MD-distilled/'
+                    kwargs['af_conf_dir'] = f'{data_root}/{data}/alphaflow_io/out_pdb_MD-distilled/'
                 else:
                     kwargs['af_conf_dir'] = f'../colabfold/{data}_af2_out/'
                 
@@ -144,12 +144,3 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
         dataset.save_subset(test_loader, subset_names[2])
             
         del dataset # free up memory
-
-if __name__ == "__main__":
-    create_datasets(data_opt=['davis'], # 'PDBbind' 'kiba' davis
-                feat_opt=['nomsa'],    # nomsa 'msa' 'shannon']
-                edge_opt=['af2-anm'], # for anm and af2 we need structures! (see colabfold-highQ)
-                pro_overlap=False,
-                #/home/jyaacoub/projects/data/
-                #'/cluster/home/t122995uhn/projects/data/'
-                data_root='/cluster/home/t122995uhn/projects/data/')

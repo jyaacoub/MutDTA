@@ -80,6 +80,24 @@ class Processor:
                 f.write(f">{prot_id}\n{pro_seq}")
     
     @staticmethod
+    def fasta_to_df(fp) -> pd.DataFrame:
+        d = {}
+        with open(fp, 'r') as f:
+            line = f.readline()
+            while line:
+                if line.startswith('>'):
+                    desc = line[1:].strip()
+                    seq = ''
+                    line = f.readline()
+                    while line and not line.startswith('>'):
+                        seq += line.strip()
+                        line = f.readline()
+                    d[desc] = seq
+                else:
+                    line = f.readline()
+        return pd.DataFrame.from_records(list(d.items()), columns=['names', 'prot_seq'])
+    
+    @staticmethod
     def fasta_to_aln_file(in_fp, out_fp):
         """
         Removes lines from the input Fasta file that start with '>' and saves the result in the output file.

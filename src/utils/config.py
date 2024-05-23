@@ -123,6 +123,13 @@ FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
 MMSEQ2_BIN = f'{Path.home()}/lib/mmseqs/bin/mmseqs'
 RING3_BIN = f'{Path.home()}/lib/ring-3.0.0/ring/bin/ring'
 
+if 'uhnh4h' in DOMAIN_NAME:
+    UniRef_dir = '/cluster/projects/kumargroup/sequence_databases/UniRef30_2020_06/UniRef30_2020_06'
+    hhsuite_bin_dir = '/cluster/tools/software/centos7/hhsuite/3.3.0/bin'
+else:
+    UniRef_dir = ''
+    hhsuite_bin_dir = ''
+
 
 ###########################
 # LOGGING STUFF:
