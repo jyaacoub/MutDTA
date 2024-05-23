@@ -344,7 +344,7 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
     
 def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], 
                   fig_callable=fig4_pro_feat_violin, fig_scale=(5,4),
-                  show=False, **kwargs):    
+                  show=False, title_postfix='', **kwargs):    
     # Create subplots with datasets as columns and metrics as rows
     fig, axes = plt.subplots(len(metrics), len(datasets), 
                              figsize=(fig_scale[0]*len(datasets), 
@@ -362,7 +362,7 @@ def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'm
                         
             # Add titles only to the top row and left column
             if j == 0:
-                ax.set_title(f'{dataset}')
+                ax.set_title(f'{dataset}{title_postfix}')
                 ax.set_xlabel('')
                 ax.set_xticklabels([])
             elif j < len(metrics)-1: # middle row
