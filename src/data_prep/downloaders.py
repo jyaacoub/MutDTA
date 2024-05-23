@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
 
 class Downloader:
     @staticmethod
@@ -81,7 +82,7 @@ class Downloader:
     
     @staticmethod  
     def download_single_file(id: str, save_path: Callable[[str], str], url: Callable[[str], str], 
-                             url_backup: Callable[[str], str], max_retries=4) -> tuple:
+                             url_backup: Callable[[str], str], max_retries=3) -> tuple:
         """
         Helper function to download a single file.
         """
@@ -106,9 +107,11 @@ class Downloader:
 
         resp = fetch_url(url(id))
         if resp.status_code >= 400 and url_backup:
+            logging.debug(f'{id}-{resp.status_code} {resp}')
             resp = fetch_url(url_backup(id))
 
         if resp.status_code >= 400:
+            logging.debug(f'\tbkup{id}-{resp.status_code} {resp}')
             return id, resp.status_code
         else:
             with open(fp, 'w') as f:
@@ -122,7 +125,8 @@ class Downloader:
                 tqdm_desc='Downloading files',
                 url_backup=None, # for if the first url fails
                 tqdm_disable=False,
-                max_workers=None) -> dict:
+                max_workers=None,
+                **kwargs) -> dict:
         """
         Generalized multithreaded download function for downloading any file type from any site.
         
@@ -146,7 +150,8 @@ class Downloader:
         """
         ID_status = {}
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(Downloader.download_single_file, id, save_path, url, url_backup): id for id in IDs}
+            futures = {executor.submit(Downloader.download_single_file, id, save_path, 
+                                       url, url_backup, **kwargs): id for id in IDs}
             for future in tqdm(as_completed(futures), desc=tqdm_desc, total=len(IDs), disable=tqdm_disable):
                 id, status = future.result()
                 ID_status[id] = status
@@ -172,6 +177,7 @@ class Downloader:
     @staticmethod
     def download_SDFs(ligand_ids: List[str],
                       save_dir='./data/structures/ligands/',
+                      max_workers=None,
                       **kwargs) -> dict:
         """
         Wrapper of `Downloader.download` for downloading SDF files. 
@@ -209,7 +215,7 @@ class Downloader:
         save_path = lambda x: os.path.join(save_dir, f'{x}.sdf')        
         url_backup=lambda x: url(x).split('?')[0]  # fallback to 2d conformer structure
         return Downloader.download(ligand_ids, save_path=save_path, url=url, url_backup=url_backup,
-                                   tqdm_desc='Downloading ligand sdfs', **kwargs)
+                                   tqdm_desc='Downloading ligand sdfs', max_workers=max_workers, **kwargs)
 
 if __name__ == '__main__':
     # downloading pdbs from X.csv list

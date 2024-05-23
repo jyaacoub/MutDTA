@@ -221,9 +221,9 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             # ensures that the right codes are always present in unique_pro
             df.sort_values(by='sort_order', inplace=True)
         else:
-            df['seq_len'] = df['prot_seq'].str.len()
+            df = df.assign(seq_len=df['prot_seq'].str.len())
             df.sort_values(by='seq_len', ascending=False, inplace=True)
-            df['sort_order'] = [i for i in range(len(df))]
+            df = df.assign(sort_order=[i for i in range(len(df))])
         
         # Get unique protid codes
         idx_name = df.index.name
@@ -365,6 +365,24 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         
         logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
         
+        # we are done filtering if ligand doesnt need filtering
+        if not (self.ligand_edge in cfg.OPT_REQUIRES_SDF or 
+                self.ligand_feature in cfg.OPT_REQUIRES_SDF):
+            return filtered_df
+            
+        # removing rows with ligands that have missing sdf files:
+        unique_lig = filtered_df[['lig_id']].drop_duplicates()
+        missing = set()
+        for code, (lig_id,) in tqdm(unique_lig.iterrows(), desc='dropping missing sdfs from df', 
+                                    total=len(unique_lig)):
+            fp = self.sdf_p(code, lig_id=lig_id)
+            if (not os.path.isfile(fp) or 
+                os.path.getsize(fp) <= 20):
+                missing.add(lig_id)
+        
+        logging.debug(f'{len(missing)}/{len(unique_lig)} missing ligands')
+        filtered_df = filtered_df[~filtered_df.lig_id.isin(missing)]
+        logging.debug(f'Number of codes after ligand filter: {len(filtered_df)}/{len(df)}')
         return filtered_df
     
     def _create_protein_graphs(self, df, node_feat, edge):

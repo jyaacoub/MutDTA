@@ -102,14 +102,14 @@ if __name__ == "__main__":
     #         "output_dim":  ray.tune.choice([128, 256, 512]), 
     #     }
     # }
-  # 'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'): 
+#  'gvpL': ('nomsa', 'aflow', 'gvp', 'binary')
     search_space = {
         ## constants:
         "epochs": 20,
         "model": cfg.MODEL_OPT.GVPL,
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
-        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
         
@@ -126,6 +126,30 @@ if __name__ == "__main__":
             "output_dim":  ray.tune.choice([128, 256, 512]), 
         }
     }
+  # 'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'): 
+    # search_space = {
+    #     ## constants:
+    #     "epochs": 20,
+    #     "model": cfg.MODEL_OPT.GVPL,
+    #     "dataset": cfg.DATA_OPT.davis,
+    #     "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+    #     "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+    #     "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+    #     "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+        
+    #     "fold_selection": 0,
+    #     "save_checkpoint": False,
+                
+    #     ## hyperparameters to tune:
+    #     "lr": ray.tune.loguniform(1e-5, 1e-3),
+    #     "batch_size": ray.tune.choice([32, 64, 128]), # local batch size
+        
+    #     # model architecture hyperparams
+    #     "architecture_kwargs":{
+    #         "dropout": ray.tune.uniform(0.0, 0.5),
+    #         "output_dim":  ray.tune.choice([128, 256, 512]), 
+    #     }
+    # }
  # search space for GVPL_RNG MODEL:
 #    search_space = {
 #        ## constants:
