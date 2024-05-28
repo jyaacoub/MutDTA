@@ -65,13 +65,15 @@ class GVPLigand_DGPro(DGraphDTA):
                  num_features_mol=78, 
                  output_dim=512,
                  dropout=0.2,
+                 num_GVPLayers=3,
                  edge_weight_opt='binary', **kwargs):
         output_dim = int(output_dim)
         super(GVPLigand_DGPro, self).__init__(num_features_pro, 
                                                 num_features_mol, output_dim, 
                                                 dropout, edge_weight_opt)
         
-        self.gvp_ligand = GVPBranchLigand(final_out=output_dim,
+        self.gvp_ligand = GVPBranchLigand(num_layers=num_GVPLayers, 
+                                          final_out=output_dim,
                                           drop_rate=dropout)
         
         self.dense_out = nn.Sequential(
