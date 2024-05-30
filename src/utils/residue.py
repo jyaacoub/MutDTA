@@ -182,6 +182,8 @@ class Chain:
         
         # parse chain -> {<chain>: {<residue_key>: {<atom_type>: np.array([x,y,z], "name": <res_name>)}}}
         self._chains = self._pdb_get_chains(pdb_file, model, self.grep_atoms)
+        if len(self._chains) == 0:
+            raise Exception(f'No chains parsed on {pdb_file}')
         
         # if t_chain is not specified then set it to be the largest chain
         self.t_chain = t_chain or max(self._chains, key=lambda x: len(self._chains[x]))

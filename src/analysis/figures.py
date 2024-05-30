@@ -383,6 +383,30 @@ def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'm
 
 def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cindex', 
                    verbose=False, show=False, add_stats=True, ax=None):
+    
+    """
+    Example usage with `fig_combined`.
+        ```
+        from src.analysis.figures import custom_fig, prepare_df, fig_combined
+
+        df = prepare_df()
+
+        models = {
+            'DG': ('nomsa', 'binary', 'original', 'binary'),
+            # 'DG-simple': ('nomsa', 'simple', 'original', 'binary'),
+            'DG-anm': ('nomsa', 'anm', 'original', 'binary'),
+            'DG-af2': ('nomsa', 'af2', 'original', 'binary'),
+            'DG-ESM': ('ESM', 'binary', 'original', 'binary'),
+            # 'DG-saprot': ('foldseek', 'binary', 'original', 'binary'),
+            'gvpP': ('gvp', 'binary', 'original', 'binary'),
+            'gvpL-aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
+        }
+
+        fig_combined(df, datasets=['PDBbind'], metrics=['cindex', 'mse'], fig_scale=(10,5),
+                    fig_callable=custom_fig, models=models, title_postfix=' test set performance',
+                    add_stats=True)
+        ```
+    """
     if models is None: # example custom plot:
         # models to plot:
         # - Original model with (nomsa, binary) and (original,  binary) features for protein and ligand respectively

@@ -1025,11 +1025,15 @@ class PlatinumDataset(BaseDataset):
         """Needed for gvp ligand branch (uses coordinate info)"""
         return os.path.join(self.raw_paths[2], f'{lig_id}.sdf')
     
-    def pdb_p(self, code):
-        # code = code.split('_')[0] # removing additional information for mutations.
-        # no need to remove mutation information since that is curtial for the pdb id
-        return os.path.join(self.raw_paths[1], f'{code}.pdb')
-    
+    def pdb_p(self, pid, id_is_pdb=False):
+        if id_is_pdb:
+            fp = os.path.join(self.raw_paths[1], f'{pid}.pdb')
+        else:
+            fp = f'{self.af_conf_dir}/{pid}.pdb'
+            
+        fp = fp if os.path.exists(fp) else None
+        return fp
+        
     def cmap_p(self, prot_id):
         return os.path.join(self.raw_dir, 'contact_maps', f'{prot_id}.npy')
     
@@ -1108,7 +1112,55 @@ class PlatinumDataset(BaseDataset):
                             lambda x: os.path.join(self.raw_paths[2], f'{x}.sdf'))
         df_raw['smiles'] = df_raw['affin.lig_id'].map(smiles_dict)
         df_raw.to_csv(self.raw_paths[0])
+    
+    def _get_prot_structure(self, muts, pdb_wt, pdb_mt, t_chain):
+        # Check if PDBs available (need at least 1 for sequence info)
+        missing_wt = pdb_wt == 'NO'
+        missing_mt = pdb_mt == 'NO'
+        assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt'
+        pdb_wt = pdb_mt if missing_wt else pdb_wt
+        pdb_mt = pdb_wt if missing_mt else pdb_mt
         
+        # creating protein unique IDs for computational speed up by avoiding redundant compute
+        wt_id = f'{pdb_wt}_wt'
+        mt_id = f'{pdb_mt}_{"-".join(muts)}'
+        
+        chain_wt = Chain(self.pdb_p(pdb_wt, id_is_pdb=True), t_chain=t_chain)
+        chain_mt = Chain(self.pdb_p(pdb_mt, id_is_pdb=True), t_chain=t_chain)
+        
+        # Getting sequences:
+        if missing_wt:
+            mut_seq = chain_mt.sequence
+            ref_seq = chain_mt.get_mutated_seq(muts, reversed=True)
+        else:
+            # get mut_seq from wt to confirm that mapping the mutations works
+            mut_seq = chain_wt.get_mutated_seq(muts, reversed=False)
+            ref_seq = chain_wt.sequence
+        
+        if pdb_mt != pdb_wt and mut_seq != chain_mt.sequence:
+            # sequences dont match due to missing residues in either the wt or the mt pdb files (seperate files since pdb_mt != pdb_wt)
+            # we can just use the wildtype protein structure to avoid mismatches with graph network (still the same mutated sequence tho)
+            mt_id = f'{pdb_wt}_{"-".join(muts)}'
+            
+            # if we have aflow confs then we use those instead
+            fp = self.pdb_p(mt_id, id_is_pdb=False)
+            if fp is not None:
+                chain_mt = Chain(fp, model=0) # no t_chain for alphaflow confs since theres only one input sequence.
+            
+            # final check to make sure this aflow conf is correct for the mt sequence.
+            if mut_seq != chain_mt.sequence:
+                logging.warning(f'Mismatched AA: Using wt STRUCTURE ({pdb_wt}) for mutated {mt_id}')
+                chain_mt = chain_wt
+        
+        # Getting and saving cmaps under the unique protein ID
+        if not os.path.isfile(self.cmap_p(wt_id)) or self.overwrite:
+            np.save(self.cmap_p(wt_id), chain_wt.get_contact_map())
+        
+        if not os.path.isfile(self.cmap_p(mt_id)) or self.overwrite:
+            np.save(self.cmap_p(mt_id), chain_mt.get_contact_map())
+        
+        return wt_id, ref_seq, mt_id, mut_seq
+            
     def pre_process(self):
         """
         This method is used to create the processed data files for feature extraction.
@@ -1134,7 +1186,7 @@ class PlatinumDataset(BaseDataset):
         pd.DataFrame
             The XY.csv dataframe.
         """
-        ### LOAD UP RAW CSV FILE + adjust values###
+        ### LOAD UP RAW CSV FILE + adjust values ###
         df_raw = pd.read_csv(self.raw_paths[0])
         # fixing pkd values for binding affinity
         df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
@@ -1157,53 +1209,14 @@ class PlatinumDataset(BaseDataset):
             pdb_mt = row['mut.mt_pdb'] 
             t_chain = row['affin.chain']
             
-            # Check if PDBs available (need at least 1 for sequence info)
-            missing_wt = pdb_wt == 'NO'
-            missing_mt = pdb_mt == 'NO'
-            assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
-            pdb_wt = pdb_mt if missing_wt else pdb_wt
-            pdb_mt = pdb_wt if missing_mt else pdb_mt
-            
             try:
-                chain_wt = Chain(self.pdb_p(pdb_wt), t_chain=t_chain)
-                chain_mt = Chain(self.pdb_p(pdb_mt), t_chain=t_chain)
-                
-                # Getting sequences:
-                if missing_wt:
-                    mut_seq = chain_wt.sequence
-                    ref_seq = chain_wt.get_mutated_seq(muts, reversed=True)
-                else:
-                    mut_seq = chain_wt.get_mutated_seq(muts, reversed=False)
-                    ref_seq = chain_wt.sequence
-                
-                # creating protein unique IDs for computational speed up by avoiding redundant compute
-                wt_id = f'{pdb_wt}_wt'
-                mt_id = f'{pdb_mt}_{"-".join(muts)}'
-                if pdb_mt != pdb_wt and mut_seq != chain_mt.sequence:
-                    # print(f'Mutated doesnt match with chain for {i}:{self.pdb_p(pdb_wt)} and {self.pdb_p(pdb_mt)}')
-                    # using just the wildtype protein structure to avoid mismatches with graph network
-                    mt_id = f'{pdb_wt}_{"-".join(muts)}'
-                    chain_mt = chain_wt
-                
-                # Getting and saving cmaps under the unique protein ID
-                if not os.path.isfile(self.cmap_p(wt_id)):
-                    np.save(self.cmap_p(wt_id), chain_wt.get_contact_map())
-                
-                if not os.path.isfile(self.cmap_p(mt_id)):
-                    np.save(self.cmap_p(mt_id), chain_mt.get_contact_map())
-                
+                wt_id, ref_seq, mt_id, mut_seq = self._get_prot_structure(muts, pdb_wt, pdb_mt, t_chain)
             except Exception as e:
                 raise Exception(f'Error with idx {i} on {pdb_wt} wt and {pdb_mt} mt.') from e
-                
-            # Saving sequence and additional relevant info
-            mt_pkd = row['affin.k_mt']
-            wt_pkd = row['affin.k_wt']
-            lig_id = row['affin.lig_id']
-            smiles = row['smiles']
-            
+    
             # Using index number for ID since pdb is not unique in this dataset.
-            prot_seq[f'{i}_mt'] = (mt_id, lig_id,  mt_pkd, smiles, mut_seq)
-            prot_seq[f'{i}_wt'] = (wt_id, lig_id, wt_pkd, smiles, ref_seq)
+            prot_seq[f'{i}_mt'] = (mt_id, row['affin.lig_id'], row['affin.k_mt'], row['smiles'], mut_seq)
+            prot_seq[f'{i}_wt'] = (wt_id, row['affin.lig_id'], row['affin.k_wt'], row['smiles'], ref_seq)
                 
         df = pd.DataFrame.from_dict(prot_seq, orient='index', 
                                         columns=['prot_id', 'lig_id', 
