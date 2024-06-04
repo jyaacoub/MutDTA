@@ -86,8 +86,8 @@ if __name__ == "__main__":
                 
         "dataset": cfg.DATA_OPT.kiba,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
-        "edge_opt": cfg.PRO_EDGE_OPT.binary,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
         
         "fold_selection": 0,

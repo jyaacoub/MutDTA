@@ -57,7 +57,33 @@ TUNED_MODEL_CONFIGS = {
             'output_dim': 256
         }
     },
+    #####################################################
+    ############## kiba #################################
+    #####################################################
+    'kiba_gvpl': {
+        "model": cfg.MODEL_OPT.GVPL,
+                
+        "dataset": cfg.DATA_OPT.kiba,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+            
+        'lr': 0.00003372637625954074, 
+        'batch_size': 32, 
+        
+        'architecture_kwargs': {
+            'dropout': 0.09399264336737133,
+            'output_dim': 512, 
+            'num_GVPLayers': 4
+        }
+    }
     
+    
+    #####################################################
+    ########### PDBbind #################################
+    #####################################################
     #GVPLM_PDBbind0D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE
     'PDBbind_gvpl_aflow':{
         "model": cfg.MODEL_OPT.GVPL,
