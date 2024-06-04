@@ -81,7 +81,7 @@ def generate_markdown(results, names=None, verbose=False, thresh_sig=False, cind
     ```
     """
     n_groups = len(results)
-    names = names if names else [str(i) for i in range(n_groups)]
+    names = names if len(names)>0 else [str(i) for i in range(n_groups)]
     # Convert results to DataFrame
     results_df = [None for _ in range(n_groups)]
     md_table = None
@@ -112,6 +112,7 @@ def generate_markdown(results, names=None, verbose=False, thresh_sig=False, cind
         md_table = pd.concat([md_table, sig], axis=1)
         md_table.columns = [*names, 'p-val']
     else:
+        md_table = pd.DataFrame(md_table)
         md_table.columns = names
 
     md_output = md_table.to_markdown()

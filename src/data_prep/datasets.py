@@ -127,6 +127,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         # Validating subset
         subset = subset or 'full'
         save_root = os.path.join(save_root, f'{self.pro_feat_opt}_{self.pro_edge_opt}_{self.ligand_feature}_{self.ligand_edge}') # e.g.: path/to/root/nomsa_anm
+        self.save_path = save_root
         if self.verbose: print('save_root:', save_root)
         
         if subset != 'full':
@@ -402,7 +403,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                         total=len(unique_df)):
             
             if node_feat == cfg.PRO_FEAT_OPT.gvp:
-                # gvp has its own unique graph to support the architecture implementation.
+                # gvp has its own unique graph to support the architecture's implementation.
                 coords = Chain(self.pdb_p(code), grep_atoms={'CA', 'N', 'C'}).getCoords(get_all=True)
                 processed_prots[prot_id] = GVPFeaturesProtein().featurize_as_graph(code, coords, pro_seq)
                 continue
@@ -448,7 +449,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                 
                 if len(pro_edge_weight.shape) == 2:
                     pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
-                elif len(pro_edge_weight.shape) == 3: # edge attr!
+                elif len(pro_edge_weight.shape) == 3: # has edge attr!
                     pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1], :])
         
             pro = torchg.data.Data(x=torch.Tensor(pro_feat),

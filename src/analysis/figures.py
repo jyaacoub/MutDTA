@@ -576,8 +576,8 @@ def predictive_performance(
     if compare_overlap:
         return generate_markdown([results_with_overlap, results_without_overlap], names=['with overlap', 'without overlap'], 
                              cindex=True,verbose=verbose)
-    
-    return generate_markdown([results_without_overlap], names=['mean $\pm$ se'], cindex=True, verbose=verbose)
+    # 'mean $\pm$ se'
+    return generate_markdown([results_without_overlap], names=['mean predictive performance'], cindex=True, verbose=verbose)
 
 def get_dpkd(df, pkd_col='pkd', normalize=False) -> np.ndarray:
     """ 
@@ -825,7 +825,6 @@ def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plo
         print(f"True Positive Rate (TPR): {tpr:.2f}")
         print(f"True Negative Rate (TNR): {tnr:.2f}")
     return conf_matrix, tpr, tnr
-
 
 def generate_roc_curve(true_dpkd, pred_dpkd, thres_range=(0,5), step=0.1):
     """3. significant mutation impact analysis"""
