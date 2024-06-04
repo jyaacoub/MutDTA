@@ -70,6 +70,7 @@ OPT_REQUIRES_CONF = StringEnum('multiple_pdb', ['af2', 'af2_anm', 'ring3', 'aflo
                                                 'aflow_ring3'])
 OPT_REQUIRES_AFLOW_CONF = StringEnum('alphaflow_confs', ['aflow', 'aflow_ring3'])
 OPT_REQUIRES_RING3 = StringEnum('ring3', ['ring3', 'aflow_ring3'])
+OPT_REQUIRES_SDF = StringEnum('lig_sdf', ['gvp'])
 
 # ligand options
 class LIG_EDGE_OPT(StringEnum):
@@ -127,8 +128,8 @@ if 'uhnh4h' in DOMAIN_NAME:
     UniRef_dir = '/cluster/projects/kumargroup/sequence_databases/UniRef30_2020_06/UniRef30_2020_06'
     hhsuite_bin_dir = '/cluster/tools/software/centos7/hhsuite/3.3.0/bin'
 else:
-    UniRef_dir = ''
-    hhsuite_bin_dir = ''
+    UniRef_dir = '/cvmfs/bio.data.computecanada.ca/content/databases/Core/alphafold2_dbs/2024_01/uniref30/UniRef30_2021_03'
+    hhsuite_bin_dir = '/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v3/MPI/gcc12/openmpi4/hh-suite/3.3.0/bin'
 
 
 ###########################

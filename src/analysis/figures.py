@@ -383,6 +383,30 @@ def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'm
 
 def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cindex', 
                    verbose=False, show=False, add_stats=True, ax=None):
+    
+    """
+    Example usage with `fig_combined`.
+        ```
+        from src.analysis.figures import custom_fig, prepare_df, fig_combined
+
+        df = prepare_df()
+
+        models = {
+            'DG': ('nomsa', 'binary', 'original', 'binary'),
+            # 'DG-simple': ('nomsa', 'simple', 'original', 'binary'),
+            'DG-anm': ('nomsa', 'anm', 'original', 'binary'),
+            'DG-af2': ('nomsa', 'af2', 'original', 'binary'),
+            'DG-ESM': ('ESM', 'binary', 'original', 'binary'),
+            # 'DG-saprot': ('foldseek', 'binary', 'original', 'binary'),
+            'gvpP': ('gvp', 'binary', 'original', 'binary'),
+            'gvpL-aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
+        }
+
+        fig_combined(df, datasets=['PDBbind'], metrics=['cindex', 'mse'], fig_scale=(10,5),
+                    fig_callable=custom_fig, models=models, title_postfix=' test set performance',
+                    add_stats=True)
+        ```
+    """
     if models is None: # example custom plot:
         # models to plot:
         # - Original model with (nomsa, binary) and (original,  binary) features for protein and ligand respectively
@@ -412,7 +436,7 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
     for model, feat in models.items():
         plot_data[model] = filtered_df[matched(filtered_df, feat)][sel_col]
         if len(plot_data[model]) != 5:
-            logging.warning(f'Expected 5 results for {model}, got {len(plot_data[model])}')
+            logging.warning(f'Expected 5 results for {model} on {sel_dataset}, got {len(plot_data[model])}')
 
     # plot violin plot with annotations
     vals = list(plot_data.values())
@@ -552,8 +576,8 @@ def predictive_performance(
     if compare_overlap:
         return generate_markdown([results_with_overlap, results_without_overlap], names=['with overlap', 'without overlap'], 
                              cindex=True,verbose=verbose)
-    
-    return generate_markdown([results_without_overlap], names=['mean $\pm$ se'], cindex=True, verbose=verbose)
+    # 'mean $\pm$ se'
+    return generate_markdown([results_without_overlap], names=['mean predictive performance'], cindex=True, verbose=verbose)
 
 def get_dpkd(df, pkd_col='pkd', normalize=False) -> np.ndarray:
     """ 
@@ -801,7 +825,6 @@ def fig_sig_mutations_conf_matrix(true_dpkd, pred_dpkd, std=2, verbose=True, plo
         print(f"True Positive Rate (TPR): {tpr:.2f}")
         print(f"True Negative Rate (TNR): {tnr:.2f}")
     return conf_matrix, tpr, tnr
-
 
 def generate_roc_curve(true_dpkd, pred_dpkd, thres_range=(0,5), step=0.1):
     """3. significant mutation impact analysis"""
