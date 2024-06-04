@@ -7,54 +7,11 @@ from torch_geometric.data import Data as Data_g
 from torch_geometric import nn as nn_g
 
 from src.models.utils import BaseModel
-from src.models.gvp_branch import GVPBranchProt, GVPBranchLigand
+from src.models.branches import GVPBranchProt, GVPBranchLigand, ESMBranch
 
 
 from src.models.prior_work import DGraphDTA
 from src.models.ring3 import Ring3Branch
-
-class GVPLigand_RNG3(BaseModel):
-    def __init__(self, dropout=0.2, pro_emb_dim=128, output_dim=250, 
-                  nheads_pro=5,
-                 
-                 # Feature input sizes:
-                 num_features_pro=54, # esm has 320d embeddings original feats is 54
-                 edge_dim_pro=6, # edge dim for protein branch from RING3
-                 **kwargs
-                 ):
-        
-        super(GVPLigand_RNG3, self).__init__()
-
-        # LIGAND BRANCH 
-        self.forward_mol = GVPBranchLigand(final_out=output_dim, drop_rate=dropout)
-
-        # PROTEIN BRANCH:
-        self.forward_pro = Ring3Branch(pro_emb_dim, output_dim, dropout, 
-                                     nheads_pro,num_features_pro,
-                                     edge_dim_pro)
-        
-        # CONCATENATION OF BRANCHES:
-        self.dense_out = nn.Sequential(
-            nn.Linear(2*output_dim, 1024),
-            nn.Dropout(dropout),
-            nn.ReLU(),
-            nn.Linear(1024, 512),
-            nn.Dropout(dropout),
-            nn.ReLU(),
-            nn.Linear(512, 128),
-            nn.Dropout(dropout),
-            nn.ReLU(),
-            nn.Linear(128, 1),        
-        )
-
-    def forward(self, data_pro:Data_g, data_mol:Data_g):
-        xm = self.forward_mol(data_mol)
-        xp = self.forward_pro(data_pro)
-        
-        # concat
-        xc = torch.cat((xm, xp), 1)
-        return self.dense_out(xc)
-    
 
 
 class GVPLigand_DGPro(DGraphDTA):
@@ -102,6 +59,96 @@ class GVPLigand_DGPro(DGraphDTA):
         xc = torch.cat((xm, xp), 1)
         return self.dense_out(xc)
     
+class GVPL_ESM(nn.Module):
+    def __init__(self, 
+                 pro_num_feat=320,pro_emb_dim=512, pro_dropout_gnn=0.0, pro_extra_fc_lyr=False,
+                 num_GVPLayers=3,
+                 dropout=0.2,
+                 output_dim=512,
+                 **kwargs):
+        output_dim = int(output_dim)
+        super(GVPLigand_DGPro, self).__init__()
+        
+        self.gvp_ligand = GVPBranchLigand(num_layers=num_GVPLayers, 
+                                          final_out=output_dim,
+                                          drop_rate=dropout)
+        
+        self.esm_branch = ESMBranch(num_feat=pro_num_feat, emb_dim=pro_emb_dim, 
+                                    dropout_gnn=pro_dropout_gnn, 
+                                    extra_fc_lyr=pro_extra_fc_lyr,
+                                    output_dim=output_dim, dropout=dropout)
+        
+        self.dense_out = nn.Sequential(
+            nn.Linear(2*output_dim, 1024),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            
+            nn.Linear(1024, 512),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            
+            nn.Linear(512, 128),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            
+            nn.Linear(128, 1),        
+        )
+        
+    def forward_pro(self, data):
+        return self.esm_branch(data)
+    
+    def forward_mol(self, data):
+        return self.gvp_ligand(data)
+    
+    def forward(self, data_pro, data_mol):
+        xm = self.forward_mol(data_mol)
+        xp = self.forward_pro(data_pro)
+
+        xc = torch.cat((xm, xp), 1)
+        return self.dense_out(xc)
+
+
+class GVPLigand_RNG3(BaseModel):
+    def __init__(self, dropout=0.2, pro_emb_dim=128, output_dim=250, 
+                  nheads_pro=5,
+                 
+                 # Feature input sizes:
+                 num_features_pro=54, # esm has 320d embeddings original feats is 54
+                 edge_dim_pro=6, # edge dim for protein branch from RING3
+                 **kwargs
+                 ):
+        
+        super(GVPLigand_RNG3, self).__init__()
+
+        # LIGAND BRANCH 
+        self.forward_mol = GVPBranchLigand(final_out=output_dim, drop_rate=dropout)
+
+        # PROTEIN BRANCH:
+        self.forward_pro = Ring3Branch(pro_emb_dim, output_dim, dropout, 
+                                     nheads_pro,num_features_pro,
+                                     edge_dim_pro)
+        
+        # CONCATENATION OF BRANCHES:
+        self.dense_out = nn.Sequential(
+            nn.Linear(2*output_dim, 1024),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(1024, 512),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(512, 128),
+            nn.Dropout(dropout),
+            nn.ReLU(),
+            nn.Linear(128, 1),        
+        )
+
+    def forward(self, data_pro:Data_g, data_mol:Data_g):
+        xm = self.forward_mol(data_mol)
+        xp = self.forward_pro(data_pro)
+        
+        # concat
+        xc = torch.cat((xm, xp), 1)
+        return self.dense_out(xc)
     
 
 class GVPModel(BaseModel):
