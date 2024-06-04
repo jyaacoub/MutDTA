@@ -436,7 +436,7 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
     for model, feat in models.items():
         plot_data[model] = filtered_df[matched(filtered_df, feat)][sel_col]
         if len(plot_data[model]) != 5:
-            logging.warning(f'Expected 5 results for {model}, got {len(plot_data[model])}')
+            logging.warning(f'Expected 5 results for {model} on {sel_dataset}, got {len(plot_data[model])}')
 
     # plot violin plot with annotations
     vals = list(plot_data.values())

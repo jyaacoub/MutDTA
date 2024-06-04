@@ -28,8 +28,6 @@ fig, axes = fig_combined(df, datasets=['davis','PDBbind'], fig_callable=custom_f
              fig_scale=(8,5))
 plt.xticks(rotation=45)
 
-# %%
-
 
 # %%
 ########################################################################

@@ -222,3 +222,4 @@ results/model_checkpoints/ours/*.model
 results/model_media/*/train_log/*
 results/model_media/*/train_set_pred/*
 results/model_media/*/test_set_pred/*
+results/model_media/test_set_pred
