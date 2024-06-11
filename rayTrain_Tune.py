@@ -91,12 +91,12 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": cfg.MODEL_OPT.DG,
+        "model": cfg.MODEL_OPT.GVPL_ESM,
                 
-        "dataset": cfg.DATA_OPT.kiba,
+        "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
         "edge_opt": cfg.PRO_EDGE_OPT.aflow,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
         
         "fold_selection": 0,
@@ -104,7 +104,7 @@ if __name__ == "__main__":
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([32, 64, 128]), # local batch size
+        "batch_size": ray.tune.choice([4, 8, 10, 12]), # local batch size
         
         # model architecture hyperparams
         "architecture_kwargs":{
@@ -118,11 +118,16 @@ if __name__ == "__main__":
     elif search_space['model'] == cfg.MODEL_OPT.GVPL_RNG:
         arch_kwargs["pro_emb_dim"]  = ray.tune.choice([64, 128, 256])
         arch_kwargs["nheads_pro"]   = ray.tune.choice([3, 4, 5])
+    elif search_space['model'] == cfg.MODEL_OPT.GVPL_ESM:
+        arch_kwargs["num_GVPLayers"]    = ray.tune.choice([2, 3, 4])
+        arch_kwargs["pro_dropout_gnn"]  = ray.tune.uniform(0.0, 0.5)
+        arch_kwargs["pro_extra_fc_lyr"] = ray.tune.choice([True, False])
+        arch_kwargs["pro_emb_dim"]      = ray.tune.choice([128, 256, 320])
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
-    scaling_config = ScalingConfig(num_workers=1, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=4, # number of ray actors to launch to distribute compute across
                                    use_gpu=True,  # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    resources_per_worker={"CPU": 2, "GPU": 1},
                                    # trainer_resources={"CPU": 2, "GPU": 1},
@@ -142,7 +147,7 @@ if __name__ == "__main__":
             search_alg=OptunaSearch(), # using ray.tune.search.Repeater() could be useful to get multiple trials per set of params
                                        # would be even better if we could set trial-wise dependencies for a certain fold.
                                        # https://github.com/ray-project/ray/issues/33677
-            num_samples=1000,
+            num_samples=500,
         ),
     )
 
