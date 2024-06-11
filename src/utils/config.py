@@ -38,6 +38,7 @@ class MODEL_OPT(StringEnum):
     GVPL = "GVPL" # GVP ligand branch only
     
     GVPL_RNG = "GVPL_RNG" # ring3DTA with GVP ligand branch
+    GVPL_ESM = "GVPL_ESM"
 
 # protein options
 class PRO_EDGE_OPT(StringEnum):
@@ -58,7 +59,6 @@ class PRO_FEAT_OPT(StringEnum):
     shannon = 'shannon'
     
     foldseek = 'foldseek'
-    
     gvp = 'gvp'
     
 # Protein options that require PDB structure files to work

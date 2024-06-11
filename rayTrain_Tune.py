@@ -1,5 +1,14 @@
-# This is a simple tuning script for the raytune library.
-# no support for distributed training in this file.
+"""
+ This is a tuning script for the raytune library.
+ 
+ support for DDP is done by RayTune
+   - This is done by increasing the number of workers in the ScalingConfig
+   - For example the following would distribute inference across 2 GPUs (num_workers*resources_per_worker['GPU']):
+       num_workers=2,
+       use_gpu=True,  
+       resources_per_worker={"CPU": 2, "GPU": 1},
+    - 
+"""
 
 import random
 import os
@@ -82,7 +91,7 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": cfg.MODEL_OPT.GVPL,
+        "model": cfg.MODEL_OPT.DG,
                 
         "dataset": cfg.DATA_OPT.kiba,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
