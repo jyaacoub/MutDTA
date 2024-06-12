@@ -43,7 +43,6 @@ class GVPLigand_DGPro(DGraphDTA):
             nn.ReLU(),
             
             nn.Linear(512, 128),
-            nn.Dropout(dropout),
             nn.ReLU(),
             
             nn.Linear(128, 1),        
@@ -88,7 +87,6 @@ class GVPL_ESM(nn.Module):
             nn.ReLU(),
             
             nn.Linear(512, 128),
-            nn.Dropout(dropout),
             nn.ReLU(),
             
             nn.Linear(128, 1),        
@@ -137,7 +135,6 @@ class GVPLigand_RNG3(BaseModel):
             nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(512, 128),
-            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(128, 1),        
         )
@@ -228,6 +225,5 @@ class GVPModel(BaseModel):
         xc = self.dropout(xc)
         xc = self.fc2(xc)
         xc = self.relu(xc)
-        xc = self.dropout(xc)
         out = self.out(xc)
         return out

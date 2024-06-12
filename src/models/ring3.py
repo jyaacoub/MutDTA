@@ -44,7 +44,6 @@ class Ring3Branch(BaseModel):
             nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(1024, output_dim),
-            nn.Dropout(dropout),
             nn.ReLU(),
         )
         
@@ -127,7 +126,6 @@ class Ring3DTA(BaseModel):
             nn.Dropout(dropout),
             nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Dropout(dropout),
             nn.Linear(512, 1),
         )
         

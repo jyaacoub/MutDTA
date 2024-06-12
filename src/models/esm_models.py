@@ -181,7 +181,6 @@ class EsmDTA(BaseModel):
         xc = self.dropout(xc)
         xc = self.fc2(xc)
         xc = self.relu(xc)
-        xc = self.dropout(xc)
         out = self.out(xc)
         return out
     
