@@ -102,6 +102,23 @@ TUNED_MODEL_CONFIGS = {
             'output_dim': 256
         }
     },
+    'PDBbind_gvpl':{
+        "model": cfg.MODEL_OPT.GVPL,
+                
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+            
+        'lr': 0.00020066831190641135, 
+        'batch_size': 128, 
+        
+        'architecture_kwargs': {
+            'dropout': 0.4661593536060576, 
+            'output_dim': 512
+        }
+    },
     'PDBbind_aflow':{
         "model": cfg.MODEL_OPT.DG,
                 
