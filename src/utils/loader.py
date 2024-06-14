@@ -152,12 +152,15 @@ class Loader():
             
         elif model == cfg.MODEL_OPT.GVPL:
             model = GVPLigand_DGPro(num_features_pro=num_feat_pro,
-                                    dropout=dropout,
+                                    dropout=dropout, 
+                                    edge_weight_opt=pro_edge,
                                     **kwargs)
         elif model == cfg.MODEL_OPT.GVPL_RNG:
             model = GVPLigand_RNG3(dropout=dropout, **kwargs)
         elif model == cfg.MODEL_OPT.GVPL_ESM:
-            model = GVPL_ESM(pro_num_feat=320+num_feat_pro, **kwargs)
+            model = GVPL_ESM(pro_num_feat=320, 
+                             edge_weight_opt=pro_edge, 
+                             **kwargs)
         return model
     
     @staticmethod

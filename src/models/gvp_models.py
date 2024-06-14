@@ -43,7 +43,6 @@ class GVPLigand_DGPro(DGraphDTA):
             nn.ReLU(),
             
             nn.Linear(512, 128),
-            nn.Dropout(dropout),
             nn.ReLU(),
             
             nn.Linear(128, 1),        
@@ -65,9 +64,10 @@ class GVPL_ESM(nn.Module):
                  num_GVPLayers=3,
                  dropout=0.2,
                  output_dim=512,
+                 edge_weight_opt='binary',
                  **kwargs):
         output_dim = int(output_dim)
-        super(GVPLigand_DGPro, self).__init__()
+        super(GVPL_ESM, self).__init__()
         
         self.gvp_ligand = GVPBranchLigand(num_layers=num_GVPLayers, 
                                           final_out=output_dim,
@@ -76,7 +76,8 @@ class GVPL_ESM(nn.Module):
         self.esm_branch = ESMBranch(num_feat=pro_num_feat, emb_dim=pro_emb_dim, 
                                     dropout_gnn=pro_dropout_gnn, 
                                     extra_fc_lyr=pro_extra_fc_lyr,
-                                    output_dim=output_dim, dropout=dropout)
+                                    output_dim=output_dim, dropout=dropout,
+                                    edge_weight_opt=edge_weight_opt)
         
         self.dense_out = nn.Sequential(
             nn.Linear(2*output_dim, 1024),
@@ -88,7 +89,6 @@ class GVPL_ESM(nn.Module):
             nn.ReLU(),
             
             nn.Linear(512, 128),
-            nn.Dropout(dropout),
             nn.ReLU(),
             
             nn.Linear(128, 1),        
@@ -137,7 +137,6 @@ class GVPLigand_RNG3(BaseModel):
             nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(512, 128),
-            nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(128, 1),        
         )
@@ -228,6 +227,5 @@ class GVPModel(BaseModel):
         xc = self.dropout(xc)
         xc = self.fc2(xc)
         xc = self.relu(xc)
-        xc = self.dropout(xc)
         out = self.out(xc)
         return out

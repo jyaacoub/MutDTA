@@ -16,9 +16,13 @@ from src.models.utils import GVP, GVPConvLayer, LayerNorm
 class ESMBranch(nn.Module):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_feat=320, emb_dim=512, output_dim=128, dropout=0.2, 
-                 dropout_gnn=0.0, extra_fc_lyr=False):
+                 dropout_gnn=0.0, extra_fc_lyr=False, esm_only=True,
+                 edge_weight='binary'):
         
         super(ESMBranch, self).__init__()
+        
+        self.esm_only = esm_only
+        self.edge_weight = edge_weight
 
         # Protein graph:
         self.conv1 = GCNConv(num_feat, emb_dim)
