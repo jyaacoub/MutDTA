@@ -94,12 +94,13 @@ TUNED_MODEL_CONFIGS = {
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
             
-        'lr': 0.00022659, 
+        'lr': 0.00020048122460779208, 
         'batch_size': 128, 
         
         'architecture_kwargs': {
-            'dropout': 0.02414, 
-            'output_dim': 256
+            'dropout': 0.042268679447260635, 
+            'output_dim': 512,
+            'num_GVPLayers': 3,
         }
     },
     'PDBbind_gvpl':{
