@@ -46,7 +46,7 @@ torch.manual_seed(args.rand_seed)
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False, # forces full training
-                            patience=50, min_delta=0.5)
+                            patience=150, min_delta=0.5)
 
 # %% Training loop
 metrics = {}
