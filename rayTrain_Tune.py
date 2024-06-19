@@ -91,7 +91,7 @@ if __name__ == "__main__":
     search_space = {
         ## constants:
         "epochs": 20,
-        "model": cfg.MODEL_OPT.GVPL_ESM,
+        "model": cfg.MODEL_OPT.GVPL,
                 
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
@@ -104,7 +104,7 @@ if __name__ == "__main__":
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([4, 8, 10, 12]), # local batch size
+        "batch_size": ray.tune.choice([16,32,64,128]), # global batch size (see ScalingConfig init below)
         
         # model architecture hyperparams
         "architecture_kwargs":{
@@ -123,17 +123,26 @@ if __name__ == "__main__":
         arch_kwargs["pro_dropout_gnn"]  = ray.tune.uniform(0.0, 0.5)
         arch_kwargs["pro_extra_fc_lyr"] = ray.tune.choice([True, False])
         arch_kwargs["pro_emb_dim"]      = ray.tune.choice([128, 256, 320])
+
     
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
-    scaling_config = ScalingConfig(num_workers=4, # number of ray actors to launch to distribute compute across
+    scaling_config = ScalingConfig(num_workers=1, # number of ray actors to launch to distribute compute across
                                    use_gpu=True,  # default is for each worker to have 1 GPU (overrided by resources per worker)
                                    resources_per_worker={"CPU": 2, "GPU": 1},
                                    # trainer_resources={"CPU": 2, "GPU": 1},
                                    # placement_strategy="PACK", # place workers on same node
                                    )
-    
+    if scaling_config.num_workers > 1:
+        n_workers = scaling_config.num_workers
+        new_bs = []
+        for bs in search_space['batch_size']:
+            if bs % n_workers != 0:
+                raise Exception(f"Batch Size {bs} not divisible by num_workers {n_workers}")
+            new_bs.append(bs//n_workers)
+        search_space['batch_size']= ray.tune.choice(new_bs)
+
     print('init Tuner')     
     tuner = ray.tune.Tuner(
         TorchTrainer(train_func),
