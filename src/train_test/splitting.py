@@ -136,7 +136,7 @@ def balanced_kfold_split(dataset: BaseDataset,
                          k_folds:int=5, test_split=.1,
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128,
-                         verbose=False) -> tuple[DataLoader]:
+                         verbose=False, test_prots:set=None) -> tuple[DataLoader]:
     """
     Same as train_val_test_split_kfold but we make considerations for the 
     fact that each protein might not show up in equal proportions (e.g.: 
@@ -157,12 +157,20 @@ def balanced_kfold_split(dataset: BaseDataset,
         seed for shuffle, by default None
     `batch_train` : int, optional
         size of batch, by default 128
+    `verbose` : bool, optional
+        If true, will print out the number of proteins in each fold, by default False
+    `test_prots` : set, optional
+        If not None, will use this set of proteins ("prot_ids" only!) for the test set, by default
+        None.
 
     Returns
     -------
     tuple[DataLoader]
         Train, val, and test loaders
     """
+    # throwing error so that we make sure to always use the same test_prots
+    assert test_prots is None or isinstance(test_prots, set), 'test_prots must be set for consistency'
+    
     if random_seed is not None: 
         np.random.seed(random_seed)
         torch.manual_seed(random_seed)
@@ -180,13 +188,17 @@ def balanced_kfold_split(dataset: BaseDataset,
     prots = list(prot_counts.keys())
     np.random.shuffle(prots)
     
-    #### Getting test set 
-    count = 0
-    test_prots = {}
+    #### Add manually selected proteins here
+    test_prots = test_prots if test_prots is not None else set()
+    # increment count by number of samples in test_prots
+    count = sum([prot_counts[p] for p in test_prots])
+    
+    #### Sampling remaining proteins for test set (if we are under the test_size) 
     for p in prots: # O(k); k = number of proteins
-        if count + prot_counts[p] <= test_size:
-            test_prots[p] = True
-            count += prot_counts[p]
+        if count + prot_counts[p] > test_size:
+            break
+        test_prots.add(p)
+        count += prot_counts[p]
             
     # looping through dataset to get indices for test
     test_indices = [i for i in range(dataset_size) if dataset[i]['prot_id'] in test_prots]
@@ -197,6 +209,7 @@ def balanced_kfold_split(dataset: BaseDataset,
     # removing selected proteins from prots
     prots = [p for p in prots if p not in test_prots]
     print(f'Number of unique proteins in test set: {len(test_prots)} == {count} samples')
+    
     
     ########## split remaining proteins into k_folds ##########
     # Steps for this basically follow Greedy Number Partitioning
