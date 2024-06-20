@@ -77,7 +77,7 @@ class GVPL_ESM(nn.Module):
                                     dropout_gnn=pro_dropout_gnn, 
                                     extra_fc_lyr=pro_extra_fc_lyr,
                                     output_dim=output_dim, dropout=dropout,
-                                    edge_weight_opt=edge_weight_opt)
+                                    edge_weight=edge_weight_opt)
         
         self.dense_out = nn.Sequential(
             nn.Linear(2*output_dim, 1024),

@@ -104,7 +104,7 @@ if __name__ == "__main__":
                 
         ## hyperparameters to tune:
         "lr": ray.tune.loguniform(1e-5, 1e-3),
-        "batch_size": ray.tune.choice([4, 8, 10, 12]), # local batch size
+        "batch_size": ray.tune.choice([16, 32, 64, 128]), # local batch size
         
         # model architecture hyperparams
         "architecture_kwargs":{
@@ -124,6 +124,10 @@ if __name__ == "__main__":
         arch_kwargs["pro_extra_fc_lyr"] = ray.tune.choice([True, False])
         arch_kwargs["pro_emb_dim"]      = ray.tune.choice([128, 256, 320])
     
+    if 'esm' in search_space['model'].lower():
+        search_space['batch_size'] = ray.tune.choice([4,8,12,16])
+
+    
     # each worker is a node from the ray cluster.
     # WARNING: SBATCH GPU directive should match num_workers*GPU_per_worker
     # same for cpu-per-task directive
@@ -133,7 +137,7 @@ if __name__ == "__main__":
                                    # trainer_resources={"CPU": 2, "GPU": 1},
                                    # placement_strategy="PACK", # place workers on same node
                                    )
-    
+
     print('init Tuner')     
     tuner = ray.tune.Tuner(
         TorchTrainer(train_func),
