@@ -13,13 +13,14 @@ TUNED_MODEL_CONFIGS = {
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
                 
-        "lr": 0.0001360163557088453,
-        "batch_size": 128, # local batch size
-        
-        "architecture_kwargs":{
-            "dropout": 0.027175922988649594,
-            "output_dim":  128,
-        }
+      	'lr': 0.00014968791626986144,
+    	'batch_size': 128,
+    
+    	'architecture_kwargs': {
+    		'dropout': 0.00039427600918916277,
+    		'output_dim': 256,
+    		'num_GVPLayers': 3
+    	}
     },
     #GVPLM_davis3D_nomsaF_binaryE_128B_0.00020535607176845963LR_0.08845592454543601D_2000E_gvpLF_binaryLE
     'davis_gvpl': {
@@ -38,8 +39,7 @@ TUNED_MODEL_CONFIGS = {
             'output_dim': 512
         }
     },
-    
-    'davis_aflow':{ # not trained yet...
+    'davis_aflow':{
         "model": cfg.MODEL_OPT.DG,
                 
         "dataset": cfg.DATA_OPT.davis,
@@ -60,6 +60,25 @@ TUNED_MODEL_CONFIGS = {
     #####################################################
     ############## kiba #################################
     #####################################################
+    'kiba_gvpl_aflow': {
+        "model": cfg.MODEL_OPT.GVPL,
+                
+        "dataset": cfg.DATA_OPT.kiba,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+            
+        'lr': 0.00005480618584919115, 
+        'batch_size': 32, 
+        
+        'architecture_kwargs': {
+		    'dropout': 0.0808130125360696, 
+		    'output_dim': 512, 
+		    'num_GVPLayers': 4
+        }
+    },
     'kiba_gvpl': {
         "model": cfg.MODEL_OPT.GVPL,
                 
@@ -79,8 +98,6 @@ TUNED_MODEL_CONFIGS = {
             'num_GVPLayers': 4
         }
     },
-    
-    
     #####################################################
     ########### PDBbind #################################
     #####################################################
