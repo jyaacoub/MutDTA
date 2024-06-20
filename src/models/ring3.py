@@ -211,20 +211,22 @@ class Ring3_ESMDTA(Ring3DTA):
                                   self.edge_weight != 'binary') else None
         
         #### Graph NN ####
-        target_x = self.relu(target_x)
-        # WARNING: dropout_node doesnt work if `ew` isnt also dropped out
-        # ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-        #                                 training=self.training)
-        # GNN layers:
-        xt = self.pro_conv1(target_x, ei, ew)
+        xt = self.relu(target_x)
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
+                                            training=self.training)
+        
+        # conv1
+        xt = self.conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-        # ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-        #                                 training=self.training)
-        xt = self.pro_conv2(xt, ei, ew)
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
+                                        training=self.training)
+        # conv2
+        xt = self.conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-        # ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-        #                                 training=self.training)
-        xt = self.pro_conv3(xt, ei, ew)
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
+                                        training=self.training)
+        # conv3
+        xt = self.conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
 
         # flatten/pool

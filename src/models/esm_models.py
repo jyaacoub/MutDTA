@@ -95,22 +95,22 @@ class EsmDTA(BaseModel):
         ew = data.edge_weight if (self.edge_weight is not None and 
                                   self.edge_weight != 'binary') else None
         
-        target_x = self.relu(target_x)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-                                        training=self.training)
+        xt = self.relu(target_x)
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
+                                            training=self.training)
         
         # conv1
-        xt = self.pro_conv1(target_x, ei_drp, ew)
+        xt = self.conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv2
-        xt = self.pro_conv2(xt, ei_drp, ew)
+        xt = self.conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv3
-        xt = self.pro_conv3(xt, ei_drp, ew)
+        xt = self.conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
 
         # flatten/pool
@@ -257,24 +257,24 @@ class SaProtDTA(EsmDTA):
         ew = data.edge_weight if (self.edge_weight is not None and 
                                   self.edge_weight != 'binary') else None
         
-        target_x = self.relu(target_x)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
-                                        training=self.training)
+        xt = self.relu(target_x)
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
+                                            training=self.training)
         
         # conv1
-        xt = self.pro_conv1(target_x, ei_drp, ew)
+        xt = self.conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv2
-        xt = self.pro_conv2(xt, ei_drp, ew)
+        xt = self.conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-        ei_drp, _, _ = dropout_node(ei, p=self.dropout_prot_p, num_nodes=target_x.shape[0], 
+        ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv3
-        xt = self.pro_conv3(xt, ei_drp, ew)
+        xt = self.conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
-
+        
         # flatten/pool
         xt = gep(xt, data.batch)  # global pooling
         xt = self.relu(xt)
