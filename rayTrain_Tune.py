@@ -112,6 +112,9 @@ if __name__ == "__main__":
             "output_dim":  ray.tune.choice([128, 256, 512]),
         },
     }
+    if 'esm' in search_space['model'].lower():
+        search_space['batch_size'] = ray.tune.choice([4,8,12,16])
+        
     arch_kwargs = search_space['architecture_kwargs']
     if search_space['model'] == cfg.MODEL_OPT.GVPL:
         arch_kwargs["num_GVPLayers"]= ray.tune.choice([2, 3, 4])
@@ -123,9 +126,6 @@ if __name__ == "__main__":
         arch_kwargs["pro_dropout_gnn"]  = ray.tune.uniform(0.0, 0.5)
         arch_kwargs["pro_extra_fc_lyr"] = ray.tune.choice([True, False])
         arch_kwargs["pro_emb_dim"]      = ray.tune.choice([128, 256, 320])
-    
-    if 'esm' in search_space['model'].lower():
-        search_space['batch_size'] = ray.tune.choice([4,8,12,16])
 
     
     # each worker is a node from the ray cluster.
