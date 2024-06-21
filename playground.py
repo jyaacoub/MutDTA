@@ -1,5 +1,45 @@
-#%%
 # %%
+import pandas as pd
+from src.data_prep.downloaders import Downloader
+
+df = pd.read_csv('../data/all_prots.csv')
+
+id_status = {}
+for db in df.db.unique():
+    id = Downloader.download_pocket_seq(df[df.db == db].prot_id.to_list(), 
+                                        f"../data/pocket_seq/{db}/",
+                                        tqdm_desc=f"Downloading {db} pocket sequences")
+    id_status[db] = id
+#%%
+import json
+# json.dump(id_status, open('../data/pocket_seq/seq_out.json', 'w'))
+# id_status = json.load(open('../data/pocket_seq/seq_out.json', 'r'))
+for db, st in id_status.items():
+    total_ids = len(st)
+    missing = list(id_status[db].values()).count(400)
+    print(f"{db}: {total_ids - missing}/{total_ids} ({missing})")
+
+# %%
+########################################################################
+########################## TEST DATASETS ###############################
+########################################################################
+from src import config as cfg
+from src.utils.loader import Loader
+
+
+# load up platinum test db
+loaders = Loader.load_DataLoaders(cfg.DATA_OPT.platinum,
+                            pro_feature    = cfg.PRO_FEAT_OPT.nomsa, 
+                            edge_opt       = cfg.PRO_EDGE_OPT.binary,
+                            ligand_feature = cfg.LIG_FEAT_OPT.original, 
+                            ligand_edge    = cfg.LIG_EDGE_OPT.binary,
+                            datasets=['test'])
+
+
+# %%
+########################################################################
+####################### VIOLIN PLOTS ###################################
+########################################################################
 import logging
 from typing import OrderedDict
 
