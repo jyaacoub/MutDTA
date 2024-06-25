@@ -57,6 +57,27 @@ TUNED_MODEL_CONFIGS = {
             'output_dim': 256
         }
     },
+    'davis_gvpl_esm_aflow': {
+        "model": cfg.MODEL_OPT.GVPL_ESM,
+                
+        "dataset": cfg.DATA_OPT.davis,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+ 
+        'lr': 0.00010636872718329864, 
+        'batch_size': 48, # global batch size (local was 12)
+        
+        'architecture_kwargs': {
+            'dropout': 0.23282479481785903, 
+            'output_dim': 512, 
+            'num_GVPLayers': 3, 
+            'pro_dropout_gnn': 0.15822227777305042, 
+            'pro_extra_fc_lyr': False, 
+            'pro_emb_dim': 128
+        }
+    },
     #####################################################
     ############## kiba #################################
     #####################################################
@@ -68,15 +89,14 @@ TUNED_MODEL_CONFIGS = {
         "edge_opt": cfg.PRO_EDGE_OPT.aflow,
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
-                
             
-        'lr': 0.00005480618584919115, 
-        'batch_size': 32, 
+        'lr': 0.00010990897170411903, 
+        'batch_size': 16, 
         
         'architecture_kwargs': {
-		    'dropout': 0.0808130125360696, 
-		    'output_dim': 512, 
-		    'num_GVPLayers': 4
+            'dropout': 0.03599877069828837, 
+            'output_dim': 128, 
+            'num_GVPLayers': 2
         }
     },
     'kiba_gvpl': {
