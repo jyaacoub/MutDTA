@@ -3,6 +3,24 @@ from src.utils import config as cfg
 
 
 TUNED_MODEL_CONFIGS = {
+    #DGM_davis0D_nomsaF_binaryE_128B_0.00012LR_0.24D_2000E
+    'davis_DG':{
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.davis,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": None,
+        "lig_edge_opt": None,
+                
+      	'lr': 0.00012,
+    	'batch_size': 128,
+    
+    	'architecture_kwargs': {
+    		'dropout': 0.24,
+            'output_dim': 128,
+    	}
+    },    
     #GVPLM_davis0D_nomsaF_aflowE_128B_0.0001360163557088453LR_0.027175922988649594D_2000E_gvpLF_binaryLE
     'davis_gvpl_aflow': {
         "model": cfg.MODEL_OPT.GVPL,

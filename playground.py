@@ -1,44 +1,68 @@
-# %%
-import pandas as pd
-from src.data_prep.downloaders import Downloader
-
-df = pd.read_csv('../data/all_prots.csv')
-
-id_status = {}
-for db in df.db.unique():
-    id = Downloader.download_pocket_seq(df[df.db == db].prot_id.to_list(), 
-                                        f"../data/pocket_seq/{db}/",
-                                        tqdm_desc=f"Downloading {db} pocket sequences")
-    id_status[db] = id
 #%%
-import json
-# json.dump(id_status, open('../data/pocket_seq/seq_out.json', 'w'))
-# id_status = json.load(open('../data/pocket_seq/seq_out.json', 'r'))
-for db, st in id_status.items():
-    total_ids = len(st)
-    missing = list(id_status[db].values()).count(400)
-    print(f"{db}: {total_ids - missing}/{total_ids} ({missing})")
+########################################################################
+###################### TEST MODEL W/DATASET ############################
+########################################################################
+import torch
 
-# %%
-########################################################################
-########################## TEST DATASETS ###############################
-########################################################################
 from src import config as cfg
+from src import TUNED_MODEL_CONFIGS
 from src.utils.loader import Loader
+from src.models.utils import BaseModel
+
+def get_check_p(params):
+    key = Loader.get_model_key(params['model'], params['dataset'], params['feature_opt'], 
+                            params['edge_opt'], params['batch_size'], params['lr'], fold=0, 
+                            ligand_feature=params['lig_feat_opt'], ligand_edge=params['lig_edge_opt'], 
+                            **params['architecture_kwargs'])
+    model_p_tmp = f'{cfg.MODEL_SAVE_DIR}/{key}.model_tmp'
+    model_p = f'{cfg.MODEL_SAVE_DIR}/{key}.model'
+
+    # MODEL_KEY = 'DDP-' + MODEL_KEY # distributed model
+    model_p = model_p if os.path.isfile(model_p) else model_p_tmp
+    assert os.path.isfile(model_p), f"MISSING MODEL CHECKPOINT {model_p}"
+    return key, model_p
+
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+targets = ['davis_gvpl_aflow', 'davis_gvpl', 'davis_aflow', 'davis_DG']
+params = TUNED_MODEL_CONFIGS[targets[-1]]
+
+from src.data_prep.init_dataset import create_datasets
+
+kwargs = {
+    "ligand_features": params['lig_feat_opt'],
+    "ligand_edges": params['lig_edge_opt'],
+    "k_folds": 5, 
+    "test_prots_csv": '/cluster/home/t122995uhn/projects/downloads/test_prots_gene_names.csv'
+}
+
+kwargs = {k: v for k, v in kwargs.items() if v is not None}
+
+create_datasets(params['dataset'], params['feature_opt'], 
+                params['edge_opt'],**kwargs)
+
+#%%
+m : BaseModel = Loader.init_model(params['model'],params['feature_opt'], params['edge_opt'], **params['architecture_kwargs'])
+key, model_p = get_check_p(params)
+print(model_p)
+m.to(device)
+m.safe_load_state_dict(torch.load(model_p, map_location=device))
 
 
-# load up platinum test db
-loaders = Loader.load_DataLoaders(cfg.DATA_OPT.platinum,
-                            pro_feature    = cfg.PRO_FEAT_OPT.nomsa, 
-                            edge_opt       = cfg.PRO_EDGE_OPT.binary,
-                            ligand_feature = cfg.LIG_FEAT_OPT.original, 
-                            ligand_edge    = cfg.LIG_EDGE_OPT.binary,
-                            datasets=['test'])
+#%%
+dl = Loader.load_DataLoaders(params['dataset'], params['feature_opt'], 
+                             params['edge_opt'], 
+                             ligand_feature=params['lig_feat_opt'], 
+                             ligand_edge=params['lig_edge_opt'], 
+                             datasets=['test'])['test']
+sample = next(iter(dl))
+
+#%%
+m(sample['protein'], sample['ligand'])
 
 
 # %%
 ########################################################################
-####################### VIOLIN PLOTS ###################################
+########################## VIOLIN PLOTTING #############################
 ########################################################################
 import logging
 from typing import OrderedDict
@@ -49,21 +73,20 @@ from statannotations.Annotator import Annotator
 
 from src.analysis.figures import prepare_df, custom_fig, fig_combined
 
-df = prepare_df()
-# %%
 models = {
     'DG': ('nomsa', 'binary', 'original', 'binary'),
+    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
     'aflow': ('nomsa', 'aflow', 'original', 'binary'),
-    # 'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
     # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
     # 'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
-    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
     'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    # 'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
+    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
     # 'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
 }
 
-# %%
-fig, axes = fig_combined(df, datasets=['davis','PDBbind'], fig_callable=custom_fig,
+df = prepare_df()
+fig, axes = fig_combined(df, datasets=['davis'], fig_callable=custom_fig,
              models=models, metrics=['cindex', 'mse'],
              fig_scale=(8,5))
 plt.xticks(rotation=45)

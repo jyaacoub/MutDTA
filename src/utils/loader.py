@@ -18,7 +18,7 @@ def validate_args(valid_options):
         @wraps(func) # to maintain original fn metadata
         def wrapper(*args, **kwargs):
             for arg, value in kwargs.items():
-                if arg in valid_options and value not in valid_options[arg]:
+                if value is not None and arg in valid_options and value not in valid_options[arg]:
                     raise ValueError(f'Invalid {arg} option: {value}.')
             return func(*args, **kwargs)
         return wrapper
@@ -34,8 +34,8 @@ class Loader():
     @validate_args({'model': model_opt, 'data':data_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def get_model_key(model:str, data:str, pro_feature:str, edge:str,
-                      batch_size:int, lr:float, dropout:float, n_epochs:int, pro_overlap:bool=False,
-                      fold:int=None, ligand_feature:str='original', ligand_edge:str='binary'):
+                      batch_size:int, lr:float, dropout:float, n_epochs:int=2000, pro_overlap:bool=False,
+                      fold:int=None, ligand_feature:str='original', ligand_edge:str='binary', **kwargs):
         data += f'{fold}' if fold is not None else '' # for cross-val
         data += '-overlap' if pro_overlap else ''
         
