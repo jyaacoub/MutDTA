@@ -65,7 +65,7 @@ class GVPL_ESM(BaseModel):
                  dropout=0.2,
                  output_dim=512,
                  edge_weight_opt='binary',
-                 esm_only=True
+                 esm_only=True,
                  **kwargs):
         output_dim = int(output_dim)
         super(GVPL_ESM, self).__init__(edge_weight_opt=edge_weight_opt)
