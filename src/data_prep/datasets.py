@@ -350,6 +350,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                             
                 if model_count < 5:
                     missing_conf.add(pid)
+                    logging.debug(f'missing conf for {pid} in {self.af_conf_dir}')
                     continue
                 
                 af_seq = Chain(af_confs[0]).sequence
