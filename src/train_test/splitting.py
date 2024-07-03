@@ -9,6 +9,7 @@ from torch_geometric.loader import DataLoader
 
 from src.models.utils import BaseModel
 from src.data_prep.datasets import BaseDataset
+from src.utils.loader import init_dataset_object
 
 # Creating data indices for training and validation splits:
 def train_val_test_split(dataset: BaseDataset, 
@@ -273,3 +274,17 @@ def balanced_kfold_split(dataset: BaseDataset,
     assert te_count > 0, 'Test set is empty'
     
     return train_loaders, val_loaders, test_loader
+
+
+@init_dataset_object(strict=True)
+def resplit(dataset:str|BaseDataset, split_files:list=None, **kwargs):
+    """
+     - Takes as input the target dataset path or dataset object, and a list defining the 6 splits for all 5 folds + 1 test set.
+     - Deletes existing splits
+     - Builds new splits using Dataset.save_subset()
+    """
+    print("RESPLIT")
+    print(kwargs)
+        
+    return dataset
+    
