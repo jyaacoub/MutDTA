@@ -134,7 +134,7 @@ def train_val_test_split(dataset: BaseDataset,
     return train_loader, val_loader, test_loader
 
 def balanced_kfold_split(dataset: BaseDataset,
-                         k_folds:int=5, test_split=.1,
+                         k_folds:int=5, test_split=.1, val_split=.1,
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128,
                          verbose=False, test_prots:set=None) -> tuple[DataLoader]:
@@ -178,8 +178,9 @@ def balanced_kfold_split(dataset: BaseDataset,
     
     # Get size for each dataset and indices
     dataset_size = len(dataset)
-    indices = list(range(dataset_size))
     test_size = int(test_split * dataset_size)
+    val_size = int(val_split * dataset_size)
+    indices = list(range(dataset_size))
     if shuffle_dataset:
         np.random.shuffle(indices) # in-place shuffle
 
@@ -213,6 +214,8 @@ def balanced_kfold_split(dataset: BaseDataset,
     
     
     ########## split remaining proteins into k_folds ##########
+    # this is selecting the proteins for the validation set
+    # we partition the dataset into k_folds based on the proteins
     # Steps for this basically follow Greedy Number Partitioning
     # tuple of (list of proteins, total weight, current-score):
     prot_folds = [[[], 0, -1] for i in range(k_folds)] 
@@ -250,9 +253,9 @@ def balanced_kfold_split(dataset: BaseDataset,
     for i, fold in enumerate(prot_folds):
         train_indices, val_indices = [], []
         for idx in range(dataset_size): # O(n)
-            if dataset[idx]['prot_id'] in fold:
+            if len(val_indices) <= val_size and dataset[idx]['prot_id'] in fold:
                 val_indices.append(idx)
-            elif dataset[idx]['prot_id'] not in test_prots:
+            elif dataset[idx]['prot_id'] not in test_prots: # anything remaining goes to training set
                 train_indices.append(idx)
         train_sampler = SubsetRandomSampler(train_indices)
         val_sampler = SubsetRandomSampler(val_indices)
