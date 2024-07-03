@@ -1,3 +1,28 @@
+#%% now based on this test set we can create the splits that will be used for all models
+# 5-fold cross validation + test set
+import pandas as pd
+from src import cfg
+from src.train_test.splitting import balanced_kfold_split
+from src.utils.loader import Loader
+
+test_df = pd.read_csv('/home/jean/projects/data/splits/davis_test_genes_oncoG.csv')
+test_prots = set(test_df.prot_id)
+
+db = Loader.load_dataset(f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_binary_original_binary/full/')
+
+#%%
+train, val, test = balanced_kfold_split(db,
+                k_folds=5, test_split=0.1, val_split=0.1, 
+                test_prots=test_prots, random_seed=0, verbose=True
+                )
+
+
+#%%
+db.save_subset_folds(train, 'train')
+db.save_subset_folds(val, 'val')
+db.save_subset(test, 'test')
+
+
 # %%
 ########################################################################
 ########################## VIOLIN PLOTTING #############################

@@ -1,4 +1,5 @@
 import os
+import logging
 from functools import wraps
 from typing import Iterable
 from torch.utils.data.distributed import DistributedSampler
@@ -24,6 +25,9 @@ def validate_args(valid_options):
         return wrapper
     return decorator
 
+##########################################################
+################## Class Method ##########################
+##########################################################
 class Loader():
     model_opt = cfg.MODEL_OPT
     edge_opt = cfg.PRO_EDGE_OPT
@@ -162,11 +166,12 @@ class Loader():
                              edge_weight_opt=pro_edge, 
                              **kwargs)
         return model
-    
+        
     @staticmethod
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
-    def load_dataset(data:str, pro_feature:str, edge_opt:str, subset:str=None, path:str=cfg.DATA_ROOT, 
+    def load_dataset(data:str, pro_feature:str=None, edge_opt:str=None, subset:str=None, 
+                     path:str=cfg.DATA_ROOT, 
                      ligand_feature:str='original', ligand_edge:str='binary'):
         # subset is used for train/val/test split.
         # can also be used to specify the cross-val fold used by train1, train2, etc.
@@ -212,6 +217,10 @@ class Loader():
                     subset=subset,
                 )
         else:
+            # Check if dataset is a string (file path) and it exists
+            if isinstance(data, str) and os.path.exists(data):
+                kwargs = Loader.parse_db_kwargs(data)
+                return Loader.load_dataset(**kwargs)
             raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
             
         return dataset
@@ -316,61 +325,58 @@ class Loader():
             loaders[d] = loader
             
         return loaders
-        
-
-
-
-##################################################
-########## Extra related helpful methods #########
-def parse_db_kwargs(db_path):
-    """
-    Parses parameters given a path string to a db you want to load up. 
-    If subset folder is not included then we default to 'full' for the subset
-    """
-    kwargs = {
-        'data': None,
-        'subset': 'full',
-        }
-    # get db class/type 
-    db_path_s = [x for x in db_path.split('/') if x]
-    if 'PDBbindDataset' in db_path_s:
-        idx_cls = db_path_s.index('PDBbindDataset')
-        kwargs['data'] = cfg.DATA_OPT.PDBbind
-        if len(db_path_s) > idx_cls+2: # +2 to skip over db_params
-            kwargs['subset'] = db_path_s[idx_cls+2]
-            # remove from string
-            db_path = '/'.join(db_path_s[:idx_cls+2])
-    elif 'DavisKibaDataset' in db_path_s:
-        idx_cls = db_path_s.index('DavisKibaDataset')
-        kwargs['data'] = cfg.DATA_OPT.davis if db_path_s[idx_cls+1] == 'davis' else cfg.DATA_OPT.kiba
-        if len(db_path_s) > idx_cls+3:
-            kwargs['subset'] = db_path_s[idx_cls+3]
-            db_path = '/'.join(db_path_s[:idx_cls+3])
-    else:
-        raise ValueError(f"Invalid path string, couldn't find db class info - {db_path_s}")
     
-    # get db parameters:
-    kwargs_p = {
-        'pro_feature': cfg.PRO_FEAT_OPT, 
-        'edge_opt': cfg.PRO_EDGE_OPT, 
-        'ligand_feature': cfg.LIG_FEAT_OPT, 
-        'ligand_edge': cfg.LIG_EDGE_OPT,
-    }
-    db_params = os.path.basename(db_path.strip('/')).split('_')
-    for k, params in kwargs_p.items():
-        double = "_".join(db_params[:2])
-        
-        if double in params:
-            kwargs_p[k] = double
-            db_params = db_params[2:]
-        elif db_params[0] in params:
-            kwargs_p[k] = db_params[0]
-            db_params = db_params[1:]
+    @staticmethod
+    def parse_db_kwargs(db_path):
+        """
+        Parses parameters given a path string to a db you want to load up. 
+        If subset folder is not included then we default to 'full' for the subset
+        """
+        kwargs = {
+            'data': None,
+            'subset': 'full',
+            }
+        # get db class/type 
+        db_path_s = [x for x in db_path.split('/') if x]
+        if 'PDBbindDataset' in db_path_s:
+            idx_cls = db_path_s.index('PDBbindDataset')
+            kwargs['data'] = cfg.DATA_OPT.PDBbind
+            if len(db_path_s) > idx_cls+2: # +2 to skip over db_params
+                kwargs['subset'] = db_path_s[idx_cls+2]
+                # remove from string
+                db_path = '/'.join(db_path_s[:idx_cls+2])
+        elif 'DavisKibaDataset' in db_path_s:
+            idx_cls = db_path_s.index('DavisKibaDataset')
+            kwargs['data'] = cfg.DATA_OPT.davis if db_path_s[idx_cls+1] == 'davis' else cfg.DATA_OPT.kiba
+            if len(db_path_s) > idx_cls+3:
+                kwargs['subset'] = db_path_s[idx_cls+3]
+                db_path = '/'.join(db_path_s[:idx_cls+3])
         else:
-            raise ValueError(f'Invalid option, did not find {double} or {db_params[0]} in {params}')
-    assert len(db_params) == 0, f"still some unparsed params - {db_params}"
-    
-    return {**kwargs, **kwargs_p}
+            raise ValueError(f"Invalid path string, couldn't find db class info - {db_path_s}")
+        
+        # get db parameters:
+        kwargs_p = {
+            'pro_feature': cfg.PRO_FEAT_OPT, 
+            'edge_opt': cfg.PRO_EDGE_OPT, 
+            'ligand_feature': cfg.LIG_FEAT_OPT, 
+            'ligand_edge': cfg.LIG_EDGE_OPT,
+        }
+        db_params = os.path.basename(db_path.strip('/')).split('_')
+        for k, params in kwargs_p.items():
+            double = "_".join(db_params[:2])
+            
+            if double in params:
+                kwargs_p[k] = double
+                db_params = db_params[2:]
+            elif db_params[0] in params:
+                kwargs_p[k] = db_params[0]
+                db_params = db_params[1:]
+            else:
+                raise ValueError(f'Invalid option, did not find {double} or {db_params[0]} in {params}')
+        assert len(db_params) == 0, f"still some unparsed params - {db_params}"
+        
+        return {**kwargs, **kwargs_p}
+
 
 # decorator to allow for input to simply be the path to the dataset directory.
 def init_dataset_object(strict=True):
@@ -385,9 +391,9 @@ def init_dataset_object(strict=True):
                     raise FileNotFoundError(f'Dataset does not exist - {dataset}')
                 
                 # Parse and build dataset
-                kwargs = parse_db_kwargs(dataset)
-                print('Loading dataset with', kwargs)
-                built = Loader.load_dataset(**kwargs)
+                db_kwargs = Loader.parse_db_kwargs(dataset)
+                logging.info(f'Loading dataset with {db_kwargs}')
+                built = Loader.load_dataset(**db_kwargs)
             elif isinstance(dataset, BaseDataset):
                 built = dataset
             elif dataset is None:

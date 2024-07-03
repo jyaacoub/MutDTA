@@ -133,7 +133,8 @@ def train_val_test_split(dataset: BaseDataset,
     
     return train_loader, val_loader, test_loader
 
-def balanced_kfold_split(dataset: BaseDataset,
+@init_dataset_object(strict=True)
+def balanced_kfold_split(dataset: BaseDataset |str,
                          k_folds:int=5, test_split=.1, val_split=.1,
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128,
@@ -210,6 +211,7 @@ def balanced_kfold_split(dataset: BaseDataset,
             
     # removing selected proteins from prots
     prots = [p for p in prots if p not in test_prots]
+    prot_counts = {p: c for p, c in prot_counts.items() if p not in test_prots} # remove test_prots
     print(f'Number of unique proteins in test set: {len(test_prots)} == {count} samples')
     
     
@@ -221,7 +223,7 @@ def balanced_kfold_split(dataset: BaseDataset,
     prot_folds = [[[], 0, -1] for i in range(k_folds)] 
     # score = fold.weight - abs(fold.weight/len(fold) - item.weight)
     prot_counts = sorted(list(prot_counts.items()), key=lambda x: x[1], reverse=True)
-    for p, c in prot_counts:
+    for p, c in prot_counts:        
         # Update scores for each fold
         for fold in prot_folds:
             f_len = len(fold[0])
