@@ -17,16 +17,18 @@ models = {
     'aflow': ('nomsa', 'aflow', 'original', 'binary'),
     # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
     # 'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
-    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    # 'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
     # 'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
     'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
     # 'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
+    #GVPL_ESMM_davis3D_nomsaF_aflowE_48B_0.00010636872718329864LR_0.23282479481785903D_2000E_gvpLF_binaryLE
+    'gvpl_esm_aflow': ('ESM', 'aflow', 'gvp', 'binary'),
 }
 
 df = prepare_df()
 fig, axes = fig_combined(df, datasets=['davis'], fig_callable=custom_fig,
              models=models, metrics=['cindex', 'mse'],
-             fig_scale=(8,5))
+             fig_scale=(10,5), add_stats=True)
 plt.xticks(rotation=45)
 
 

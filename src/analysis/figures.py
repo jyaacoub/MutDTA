@@ -506,6 +506,7 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     df['dropout'] = df['run'].str.extract(r'_(\d+\.?\d*)D_', expand=False).astype(float)
     
     # ESM models
+    df.loc[df['run'].str.contains('ESM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
     df.loc[df['run'].str.contains('EDM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'
     df.loc[df['run'].str.contains('EDAM'), 'feat'] += '-ESM'
     df.loc[df['run'].str.contains('EDIM') & df['run'].str.contains('nomsaF'), 'feat'] = 'ESM'

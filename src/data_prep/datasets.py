@@ -280,7 +280,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         path = os.path.join(self.root, subset_name)
         os.makedirs(path, exist_ok=True)
         sub_df.to_csv(os.path.join(path, self.processed_file_names[0])) # redundant save since it is not used and mainly just for tracking prots.
-        sub_df.to_csv(os.path.join(path, self.processed_file_names[3]))
+        sub_df.to_csv(os.path.join(path, self.processed_file_names[3])) # clean_XY.csv
         torch.save(sub_prots, os.path.join(path, self.processed_file_names[1]))
         torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
         return path
