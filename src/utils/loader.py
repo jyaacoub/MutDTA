@@ -171,8 +171,10 @@ class Loader():
     @validate_args({'data': data_opt, 'pro_feature': pro_feature_opt, 'edge_opt': edge_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
     def load_dataset(data:str, pro_feature:str=None, edge_opt:str=None, subset:str=None, 
-                     path:str=cfg.DATA_ROOT, 
-                     ligand_feature:str='original', ligand_edge:str='binary'):
+                     path:str=cfg.DATA_ROOT,
+                     ligand_feature:str='original', ligand_edge:str='binary',
+                     
+                     max_seq_len:int=1500):
         # subset is used for train/val/test split.
         # can also be used to specify the cross-val fold used by train1, train2, etc.
         if data == 'PDBbind':
@@ -186,7 +188,7 @@ class Loader():
                     af_conf_dir=f'{path}/pdbbind/pdbbind_af2_out/all_ln/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
-                    max_seq_len=1500
+                    max_seq_len=max_seq_len
                     )
         elif data in ['davis', 'kiba']:
             dataset = DavisKibaDataset(
@@ -200,7 +202,7 @@ class Loader():
                     af_conf_dir='../colabfold/davis_af2_out/',
                     ligand_feature=ligand_feature,
                     ligand_edge=ligand_edge,
-                    max_seq_len=1500
+                    max_seq_len=max_seq_len
                     )
         elif data == 'platinum':
             dataset = PlatinumDataset(
@@ -220,7 +222,7 @@ class Loader():
             # Check if dataset is a string (file path) and it exists
             if isinstance(data, str) and os.path.exists(data):
                 kwargs = Loader.parse_db_kwargs(data)
-                return Loader.load_dataset(**kwargs)
+                return Loader.load_dataset(**kwargs, max_seq_len=max_seq_len)
             raise Exception(f'Invalid data option, pick from {Loader.data_opt}')
             
         return dataset
