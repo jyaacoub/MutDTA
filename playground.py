@@ -22,6 +22,71 @@ db.save_subset_folds(train, 'train')
 db.save_subset_folds(val, 'val')
 db.save_subset(test, 'test')
 
+#%%
+import os
+from src.train_test.splitting import resplit
+from src import cfg
+
+csv_files = {}
+for split in ['test'] + [f'val{i}' for i in range(5)]:
+    csv_files[split] = f'{cfg.DATA_ROOT}/splits/davis/davis_{split}.csv'
+
+
+
+db = resplit(f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_binary_original_binary', 
+        split_files=csv_files)
+
+#%% Checking for overlap
+import pandas as pd
+
+# Define file paths
+file_paths = {
+    'test': 'test/cleaned_XY.csv',
+    'val0': 'val0/cleaned_XY.csv',
+    'val1': 'val1/cleaned_XY.csv',
+    'val2': 'val2/cleaned_XY.csv',
+    'val3': 'val3/cleaned_XY.csv',
+    'val4': 'val4/cleaned_XY.csv',
+    'train0': 'train0/cleaned_XY.csv',
+    'train1': 'train1/cleaned_XY.csv',
+    'train2': 'train2/cleaned_XY.csv',
+    'train3': 'train3/cleaned_XY.csv',
+    'train4': 'train4/cleaned_XY.csv'
+}
+file_paths = {name: f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_binary_original_binary/{path}' for name, path in file_paths.items()}
+
+# Load CSV files into dataframes
+dataframes = {name: pd.read_csv(path) for name, path in file_paths.items()}
+
+# Function to check for overlap
+def check_overlap(df1, df2, name1, name2):
+    overlap = df1.merge(df2, on='prot_id', how='inner')
+    if not overlap.empty:
+        print(f'Overlap found between {name1} and {name2}')
+        print(overlap)
+    else:
+        print(f'No overlap between {name1} and {name2}')
+
+# Check for overlaps
+# Test should not overlap with any other CSV
+for name in file_paths:
+    if name != 'test':
+        check_overlap(dataframes['test'], dataframes[name], 'test', name)
+
+# valX should not overlap with corresponding trainX
+for i in range(5):
+    val_name = f'val{i}'
+    train_name = f'train{i}'
+    check_overlap(dataframes[val_name], dataframes[train_name], val_name, train_name)
+
+# Note: Overlaps between val0 and train1, val1 and train2, etc. are allowed as they are different folds
+
+
+
+#%%
+from src.utils.loader import Loader
+
+db_train = Loader.load_dataset(f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_binary_original_binary/train0/')
 
 # %%
 ########################################################################
