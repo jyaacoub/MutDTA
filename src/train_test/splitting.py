@@ -325,7 +325,8 @@ def resplit(dataset:str|BaseDataset, split_files:dict|str=None, **kwargs):
         if not os.path.exists(f):
             raise ValueError(f'{f} does not exist')
     
-    # Getting indices for each split based on db.df    
+    # Getting indices for each split based on db.df
+    split_files = split_files.copy()
     test_prots = set(pd.read_csv(split_files['test'])['prot_id'])
     test_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in test_prots]
     dataset.save_subset(test_idxs, 'test')
