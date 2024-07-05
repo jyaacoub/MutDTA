@@ -214,8 +214,8 @@ slurm_out*/
 *.swp
 *.swo
 /*.sh
-results/model_checkpoints/*/*.model_tmp
-results/model_checkpoints/*/*.model
+results/**/model_checkpoints/*/*.model_tmp
+results/**/model_checkpoints/*/*.model
 *.swp
 *.swo
 
