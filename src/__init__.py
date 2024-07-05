@@ -10,8 +10,8 @@ TUNED_MODEL_CONFIGS = {
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
         "edge_opt": cfg.PRO_EDGE_OPT.binary,
-        "lig_feat_opt": None,
-        "lig_edge_opt": None,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
                 
       	'lr': 0.00012,
     	'batch_size': 128,
@@ -20,25 +20,24 @@ TUNED_MODEL_CONFIGS = {
     		'dropout': 0.24,
             'output_dim': 128,
     	}
-    },    
-    #GVPLM_davis0D_nomsaF_aflowE_128B_0.0001360163557088453LR_0.027175922988649594D_2000E_gvpLF_binaryLE
-    'davis_gvpl_aflow': {
-        "model": cfg.MODEL_OPT.GVPL,
+    }, 
+    'davis_aflow':{
+        "model": cfg.MODEL_OPT.DG,
                 
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
         "edge_opt": cfg.PRO_EDGE_OPT.aflow,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
                 
-      	'lr': 0.00014968791626986144,
-    	'batch_size': 128,
-    
-    	'architecture_kwargs': {
-    		'dropout': 0.00039427600918916277,
-    		'output_dim': 256,
-    		'num_GVPLayers': 3
-    	}
+            
+        'lr': 0.0008279387625584954, 
+        'batch_size': 128, 
+        
+        'architecture_kwargs': {
+            'dropout': 0.3480347297724069, 
+            'output_dim': 256
+        }
     },
     #GVPLM_davis3D_nomsaF_binaryE_128B_0.00020535607176845963LR_0.08845592454543601D_2000E_gvpLF_binaryLE
     'davis_gvpl': {
@@ -57,23 +56,24 @@ TUNED_MODEL_CONFIGS = {
             'output_dim': 512
         }
     },
-    'davis_aflow':{
-        "model": cfg.MODEL_OPT.DG,
+    #GVPLM_davis0D_nomsaF_aflowE_128B_0.0001360163557088453LR_0.027175922988649594D_2000E_gvpLF_binaryLE
+    'davis_gvpl_aflow': {
+        "model": cfg.MODEL_OPT.GVPL,
                 
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
         "edge_opt": cfg.PRO_EDGE_OPT.aflow,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
                 
-            
-        'lr': 0.0008279387625584954, 
-        'batch_size': 128, 
-        
-        'architecture_kwargs': {
-            'dropout': 0.3480347297724069, 
-            'output_dim': 256
-        }
+      	'lr': 0.00014968791626986144,
+    	'batch_size': 128,
+    
+    	'architecture_kwargs': {
+    		'dropout': 0.00039427600918916277,
+    		'output_dim': 256,
+    		'num_GVPLayers': 3
+    	}
     },
     'davis_gvpl_esm_aflow': {
         "model": cfg.MODEL_OPT.GVPL_ESM,

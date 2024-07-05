@@ -199,10 +199,9 @@ def balanced_kfold_split(dataset: BaseDataset |str,
     
     #### Sampling remaining proteins for test set (if we are under the test_size) 
     for p in prots: # O(k); k = number of proteins
-        if count + prot_counts[p] > test_size:
-            break
-        test_prots.add(p)
-        count += prot_counts[p]
+        if count + prot_counts[p] < test_size:
+            test_prots.add(p)
+            count += prot_counts[p]
             
     # looping through dataset to get indices for test
     test_indices = [i for i in range(dataset_size) if dataset[i]['prot_id'] in test_prots]

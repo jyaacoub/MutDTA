@@ -1,4 +1,103 @@
 # %%
+import pandas as pd
+import logging
+DATA_ROOT = '../data'
+biom_df = pd.read_csv(f'{DATA_ROOT}/tcga/mart_export.tsv', sep='\t')
+biom_df.rename({'Gene name': 'gene'}, axis=1, inplace=True)
+
+# %% Specific to kiba:
+kiba_df = pd.read_csv(f'{DATA_ROOT}/DavisKibaDataset/kiba/nomsa_binary_original_binary/full/XY.csv')
+kiba_df = kiba_df.merge(biom_df.drop_duplicates('UniProtKB/Swiss-Prot ID'), 
+              left_on='prot_id', right_on="UniProtKB/Swiss-Prot ID", how='left')
+kiba_df.drop(['PDB ID', 'UniProtKB/Swiss-Prot ID'], axis=1, inplace=True)
+
+if kiba_df.gene.isna().sum() != 0: logging.warning("Some proteins failed to get their gene names!")
+
+# %% making sure to add any matching davis prots to the kiba test set
+davis_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/davis_test.csv')
+davis_test_prots = set(davis_df.prot_id.str.split('(').str[0])
+kiba_davis_gene_overlap = kiba_df[kiba_df.gene.isin(davis_test_prots)].gene.value_counts()
+print("Total # of gene overlap with davis TEST set:", len(kiba_davis_gene_overlap))
+print("                       # of entries in kiba:", kiba_davis_gene_overlap.sum())
+
+# Starting off with davis test set as the initial test set:
+kiba_test_df = kiba_df[kiba_df.gene.isin(davis_test_prots)]
+
+# %% using previous kiba test db:
+kiba_test_old_df = pd.read_csv('/cluster/home/t122995uhn/projects/downloads/test_prots_gene_names.csv')
+kiba_test_old_df = kiba_test_old_df[kiba_test_old_df['db'] == 'kiba']
+kiba_test_old_prots = set(kiba_test_old_df.gene_name)
+
+kiba_test_df = pd.concat([kiba_test_df, kiba_df[kiba_df.gene.isin(kiba_test_old_prots)]], axis=0).drop_duplicates(['prot_id', 'lig_id'])
+print("Combined kiba test set with davis matching genes size:", len(kiba_test_df))
+
+#%% NEXT STEP IS TO ADD MORE PROTS FROM ONCOKB IF AVAILABLE.
+onco_df = pd.read_csv("/cluster/home/t122995uhn/projects/downloads/oncoKB_DrugGenePairList.csv")
+
+kiba_join_onco = set(kiba_test_df.merge(onco_df.drop_duplicates("gene"), on="gene", how="left")['gene'])
+
+#%%
+remaining_onco = onco_df[~onco_df.gene.isin(kiba_join_onco)].drop_duplicates('gene')
+
+# match with remaining kiba:
+remaining_onco_kiba_df = kiba_df.merge(remaining_onco, on='gene', how="inner")
+counts = remaining_onco_kiba_df.value_counts('gene')
+print(counts)
+# this gives us 3680 which still falls short of our 11,808 goal for the test set size
+print("total entries in kiba with remaining (not already in test set) onco genes", counts.sum()) 
+
+
+#%%
+# drop_duplicates is redundant but just in case.
+kiba_test_df = pd.concat([kiba_test_df, remaining_onco_kiba_df], axis=0).drop_duplicates(['prot_id', 'lig_id']) 
+print("Combined kiba test set with remaining OncoKB genes:", len(kiba_test_df))
+
+# %% For the remaining 2100 entries we will just choose those randomly until we reach our target of 11808 entries
+# code is from balanced_kfold_split function
+from collections import Counter
+import numpy as np
+
+# Get size for each dataset and indices
+dataset_size = len(kiba_df)
+test_size = int(0.1 * dataset_size) # 11808
+indices = list(range(dataset_size))
+
+# getting counts for each unique protein
+prot_counts = kiba_df['prot_id'].value_counts().to_dict()
+prots = list(prot_counts.keys())
+np.random.shuffle(prots)
+
+# manually selected prots:
+test_prots = set(kiba_test_df.prot_id)
+# increment count by number of samples in test_prots
+count = sum([prot_counts[p] for p in test_prots])
+
+#%%
+## Sampling remaining proteins for test set (if we are under the test_size) 
+for p in prots: # O(k); k = number of proteins
+    if count + prot_counts[p] < test_size:
+        test_prots.add(p)
+        count += prot_counts[p]
+
+additional_prots = test_prots - set(kiba_test_df.prot_id)
+print('additional prot_ids to add:', len(additional_prots))
+print('                     count:', count)
+
+#%% ADDING FINAL PROTS
+rand_sample_df = kiba_df[kiba_df.prot_id.isin(additional_prots)]
+kiba_test_df = pd.concat([kiba_test_df, rand_sample_df], axis=0).drop_duplicates(['prot_id', 'lig_id'])
+
+kiba_test_df.drop(['cancerType', 'drug'], axis=1, inplace=True)
+print('final test dataset for kiba:')
+kiba_test_df
+
+#%% saving
+kiba_test_df.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/kiba_test.csv', index=False)
+
+# %%
+########################################################################
+########################## RESPLITTING DBS #############################
+########################################################################
 import os
 from src.train_test.splitting import resplit
 from src import cfg
@@ -12,14 +111,14 @@ print(csv_files)
 
 #%%
 for d in os.listdir(f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/'):
-    if len(d.split('_')) < 4:
+    if len(d.split('_')) < 4 or d !='nomsa_aflow_original_binary':
         print('skipping:', d)
         continue
     print('resplitting:', d)
     resplit(f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/{d}', split_files=csv_files)
 
 
-#%% Checking for overlap
+#%% VALIDATION OF SPLITS - Checking for overlap
 import pandas as pd
 
 
