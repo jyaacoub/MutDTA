@@ -768,14 +768,14 @@ class DavisKibaDataset(BaseDataset):
         return os.path.join(self.data_root, 'lig_sdf', f'{lig_id}.sdf')
     
     def pdb_p(self, code, safe=True):
+        if self.alphaflow:
+            return self.af_conf_files(code)
+        
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
         if (self.pro_edge_opt not in cfg.OPT_REQUIRES_PDB) and \
             (self.pro_feat_opt not in cfg.OPT_REQUIRES_PDB): return None
-            
-        if self.alphaflow:
-            return self.af_conf_files(code)
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file
