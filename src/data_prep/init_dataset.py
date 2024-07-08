@@ -10,7 +10,7 @@ sys.path.append(PROJECT_ROOT)
 from src.utils import config as cfg
 from src.data_prep.feature_extraction.protein_nodes import create_pfm_np_files
 from src.data_prep.datasets import DavisKibaDataset, PDBbindDataset, PlatinumDataset
-from src.train_test.splitting import train_val_test_split, balanced_kfold_split
+from src.train_test.splitting import train_val_test_split, balanced_kfold_split, resplit
 
 def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:list[str]|str,
                     ligand_features:list[str]=['original'],
@@ -22,6 +22,7 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
                     val_split:float=0.1,
                     overwrite=True,
                     test_prots_csv:str=None,
+                    val_prots_csv:list[str]=None,
                     **kwargs) -> None:
     """
     Creates the datasets for the given data, feature, and edge options.
@@ -123,36 +124,43 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
         
         # saving training, validation, and test sets
         test_split = 1 - train_split - val_split
-        if k_folds is None:
-            train_loader, val_loader, test_loader = train_val_test_split(dataset, 
-                                    train_split=train_split, val_split=val_split, 
-                                    random_seed=random_seed, split_by_prot=not pro_overlap)
-        else:
-            assert test_split > 0, f"Invalid train/val/test split: {train_split}/{val_split}/{test_split}"
-            assert not pro_overlap, f"No support for overlapping proteins with k-folds rn."
-            if test_prots_csv is not None:
-                df = pd.read_csv(test_prots_csv)
-                test_prots = set(df['prot_id'].tolist())
-            else:
-                test_prots = None
-                
-            train_loader, val_loader, test_loader = balanced_kfold_split(dataset, 
-                                    k_folds=k_folds, test_split=test_split, test_prots=test_prots,
-                                    random_seed=random_seed) # only non-overlapping splits for k-folds
+        if val_prots_csv:
+            assert k_folds is None or len(val_prots_csv) == k_folds, "Mismatch between number of val_prot_csvs provided and k_folds selected."
             
-        subset_names = ['train', 'val', 'test']
-        if pro_overlap:
-            subset_names = [s+'-overlap' for s in subset_names]
-        
-        if test_split < 1: # for datasets that are purely for testing we skip this section
+            split_files = {os.path.basename(v).split('.')[0]: v for v in val_prots_csv}
+            split_files['test'] = test_prots_csv
+            dataset = resplit(dataset, split_files=split_files)
+        else:
             if k_folds is None:
-                dataset.save_subset(train_loader, subset_names[0])
-                dataset.save_subset(val_loader, subset_names[1])
+                train_loader, val_loader, test_loader = train_val_test_split(dataset, 
+                                        train_split=train_split, val_split=val_split, 
+                                        random_seed=random_seed, split_by_prot=not pro_overlap)
             else:
-                # loops through all k folds and saves as train1, train2, etc.
-                dataset.save_subset_folds(train_loader, subset_names[0])
-                dataset.save_subset_folds(val_loader, subset_names[1])
-        
-        dataset.save_subset(test_loader, subset_names[2])
+                assert test_split > 0, f"Invalid train/val/test split: {train_split}/{val_split}/{test_split}"
+                assert not pro_overlap, f"No support for overlapping proteins with k-folds rn."
+                if test_prots_csv is not None:
+                    df = pd.read_csv(test_prots_csv)
+                    test_prots = set(df['prot_id'].tolist())
+                else:
+                    test_prots = None
+                
+                train_loader, val_loader, test_loader = balanced_kfold_split(dataset, 
+                                        k_folds=k_folds, test_split=test_split, test_prots=test_prots,
+                                        random_seed=random_seed) # only non-overlapping splits for k-folds
+                
+            subset_names = ['train', 'val', 'test']
+            if pro_overlap:
+                subset_names = [s+'-overlap' for s in subset_names]
+            
+            if test_split < 1: # for datasets that are purely for testing we skip this section
+                if k_folds is None:
+                    dataset.save_subset(train_loader, subset_names[0])
+                    dataset.save_subset(val_loader, subset_names[1])
+                else:
+                    # loops through all k folds and saves as train1, train2, etc.
+                    dataset.save_subset_folds(train_loader, subset_names[0])
+                    dataset.save_subset_folds(val_loader, subset_names[1])
+            
+            dataset.save_subset(test_loader, subset_names[2])
         
         del dataset # free up memory

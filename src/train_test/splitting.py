@@ -314,7 +314,9 @@ def resplit(dataset:str|BaseDataset, split_files:dict|str=None, **kwargs):
             csv_files[split] = f'{split_files}/{split}/cleaned_XY.csv'
         split_files = csv_files
         print('Using split files from:', split_files)
-        
+    
+    assert 'test' in split_files, 'Missing test csv from split files.'
+     
     # Check if split files exist and are in the correct format
     if split_files is None:
         raise ValueError('split_files must be provided')
