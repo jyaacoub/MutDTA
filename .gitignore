@@ -214,8 +214,8 @@ slurm_out*/
 *.swp
 *.swo
 /*.sh
-results/model_checkpoints/ours/*.model_tmp
-results/model_checkpoints/ours/*.model
+results/**/model_checkpoints/*/*.model_tmp
+results/**/model_checkpoints/*/*.model
 *.swp
 *.swo
 
@@ -223,3 +223,6 @@ results/model_media/*/train_log/*
 results/model_media/*/train_set_pred/*
 results/model_media/*/test_set_pred/*
 results/model_media/test_set_pred
+
+splits/**/*.csv
+results/v113/model_media/*/train_log/*.json

@@ -3,6 +3,59 @@ from src.utils import config as cfg
 
 
 TUNED_MODEL_CONFIGS = {
+    #DGM_davis0D_nomsaF_binaryE_128B_0.00012LR_0.24D_2000E
+    'davis_DG':{
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.davis,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+      	'lr': 0.00012,
+    	'batch_size': 128,
+    
+    	'architecture_kwargs': {
+    		'dropout': 0.24,
+            'output_dim': 128,
+    	}
+    }, 
+    'davis_aflow':{
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.davis,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+            
+        'lr': 0.0008279387625584954, 
+        'batch_size': 128, 
+        
+        'architecture_kwargs': {
+            'dropout': 0.3480347297724069, 
+            'output_dim': 256
+        }
+    },
+    #GVPLM_davis3D_nomsaF_binaryE_128B_0.00020535607176845963LR_0.08845592454543601D_2000E_gvpLF_binaryLE
+    'davis_gvpl': {
+        "model": cfg.MODEL_OPT.GVPL,
+                
+        "dataset": cfg.DATA_OPT.davis,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+        'lr': 0.00020535607176845963, 
+        'batch_size': 128, 
+        'architecture_kwargs': {
+            'dropout': 0.08845592454543601, 
+            'output_dim': 512
+        }
+    },
     #GVPLM_davis0D_nomsaF_aflowE_128B_0.0001360163557088453LR_0.027175922988649594D_2000E_gvpLF_binaryLE
     'davis_gvpl_aflow': {
         "model": cfg.MODEL_OPT.GVPL,
@@ -22,39 +75,45 @@ TUNED_MODEL_CONFIGS = {
     		'num_GVPLayers': 3
     	}
     },
-    #GVPLM_davis3D_nomsaF_binaryE_128B_0.00020535607176845963LR_0.08845592454543601D_2000E_gvpLF_binaryLE
-    'davis_gvpl': {
-        "model": cfg.MODEL_OPT.GVPL,
+    'davis_esm':{
+        "model": cfg.MODEL_OPT.EDI,
                 
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
         "edge_opt": cfg.PRO_EDGE_OPT.binary,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
-                
-        'lr': 0.00020535607176845963, 
-        'batch_size': 128, 
+ 
+        'lr': 0.0001, 
+        'batch_size': 48, # global batch size (local was 12)
+        
         'architecture_kwargs': {
-            'dropout': 0.08845592454543601, 
-            'output_dim': 512
-        }
+            'dropout': 0.4, 
+            'dropout_prot': 0.0, 
+            'output_dim': 128, 
+            'pro_extra_fc_lyr': False, 
+            # 'pro_emb_dim': 512 # just for reference since this is the default for EDI
+        }        
     },
-    'davis_aflow':{
-        "model": cfg.MODEL_OPT.DG,
+    'davis_gvpl_esm_aflow': {
+        "model": cfg.MODEL_OPT.GVPL_ESM,
                 
         "dataset": cfg.DATA_OPT.davis,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
         "edge_opt": cfg.PRO_EDGE_OPT.aflow,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
-                
-            
-        'lr': 0.0008279387625584954, 
-        'batch_size': 128, 
+ 
+        'lr': 0.00010636872718329864, 
+        'batch_size': 48, # global batch size (local was 12)
         
         'architecture_kwargs': {
-            'dropout': 0.3480347297724069, 
-            'output_dim': 256
+            'dropout': 0.23282479481785903, 
+            'output_dim': 512, 
+            'num_GVPLayers': 3, 
+            'pro_dropout_gnn': 0.15822227777305042, 
+            'pro_extra_fc_lyr': False, 
+            'pro_emb_dim': 128
         }
     },
     #####################################################
@@ -68,15 +127,14 @@ TUNED_MODEL_CONFIGS = {
         "edge_opt": cfg.PRO_EDGE_OPT.aflow,
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
-                
             
-        'lr': 0.00005480618584919115, 
-        'batch_size': 32, 
+        'lr': 0.00010990897170411903, 
+        'batch_size': 16, 
         
         'architecture_kwargs': {
-		    'dropout': 0.0808130125360696, 
-		    'output_dim': 512, 
-		    'num_GVPLayers': 4
+            'dropout': 0.03599877069828837, 
+            'output_dim': 128, 
+            'num_GVPLayers': 2
         }
     },
     'kiba_gvpl': {

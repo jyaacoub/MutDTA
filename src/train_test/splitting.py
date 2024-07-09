@@ -1,4 +1,5 @@
 from typing import Tuple
+import os
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ from torch_geometric.loader import DataLoader
 
 from src.models.utils import BaseModel
 from src.data_prep.datasets import BaseDataset
+from src.utils.loader import init_dataset_object
 
 # Creating data indices for training and validation splits:
 def train_val_test_split(dataset: BaseDataset, 
@@ -132,8 +134,9 @@ def train_val_test_split(dataset: BaseDataset,
     
     return train_loader, val_loader, test_loader
 
-def balanced_kfold_split(dataset: BaseDataset,
-                         k_folds:int=5, test_split=.1,
+@init_dataset_object(strict=True)
+def balanced_kfold_split(dataset: BaseDataset |str,
+                         k_folds:int=5, test_split=.1, val_split=.1,
                          shuffle_dataset=True, random_seed=None,
                          batch_train=128,
                          verbose=False, test_prots:set=None) -> tuple[DataLoader]:
@@ -177,8 +180,9 @@ def balanced_kfold_split(dataset: BaseDataset,
     
     # Get size for each dataset and indices
     dataset_size = len(dataset)
-    indices = list(range(dataset_size))
     test_size = int(test_split * dataset_size)
+    val_size = int(val_split * dataset_size)
+    indices = list(range(dataset_size))
     if shuffle_dataset:
         np.random.shuffle(indices) # in-place shuffle
 
@@ -195,10 +199,9 @@ def balanced_kfold_split(dataset: BaseDataset,
     
     #### Sampling remaining proteins for test set (if we are under the test_size) 
     for p in prots: # O(k); k = number of proteins
-        if count + prot_counts[p] > test_size:
-            break
-        test_prots.add(p)
-        count += prot_counts[p]
+        if count + prot_counts[p] < test_size:
+            test_prots.add(p)
+            count += prot_counts[p]
             
     # looping through dataset to get indices for test
     test_indices = [i for i in range(dataset_size) if dataset[i]['prot_id'] in test_prots]
@@ -208,16 +211,19 @@ def balanced_kfold_split(dataset: BaseDataset,
             
     # removing selected proteins from prots
     prots = [p for p in prots if p not in test_prots]
+    prot_counts = {p: c for p, c in prot_counts.items() if p not in test_prots} # remove test_prots
     print(f'Number of unique proteins in test set: {len(test_prots)} == {count} samples')
     
     
     ########## split remaining proteins into k_folds ##########
+    # this is selecting the proteins for the validation set
+    # we partition the dataset into k_folds based on the proteins
     # Steps for this basically follow Greedy Number Partitioning
     # tuple of (list of proteins, total weight, current-score):
     prot_folds = [[[], 0, -1] for i in range(k_folds)] 
     # score = fold.weight - abs(fold.weight/len(fold) - item.weight)
     prot_counts = sorted(list(prot_counts.items()), key=lambda x: x[1], reverse=True)
-    for p, c in prot_counts:
+    for p, c in prot_counts:        
         # Update scores for each fold
         for fold in prot_folds:
             f_len = len(fold[0])
@@ -249,9 +255,9 @@ def balanced_kfold_split(dataset: BaseDataset,
     for i, fold in enumerate(prot_folds):
         train_indices, val_indices = [], []
         for idx in range(dataset_size): # O(n)
-            if dataset[idx]['prot_id'] in fold:
+            if len(val_indices) <= val_size and dataset[idx]['prot_id'] in fold:
                 val_indices.append(idx)
-            elif dataset[idx]['prot_id'] not in test_prots:
+            elif dataset[idx]['prot_id'] not in test_prots: # anything remaining goes to training set
                 train_indices.append(idx)
         train_sampler = SubsetRandomSampler(train_indices)
         val_sampler = SubsetRandomSampler(val_indices)
@@ -273,3 +279,70 @@ def balanced_kfold_split(dataset: BaseDataset,
     assert te_count > 0, 'Test set is empty'
     
     return train_loaders, val_loaders, test_loader
+
+
+@init_dataset_object(strict=True)
+def resplit(dataset:str|BaseDataset, split_files:dict|str=None, **kwargs):
+    """
+     1.Takes as input the target dataset path or dataset object, and a dict defining the 6 splits for all 5 folds + 
+        1 test set.
+        - Decorator will automatically convert the dataset path to a dataset object
+        - split files should be a dict to csv files, each containing the proteins for the splits, where the keys are:
+            - val0, val1, val2, val3, val4, test
+            - training sets will be built from the remaining proteins (i.e.: proteins not in any of the val/test sets)
+     2.Deletes existing splits
+     3.Builds new splits using Dataset.save_subset()
+
+    Args:
+        dataset (str | BaseDataset): path to full dataset directory or dataset object
+        split_files (dict | str, optional): Dictionary of csvs for each of the n folds + the test set, where keys are 
+        val0, val1, val2, val3, val4, test and the values are the path to the csvs with a "prot_id" column. OR path to 
+        another dataset directory that you want to match in terms of dataset split where we extract the csvs from 
+        Defaults to None.
+
+    Raises:
+        ValueError: no split_files provided
+        ValueError: split_files must contain 6 files for the 5 folds and test set
+        ValueError: split file does not exist
+
+    Returns:
+        BaseDataset: dataset object for "full" dataset
+    """
+    if isinstance(split_files, str):
+        csv_files = {}
+        for split in ['test'] + [f'val{i}' for i in range(5)]:
+            csv_files[split] = f'{split_files}/{split}/cleaned_XY.csv'
+        split_files = csv_files
+        print('Using split files from:', split_files)
+    
+    assert 'test' in split_files, 'Missing test csv from split files.'
+     
+    # Check if split files exist and are in the correct format
+    if split_files is None:
+        raise ValueError('split_files must be provided')
+    if len(split_files) != 6:
+        raise ValueError('split_files must contain 6 files for the 5 folds and test set')
+    for f in split_files.values():
+        if not os.path.exists(f):
+            raise ValueError(f'{f} does not exist')
+    
+    # Getting indices for each split based on db.df
+    split_files = split_files.copy()
+    test_prots = set(pd.read_csv(split_files['test'])['prot_id'])
+    test_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in test_prots]
+    dataset.save_subset(test_idxs, 'test')
+    del split_files['test']
+    
+    # Building the folds
+    for k, v in split_files.items():
+        prots = set(pd.read_csv(v)['prot_id'])
+        val_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in prots]
+        dataset.save_subset(val_idxs, k)
+        
+        # Build training set from all proteins not in the val/test set
+        idxs = set(val_idxs + test_idxs)
+        train_idxs = [i for i in range(len(dataset.df)) if i not in idxs]
+        dataset.save_subset(train_idxs, k.replace('val', 'train'))
+    
+    return dataset
+    

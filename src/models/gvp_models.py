@@ -45,7 +45,7 @@ class GVPLigand_DGPro(DGraphDTA):
             nn.Linear(512, 128),
             nn.ReLU(),
             
-            nn.Linear(128, 1),        
+            nn.Linear(128, 1),
         )
     
     def forward_mol(self, data):
@@ -58,16 +58,17 @@ class GVPLigand_DGPro(DGraphDTA):
         xc = torch.cat((xm, xp), 1)
         return self.dense_out(xc)
     
-class GVPL_ESM(nn.Module):
+class GVPL_ESM(BaseModel):
     def __init__(self, 
                  pro_num_feat=320,pro_emb_dim=512, pro_dropout_gnn=0.0, pro_extra_fc_lyr=False,
                  num_GVPLayers=3,
                  dropout=0.2,
                  output_dim=512,
                  edge_weight_opt='binary',
+                 esm_only=True,
                  **kwargs):
         output_dim = int(output_dim)
-        super(GVPL_ESM, self).__init__()
+        super(GVPL_ESM, self).__init__(edge_weight_opt=edge_weight_opt)
         
         self.gvp_ligand = GVPBranchLigand(num_layers=num_GVPLayers, 
                                           final_out=output_dim,
@@ -77,7 +78,7 @@ class GVPL_ESM(nn.Module):
                                     dropout_gnn=pro_dropout_gnn, 
                                     extra_fc_lyr=pro_extra_fc_lyr,
                                     output_dim=output_dim, dropout=dropout,
-                                    edge_weight=edge_weight_opt)
+                                    edge_weight=edge_weight_opt, esm_only=esm_only)
         
         self.dense_out = nn.Sequential(
             nn.Linear(2*output_dim, 1024),

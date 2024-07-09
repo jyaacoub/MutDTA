@@ -100,9 +100,9 @@ class Downloader:
                 if resp.status_code == 503:
                     wait_time = 2 ** retries  # Exponential backoff
                     time.sleep(wait_time)
-                    retries += 1
-                else:
+                elif resp.status_code < 500:
                     return resp
+                retries += 1
             return resp  # Return the last response after exhausting retries
 
         resp = fetch_url(url(id))
@@ -216,6 +216,17 @@ class Downloader:
         url_backup=lambda x: url(x).split('?')[0]  # fallback to 2d conformer structure
         return Downloader.download(ligand_ids, save_path=save_path, url=url, url_backup=url_backup,
                                    tqdm_desc='Downloading ligand sdfs', max_workers=max_workers, **kwargs)
+        
+    @staticmethod
+    def download_pocket_seq(prot_ids: list[str], save_dir='./data/prot_pockets', max_worker=None, **kwargs) -> dict:
+        """
+        Fetches pocket sequences from the given protein IDs (Gene names or UniProt).
+        """
+        assert issubclass(type(prot_ids), list) and type(prot_ids[0]) == str, 'prot_ids should be a list of strings'
+        url = lambda x: f'https://klifs.net/api/kinase_ID?kinase_name={x}&species=HUMAN'
+        save_path = lambda x: os.path.join(save_dir, f'{x}.json')
+        # os.makedirs(save_dir, exist_ok=True)
+        return Downloader.download(prot_ids, save_path=save_path, url=url, max_workers=max_worker, **kwargs)
 
 if __name__ == '__main__':
     # downloading pdbs from X.csv list

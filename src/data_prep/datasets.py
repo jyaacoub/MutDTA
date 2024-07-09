@@ -280,7 +280,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         path = os.path.join(self.root, subset_name)
         os.makedirs(path, exist_ok=True)
         sub_df.to_csv(os.path.join(path, self.processed_file_names[0])) # redundant save since it is not used and mainly just for tracking prots.
-        sub_df.to_csv(os.path.join(path, self.processed_file_names[3]))
+        sub_df.to_csv(os.path.join(path, self.processed_file_names[3])) # clean_XY.csv
         torch.save(sub_prots, os.path.join(path, self.processed_file_names[1]))
         torch.save(sub_lig, os.path.join(path, self.processed_file_names[2]))
         return path
@@ -350,6 +350,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
                                             
                 if model_count < 5:
                     missing_conf.add(pid)
+                    logging.debug(f'missing conf for {pid} in {self.af_conf_dir}')
                     continue
                 
                 af_seq = Chain(af_confs[0]).sequence
@@ -767,14 +768,14 @@ class DavisKibaDataset(BaseDataset):
         return os.path.join(self.data_root, 'lig_sdf', f'{lig_id}.sdf')
     
     def pdb_p(self, code, safe=True):
+        if self.alphaflow:
+            return self.af_conf_files(code)
+        
         code = re.sub(r'[()]', '_', code)
         # davis and kiba dont have their own structures so this must be made using 
         # af or some other method beforehand.
         if (self.pro_edge_opt not in cfg.OPT_REQUIRES_PDB) and \
             (self.pro_feat_opt not in cfg.OPT_REQUIRES_PDB): return None
-            
-        if self.alphaflow:
-            return self.af_conf_files(code)
         
         file = glob(os.path.join(self.af_conf_dir, f'highQ/{code}_unrelaxed_rank_001*.pdb'))
         # should only be one file

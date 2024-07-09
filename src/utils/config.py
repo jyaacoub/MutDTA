@@ -87,11 +87,16 @@ class LIG_FEAT_OPT(StringEnum):
 DATA_ROOT = os.path.abspath('../data/')
 
 # Model save paths
-MEDIA_SAVE_DIR      = os.path.abspath('results/model_media/')
-MODEL_STATS_CSV     = os.path.abspath('results/model_media/model_stats.csv')
-MODEL_STATS_CSV_VAL = os.path.abspath('results/model_media/model_stats_val.csv')
-MODEL_SAVE_DIR      = os.path.abspath('results/model_checkpoints/ours')
+issue_number = 113  # 113 is for unifying all splits for cross validation so that we are more confident 
+                    # when comparing results that they were trained in the same manner.
+RESULTS_PATH = os.path.abspath(f'results/v{issue_number}/')
+MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'
+MODEL_STATS_CSV     = f'{RESULTS_PATH}/model_media/model_stats.csv'
+MODEL_STATS_CSV_VAL = f'{RESULTS_PATH}/model_media/model_stats_val.csv'
+MODEL_SAVE_DIR      = f'{RESULTS_PATH}/model_checkpoints/ours'
 CHECKPOINT_SAVE_DIR = MODEL_SAVE_DIR # alias for clarity
+os.makedirs(MODEL_SAVE_DIR, exist_ok=True)
+os.makedirs(MEDIA_SAVE_DIR, exist_ok=True)
 
 # cluster based configs:
 import socket

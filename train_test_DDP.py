@@ -26,7 +26,7 @@ executor = submitit.AutoExecutor(folder=args.output_dir,
                                  slurm_max_num_timeout=0) # no requeuing if TIMEOUT or preemption
 
 additional_params = { # slurm params not accepted by submitit
-        'mail-type': 'ALL',
+        'mail-type': 'FAIL',
         'mail-user': 'j.yaacoub@mail.utoronto.ca',
         # 'dependency': 'afterok:10275728',
     }
