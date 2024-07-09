@@ -1,4 +1,43 @@
 # %%
+########################################################################
+########################## VIOLIN PLOTTING #############################
+########################################################################
+import logging
+from typing import OrderedDict
+
+import seaborn as sns
+from matplotlib import pyplot as plt
+from statannotations.Annotator import Annotator
+
+from src.analysis.figures import prepare_df, custom_fig, fig_combined
+
+models = {
+    'DG': ('nomsa', 'binary', 'original', 'binary'),
+    # 'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+    'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+    # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
+    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    # 'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
+    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
+    # 'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
+    #GVPL_ESMM_davis3D_nomsaF_aflowE_48B_0.00010636872718329864LR_0.23282479481785903D_2000E_gvpLF_binaryLE
+    # 'gvpl_esm_aflow': ('ESM', 'aflow', 'gvp', 'binary'),
+}
+
+df = prepare_df('/cluster/home/t122995uhn/projects/MutDTA/results/v113/model_media/model_stats.csv')
+fig, axes = fig_combined(df, datasets=['davis'], fig_callable=custom_fig,
+             models=models, metrics=['cindex', 'mse'],
+             fig_scale=(10,5), add_stats=True, title_postfix=" test set performance")
+plt.xticks(rotation=45)
+
+df = prepare_df('/cluster/home/t122995uhn/projects/MutDTA/results/v113/model_media/model_stats_val.csv')
+fig, axes = fig_combined(df, datasets=['davis'], fig_callable=custom_fig,
+             models=models, metrics=['cindex', 'mse'],
+             fig_scale=(10,5), add_stats=True, title_postfix=" validation set performance")
+plt.xticks(rotation=45)
+
+
+# %%
 from src.data_prep.init_dataset import create_datasets
 from src import cfg
 
@@ -49,6 +88,5 @@ for i in range(5):
     sfile = f"{src}/val{i}/XY.csv"
     dfile = f"{dst}/val{i}.csv"
     shutil.copyfile(sfile, dfile)
-    
 
 # %%

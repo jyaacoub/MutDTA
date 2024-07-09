@@ -75,6 +75,26 @@ TUNED_MODEL_CONFIGS = {
     		'num_GVPLayers': 3
     	}
     },
+    'davis_esm':{
+        "model": cfg.MODEL_OPT.EDI,
+                
+        "dataset": cfg.DATA_OPT.davis,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+ 
+        'lr': 0.0001, 
+        'batch_size': 48, # global batch size (local was 12)
+        
+        'architecture_kwargs': {
+            'dropout': 0.4, 
+            'dropout_prot': 0.0, 
+            'output_dim': 128, 
+            'pro_extra_fc_lyr': False, 
+            # 'pro_emb_dim': 512 # just for reference since this is the default for EDI
+        }        
+    },
     'davis_gvpl_esm_aflow': {
         "model": cfg.MODEL_OPT.GVPL_ESM,
                 
