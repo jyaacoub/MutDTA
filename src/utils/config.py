@@ -87,7 +87,7 @@ class LIG_FEAT_OPT(StringEnum):
 DATA_ROOT = os.path.abspath('../data/')
 
 # Model save paths
-issue_number = 113  # 113 is for unifying all splits for cross validation so that we are more confident 
+issue_number = 115  # 113 is for unifying all splits for cross validation so that we are more confident 
                     # when comparing results that they were trained in the same manner.
 RESULTS_PATH = os.path.abspath(f'results/v{issue_number}/')
 MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'

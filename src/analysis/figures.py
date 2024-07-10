@@ -351,9 +351,13 @@ def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'm
                                       fig_scale[1]*len(metrics)))
     for i, dataset in enumerate(datasets):
         for j, metric in enumerate(metrics):
-            # Set current subplot
-            if len(datasets) == 1 or len(metrics) == 1:
-                ax = axes[j] if len(datasets) == 1 else axes[i]
+            # Set current subplot                
+            if len(datasets) == 1 and len(metrics) == 1:
+                ax = axes
+            elif len(datasets) == 1:
+                ax = axes[j]
+            elif len(metrics) == 1:
+                ax = axes[i]
             else:
                 ax = axes[j, i]
 
@@ -382,7 +386,8 @@ def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'm
     return fig, axes
 
 def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cindex', 
-                   verbose=False, show=False, add_stats=True, ax=None):
+                   verbose=False, show=False, add_stats=True, ax=None, box=False, 
+                   fold_points=True, fold_labels=False, alpha=0.7):
     
     """
     Example usage with `fig_combined`.
@@ -432,15 +437,34 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
     filtered_df = filtered_df[sum(filter_conditions) > 0]
 
     # Group each model results
-    plot_data = OrderedDict()
+    all_data = OrderedDict()
     for model, feat in models.items():
-        plot_data[model] = filtered_df[matched(filtered_df, feat)][sel_col]
-        if len(plot_data[model]) != 5:
-            logging.warning(f'Expected 5 results for {model} on {sel_dataset}, got {len(plot_data[model])}')
+        all_data[model] = filtered_df[matched(filtered_df, feat)][[sel_col, 'fold']]
+        if len(all_data[model]) != 5:
+            logging.warning(f'Expected 5 results for {model} on {sel_dataset}, got {len(all_data[model])}')
 
     # plot violin plot with annotations
+    plot_data = OrderedDict({k: v[sel_col] for k, v in all_data.items()})
+    fold_data = OrderedDict({k: v['fold'] for k, v in all_data.items()})
+    folds = list(fold_data.values())
     vals = list(plot_data.values())
-    ax = sns.violinplot(data=vals, ax=ax)
+    if box:
+        ax = sns.boxplot(data=vals, ax=ax, boxprops=dict(alpha=alpha))
+    else:
+        ax = sns.violinplot(data=vals, ax=ax)
+        for violin in ax.collections:
+            violin.set_alpha(alpha)
+
+    if fold_points or fold_labels:
+        sns.stripplot(data=vals, dodge=True, ax=ax, alpha=.8, linewidth=1)
+        
+        if fold_labels:
+            adjs = -0.5 if box else -0.2
+            for i in range(len(models)):
+                for f, v in zip(folds[i], vals[i]):
+                    ax.text(i+adjs, v, f, 
+                            horizontalalignment='left', size='medium', color='red')
+    
     ax.set_xticklabels(list(plot_data.keys()))
     ax.set_ylabel(sel_col)
     ax.set_xlabel('Model Type')
