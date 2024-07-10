@@ -1,14 +1,4 @@
 # %%
-from src.train_test.splitting import resplit
-from src import cfg
-
-db_p = lambda x: f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_{x}_original_binary'
-
-db = resplit(dataset=db_p('binary'), split_files=db_p('aflow'), use_train_set=True)
-
-
-
-# %%
 ########################################################################
 ########################## VIOLIN PLOTTING #############################
 ########################################################################
@@ -23,7 +13,7 @@ from src.analysis.figures import prepare_df, custom_fig, fig_combined
 
 models = {
     'DG': ('nomsa', 'binary', 'original', 'binary'),
-    # 'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
     'aflow': ('nomsa', 'aflow', 'original', 'binary'),
     # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
     'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
@@ -34,13 +24,13 @@ models = {
     # 'gvpl_esm_aflow': ('ESM', 'aflow', 'gvp', 'binary'),
 }
 
-df = prepare_df('./results/v113/model_media/model_stats.csv')
+df = prepare_df('./results/v115/model_media/model_stats.csv')
 fig, axes = fig_combined(df, datasets=['davis'], fig_callable=custom_fig,
              models=models, metrics=['cindex', 'mse'],
              fig_scale=(10,5), add_stats=True, title_postfix=" test set performance")
 plt.xticks(rotation=45)
 
-df = prepare_df('./results/v113/model_media/model_stats_val.csv')
+df = prepare_df('./results/v115/model_media/model_stats_val.csv')
 fig, axes = fig_combined(df, datasets=['davis'], fig_callable=custom_fig,
              models=models, metrics=['cindex', 'mse'],
              fig_scale=(10,5), add_stats=True, title_postfix=" validation set performance")
