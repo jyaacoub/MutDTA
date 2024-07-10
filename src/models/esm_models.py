@@ -18,7 +18,7 @@ class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
                  output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary',
-                 dropout_prot=0.0, extra_profc_layer=False):
+                 dropout_prot=0.0, pro_extra_fc_lyr=False):
         
         super(EsmDTA, self).__init__(pro_feat, edge_weight_opt)
 
@@ -33,13 +33,13 @@ class EsmDTA(BaseModel):
         self.pro_conv2 = GCNConv(pro_emb_dim, pro_emb_dim * 2)
         self.pro_conv3 = GCNConv(pro_emb_dim * 2, pro_emb_dim * 4)
         
-        if not extra_profc_layer:
+        self.pro_extra_fc_lyr = pro_extra_fc_lyr
+        if not pro_extra_fc_lyr:
             self.pro_fc_g1 = nn.Linear(pro_emb_dim * 4, 1024)
         else:
             self.pro_fc_g1 = nn.Linear(pro_emb_dim * 4, pro_emb_dim * 2)
             self.pro_fc_g1b = nn.Linear(pro_emb_dim * 2, 1024)
             
-        self.extra_profc_layer = extra_profc_layer           
         self.pro_fc_g2 = nn.Linear(1024, output_dim)
             
         
@@ -52,7 +52,7 @@ class EsmDTA(BaseModel):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         # note that dropout for edge and nodes is handled by torch_geometric in forward pass
-        self.dropout_prot_p = dropout_prot
+        self.dropout_gnn = dropout_prot
 
         # combined layers
         self.fc1 = nn.Linear(2 * output_dim, 1024)
@@ -100,17 +100,17 @@ class EsmDTA(BaseModel):
                                             training=self.training)
         
         # conv1
-        xt = self.conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
+        xt = self.pro_conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
         ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv2
-        xt = self.conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
+        xt = self.pro_conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
         ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv3
-        xt = self.conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
+        xt = self.pro_conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
 
         # flatten/pool
@@ -123,7 +123,7 @@ class EsmDTA(BaseModel):
         xt = self.relu(xt)
         xt = self.dropout(xt)
         
-        if self.extra_profc_layer:
+        if self.pro_extra_fc_lyr:
             xt = self.pro_fc_g1b(xt)
             xt = self.relu(xt)
             xt = self.dropout(xt)
@@ -213,7 +213,7 @@ class SaProtDTA(EsmDTA):
                  edge_weight_opt='binary', **kwargs):
         super().__init__(esm_head, num_features_pro, pro_emb_dim, num_features_mol, 
                          output_dim, dropout, pro_feat, edge_weight_opt, 
-                         extra_profc_layer=True,**kwargs)
+                         pro_extra_fc_lyr=True,**kwargs)
     
     # overwrite the forward_pro pass to account for new saprot model    
     def forward_pro(self, data):
@@ -262,17 +262,17 @@ class SaProtDTA(EsmDTA):
                                             training=self.training)
         
         # conv1
-        xt = self.conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
+        xt = self.pro_conv1(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
         ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv2
-        xt = self.conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
+        xt = self.pro_conv2(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
         ei_drp, e_mask, _ = dropout_node(ei, p=self.dropout_gnn, num_nodes=target_x.shape[0], 
                                         training=self.training)
         # conv3
-        xt = self.conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
+        xt = self.pro_conv3(xt, ei_drp, ew[e_mask] if ew is not None else ew)
         xt = self.relu(xt)
         
         # flatten/pool
@@ -285,7 +285,7 @@ class SaProtDTA(EsmDTA):
         xt = self.relu(xt)
         xt = self.dropout(xt)
         
-        if self.extra_profc_layer:
+        if self.pro_extra_fc_lyr:
             xt = self.pro_fc_g1b(xt)
             xt = self.relu(xt)
             xt = self.dropout(xt)

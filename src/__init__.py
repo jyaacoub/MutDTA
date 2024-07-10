@@ -92,7 +92,7 @@ TUNED_MODEL_CONFIGS = {
             'dropout_prot': 0.0, 
             'output_dim': 128, 
             'pro_extra_fc_lyr': False, 
-            # 'pro_emb_dim': 512 # just for reference since this is the default for EDI
+            'pro_emb_dim': 512 # just for reference since this is the default for EDI
         }        
     },
     'davis_gvpl_esm_aflow': {
