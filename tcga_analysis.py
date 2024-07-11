@@ -57,7 +57,7 @@ def plot_tcga_heat_map(prots_df=None, tcga_df=None, merged_df=None, top=10, titl
         prots_df = add_gene_name(pd.read_csv(prots_df))
         ''
 
-    assert not (prots_df is None and tcga_df is None) or merged_df, "Either provide a merged dataframe or both prots_df and tcga_df"
+    assert not (prots_df is None and tcga_df is None) or merged_df is not None, "Either provide a merged dataframe or both prots_df and tcga_df"
     
     if merged_df is None:
         logging.debug("Merging TCGA MAF with proteins")
@@ -65,10 +65,10 @@ def plot_tcga_heat_map(prots_df=None, tcga_df=None, merged_df=None, top=10, titl
 
     # narrow heat map to just the top cancers/genes
     top_x_cancers = list(merged_df.value_counts('Study Abbreviation').index[:top])
-    top_x_genes = list(merged_df.value_counts('gene').index[:top])
+    top_x_genes = list(merged_df.value_counts('Hugo_Symbol').index[:top])
 
     filtered_merged_df = merged_df[merged_df['Study Abbreviation'].isin(top_x_cancers)]
-    filtered_merged_df = filtered_merged_df[filtered_merged_df['gene'].isin(top_x_genes)]
+    filtered_merged_df = filtered_merged_df[filtered_merged_df['Hugo_Symbol'].isin(top_x_genes)]
 
     grps = filtered_merged_df.groupby(['Study Abbreviation', 'Hugo_Symbol'])
 
@@ -119,29 +119,21 @@ def plot_combined_heatmap(df_tcga=None):
 
     _, axes = plt.subplots(len(csvs),len(cases), figsize=(12*len(cases),8*len(csvs)))
 
-    for i, DROP_DUP_CASES in enumerate(cases):
-        df_tcga_uni = df_tcga.drop_duplicates(subset='case') if DROP_DUP_CASES else df_tcga
+    for i, drop_duplicates in enumerate(cases):
+        df_tcga_uni = df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode') if drop_duplicates else df_tcga
         
         for j, k in enumerate(csvs.keys()):
             merged_df = plot_tcga_heat_map(csvs[k], df_tcga_uni, merged_df=None, 
                                         top=20,
                                         title_prot_subset=k, 
-                                        title_postfix=' (unique cases)' if DROP_DUP_CASES else '',
+                                        title_postfix=' (unique cases)' if drop_duplicates else '',
                                         axis=axes[j][i], show=False)
             
     plt.tight_layout()
 
-
 # %%
-test_df = pd.read_csv('../downloads/test_prots_gene_names.csv').rename({'gene_name':'gene'}, axis=1)
-_, axes = plt.subplots(1,2, figsize=(12*2,8))
-for i, DROP_DUP_CASES in enumerate([False, True]):
-    df_tcga_uni = df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode') if DROP_DUP_CASES else df_tcga
-    merged_df = plot_tcga_heat_map(test_df[~test_df.db.isin(['BindingDB', 'PDBbindDataset'])], df_tcga_uni, merged_df=None, 
-                                top=20,
-                                title_prot_subset='test proteins without PDBbindDataset', 
-                                title_postfix=' (unique cases)' if DROP_DUP_CASES else '', show=False,
-                                axis=axes[i])
-        
-plt.tight_layout()
+df_tcga = load_TCGA()
+#%%
+plot_tcga_heat_map(merged_df=df_tcga, title_prot_subset="ENTIRE TCGA MAF", top=20)
+
 # %%
