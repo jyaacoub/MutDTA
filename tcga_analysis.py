@@ -1,128 +1,136 @@
 #%% 1.Gather data for davis,kiba and pdbbind datasets
-import os
+import os, logging
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+
 from src.analysis.utils import combine_dataset_pids
 from src import config as cfg
-ROOT_DIR = "../downloads"
-kumar_db = False
-merge_by_prot_id = False
 
-# making sure NA doesnt get dropped due to pandas parsing it as NaN
-tcga_tss = pd.read_csv(f'{ROOT_DIR}/tcga_code_tables/tissueSourceSite.tsv', sep='\t', keep_default_na=False, na_values=['-1.#IND', '1.#QNAN', '1.#IND', '-1.#QNAN', '#N/A N/A', '#N/A', 'N/A', 'n/a','', '#NA', 'NULL', 'null', 'NaN', '-NaN', 'nan', '-nan', ''])
-tcga_tss['Study Name'] = tcga_tss['Study Name'].str.strip()
-tcga_bcr = pd.read_csv(f'{ROOT_DIR}/tcga_code_tables/bcrBatchCode.tsv', sep='\t', keep_default_na=False, na_values=['-1.#IND', '1.#QNAN', '1.#IND', '-1.#QNAN', '#N/A N/A', '#N/A', 'N/A', 'n/a','', '#NA', 'NULL', 'null', 'NaN', '-NaN', 'nan', '-nan', ''])
-tcga_codes = tcga_tss.merge(tcga_bcr.drop_duplicates(subset='Study Name'), on='Study Name', how='left')
-tcga_codes = tcga_codes[['TSS Code', 'Study Abbreviation']]
-
-#%% Load up db
-if kumar_db:
-    df_tcga = pd.DataFrame()
-    for f in os.listdir('/home/jean/projects/data/tcga_kumars/TCGA_hg38/'):
-        fp = os.path.join('/home/jean/projects/data/tcga_kumars/TCGA_hg38/', f)
-        print('\n', '-'*20)
-        print(f)
-        df_tmp = pd.read_csv(fp, sep='\t', dtype=str)
-
-        # dropping unnneccessary columns
-        df_tmp = df_tmp[['Tumor_Sample_Barcode', 'Hugo_Symbol', 'SWISSPROT', 
-                         'Variant_Type', 'Variant_Classification']]
-        df_tmp['case'] = df_tmp['Tumor_Sample_Barcode'].str[:12]
-        df_tmp['uniprot'] = df_tmp['SWISSPROT'].str.split('_').str[0]
-        df_tcga = pd.concat([df_tcga, df_tmp], axis=0)
-else:
-    df_tcga = pd.read_csv(f'/cluster/home/t122995uhn/projects/data/tcga/mc3/mc3.v0.2.8.PUBLIC.maf', 
-                      sep='\t', na_filter=False)
-    df_tcga = df_tcga[['Tumor_Sample_Barcode', 'Hugo_Symbol', 'SWISSPROT', 
-                        'Variant_Type', 'Variant_Classification']]
-    df_tcga['case'] = df_tcga['Tumor_Sample_Barcode'].str[:12]
-    df_tcga['uniprot'] = df_tcga['SWISSPROT'].str.split('_').str[0]
+# get all prots
+def add_gene_name(df, biomart="/cluster/home/t122995uhn/projects/data/tcga/mart_export.tsv"):
+    bdf = pd.read_csv(biomart, sep='\t')
+    bdf['PDB ID'] = bdf['PDB ID'].str.lower()
+    
+    df_davis = df[df.db == 'davis']
+    df_davis['gene'] = df_davis['code']
+    
+    df_pdbbind = df[df.db == 'PDBbindDataset'].merge(bdf.drop_duplicates(subset='PDB ID'), 
+                                                     left_on='code',   right_on="PDB ID", how="left")
+    df_kiba = df[df.db == 'kiba'].merge(bdf.drop_duplicates(subset='UniProtKB/Swiss-Prot ID'), 
+                                        left_on='prot_id',right_on="UniProtKB/Swiss-Prot ID", how="left")
+    
+    df_pdb_kiba = pd.concat([df_pdbbind, df_kiba], axis=0)
+    df_pdb_kiba.drop(['PDB ID', 'UniProtKB/Swiss-Prot ID'], inplace=True, axis=1)
+    df_pdb_kiba.rename({'Gene name':'gene'}, inplace=True, axis=1)
+        
+    return pd.concat([df_pdb_kiba, df_davis], axis=0)
+    
 
 
-# merge with tcga codes
-# Using second id to match with TSS code for cancer type
-df_tcga['TSS Code'] = df_tcga['Tumor_Sample_Barcode'].str.split('-').str[1]
-df_tcga = df_tcga.merge(tcga_codes, on='TSS Code', how='left')
+def load_TCGA(tcga_maf= "../data/tcga/mc3/mc3.v0.2.8.PUBLIC.maf", tcga_code_tables_dir='../data/tcga_code_tables/'):
+    # making sure NA doesnt get dropped due to pandas parsing it as NaN
+    tcga_codes_kwargs = dict(sep='\t', keep_default_na=False, 
+                       na_values=['-1.#IND', '1.#QNAN', '1.#IND', '-1.#QNAN', '#N/A N/A', '#N/A', 'N/A', 
+                                  'n/a', '', '#NA', 'NULL', 'null', 'NaN', '-NaN', 'nan', '-nan', ''])
+    
+    tcga_tss = pd.read_csv(f'{tcga_code_tables_dir}/tissueSourceSite.tsv',**tcga_codes_kwargs)
+    tcga_tss['Study Name'] = tcga_tss['Study Name'].str.strip()
+    tcga_bcr = pd.read_csv(f'{tcga_code_tables_dir}/bcrBatchCode.tsv', **tcga_codes_kwargs)
+    tcga_codes = tcga_tss.merge(tcga_bcr.drop_duplicates(subset='Study Name'), on='Study Name', how='left')
+    tcga_codes = tcga_codes[['TSS Code', 'Study Abbreviation']]
 
-# 3. Drop duplicates
-df_tcga_uni=df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode')
-print(len(df_tcga_uni))
-print(df_tcga_uni['Study Abbreviation'].value_counts())
+    # Load up db
+    df_tcga = pd.read_csv(tcga_maf, sep='\t', na_filter=False, 
+                    usecols=['Tumor_Sample_Barcode', 'Hugo_Symbol', 'SWISSPROT',
+                        'Variant_Type', 'Variant_Classification', 'TREMBL'])
+    # merge with tcga codes
+    # Using second id to match with TSS code for cancer type
+    df_tcga['TSS Code'] = df_tcga['Tumor_Sample_Barcode'].str[5:7]
+    df_tcga = df_tcga.merge(tcga_codes, on='TSS Code', how='left')
+    return df_tcga
+
+def plot_tcga_heat_map(prots_df=None, tcga_df=None, merged_df=None, top=10, title_prot_subset="all proteins",
+                       title_postfix='', axis=None, show=True):
+    """Returns merged dataframe of prots and tcga maf file on "gene" column"""
+    if isinstance(prots_df, str):
+        prots_df = add_gene_name(pd.read_csv(prots_df))
+        ''
+
+    assert not (prots_df is None and tcga_df is None) or merged_df, "Either provide a merged dataframe or both prots_df and tcga_df"
+    
+    if merged_df is None:
+        logging.debug("Merging TCGA MAF with proteins")
+        merged_df = tcga_df.merge(prots_df, left_on='Hugo_Symbol', right_on='gene', how='inner')
+
+    # narrow heat map to just the top cancers/genes
+    top_x_cancers = list(merged_df.value_counts('Study Abbreviation').index[:top])
+    top_x_genes = list(merged_df.value_counts('gene').index[:top])
+
+    filtered_merged_df = merged_df[merged_df['Study Abbreviation'].isin(top_x_cancers)]
+    filtered_merged_df = filtered_merged_df[filtered_merged_df['gene'].isin(top_x_genes)]
+
+    grps = filtered_merged_df.groupby(['Study Abbreviation', 'Hugo_Symbol'])
+
+    logging.debug("Building matrix with cancers, genes as the rows and columns respectively")
+    matrix = np.zeros((len(top_x_cancers), len(top_x_genes)))
+
+    for (cancer, gene), v in grps.groups.items():
+        i_cancer = top_x_cancers.index(cancer)
+        i_gene = top_x_genes.index(gene)
+        matrix[i_cancer, i_gene] = len(v)
+        
+    logging.debug("Plotting heatmap:")
+    if axis is None:
+        _, axis = plt.subplots(figsize=(12,8))
+    heatmap = axis.pcolor(matrix, cmap=plt.cm.Blues)
+
+    # Set ticks at the center of each cell
+    axis.set_xticks(np.arange(matrix.shape[1]) + 0.5, minor=False)
+    axis.set_yticks(np.arange(matrix.shape[0]) + 0.5, minor=False)
+
+    # Set tick labels
+    axis.set_xticklabels(top_x_genes, minor=False)
+    axis.set_yticklabels(top_x_cancers, minor=False)
+    axis.tick_params('x', labelrotation=45)
+    
+    axis.set_ylabel('Cancer Type')
+    axis.set_xlabel('Gene Name')
+    axis.set_title(f"Cancer type - gene counts for {title_prot_subset}{title_postfix}")
+    plt.colorbar(heatmap)
+    if show: plt.show()
+    
+    return merged_df
 
 
-#%% 4. Merging df_prots with TCGA
-df_prots = pd.read_csv(f'{ROOT_DIR}/test_prots_gene_names.csv')
-# df_prots = df_prots[df_prots.db != 'BindingDB']
+#%%
+# df_tcga = load_TCGA()
 
-if merge_by_prot_id:
-    dfm = df_tcga.merge(df_prots[df_prots.db != 'davis'], 
-                        left_on='uniprot', right_on='prot_id', how='inner')
+# df_tcga_uni['case'] = df_tcga_uni['Tumor_Sample_Barcode'].str[:12]
+# df_tcga_uni['uniprot'] = df_tcga_uni['SWISSPROT'].str.split('_').str[0]
+# df_tcga_uni['uniprot2'] = df_tcga_uni['TREMBL'].str.split(',').str[0].str.split('_').str[0]
 
-    # for davis we have to merge on HUGO_SYMBOLS
-    dfm_davis = df_tcga.merge(df_prots[df_prots.db == 'davis'], 
-                            left_on='Hugo_Symbol', right_on='prot_id', how='inner')
+# print(df_tcga_uni['Study Abbreviation'].value_counts())
 
-    dfm = pd.concat([dfm,dfm_davis], axis=0)
-    del dfm_davis # to save mem
-else: # merge by gene name
-    dfm = df_tcga.merge(df_prots, 
-                            left_on='Hugo_Symbol', right_on='gene_name', how='inner')
+#%% 
+cases = [True,False]
+test_df = pd.read_csv('../downloads/test_prots_gene_names.csv').rename({'gene_name':'gene'}, axis=1)
+csvs = {
+    'all proteins': "../downloads/all_prots.csv", 
+    'test proteins with BindingDB': test_df,
+    'test proteins': test_df[test_df.db != 'BindingDB'],
+    }
 
-dfm['Study Abbreviation'].value_counts()
+_, axes = plt.subplots(len(csvs),len(cases), figsize=(12*len(cases),8*len(csvs)))
 
-
-# %% 5. Post filtering step
-# 5.1. Filter for only those sequences with matching sequence length (to get rid of nonmatched isoforms)
-# seq_len_x is from tcga, seq_len_y is from our dataset 
-tmp = len(dfm)
-# allow for some error due to missing amino acids from pdb file in PDBbind dataset
-#   - assumption here is that isoforms will differ by more than 50 amino acids
-dfm = dfm[(dfm.seq_len_y <= dfm.seq_len_x) & (dfm.seq_len_x<= dfm.seq_len_y+50)]
-print(f"Filter #1 (seq_len)     : {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
-
-# 5.2. Filter out those that dont have the same reference seq according to the "Protein_position" and "Amino_acids" col
- 
-# Extract mutation location and reference amino acid from 'Protein_position' and 'Amino_acids' columns
-dfm['mt_loc'] = pd.to_numeric(dfm['Protein_position'].str.split('/').str[0])
-dfm = dfm[dfm['mt_loc'] < dfm['seq_len_y']]
-dfm[['ref_AA', 'mt_AA']] = dfm['Amino_acids'].str.split('/', expand=True)
-
-dfm['db_AA'] = dfm.apply(lambda row: row['prot_seq'][row['mt_loc']-1], axis=1)
-                         
-# Filter #2: Match proteins with the same reference amino acid at the mutation location
-tmp = len(dfm)
-dfm = dfm[dfm['db_AA'] == dfm['ref_AA']]
-print(f"Filter #2 (ref_AA match): {tmp:5d} - {tmp-len(dfm):5d} = {len(dfm):5d}")
-print('\n',dfm.db.value_counts())
-
-# %% final seq len distribution
-
-n_bins = 25
-lengths = dfm.seq_len_x
-fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-
-# Plot histogram
-n, bins, patches = ax.hist(lengths, bins=n_bins, color='blue', alpha=0.7)
-ax.set_title('TCGA final filtering for db matches')
-
-# Add counts to each bin
-for count, x, patch in zip(n, bins, patches):
-    ax.text(x + 0.5, count, str(int(count)), ha='center', va='bottom')
-
-ax.set_xlabel('Sequence Length')
-ax.set_ylabel('Frequency')
-
-plt.tight_layout()
-plt.show()
-
-# %% Getting updated sequences
-def apply_mut(row):
-    ref_seq = list(row['prot_seq'])
-    ref_seq[row['mt_loc']-1] = row['mt_AA']
-    return ''.join(ref_seq)
-
-dfm['mt_seq'] = dfm.apply(apply_mut, axis=1)
-
+for i, DROP_DUP_CASES in enumerate([True, False]):
+    df_tcga_uni = df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode') if DROP_DUP_CASES else df_tcga
+    
+    for j, k in enumerate(csvs.keys()):
+        merged_df = plot_tcga_heat_map(csvs[k], df_tcga_uni, merged_df=None, 
+                                       top=20,
+                                       title_prot_subset=k, 
+                                       title_postfix=' (unique cases)' if DROP_DUP_CASES else '',
+                                       axis=axes[j][i], show=False)
 
 # %%
-dfm.to_csv("/cluster/home/t122995uhn/projects/data/tcga/tcga_maf_davis_pdbbind.csv")
