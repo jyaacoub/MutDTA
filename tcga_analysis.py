@@ -102,35 +102,46 @@ def plot_tcga_heat_map(prots_df=None, tcga_df=None, merged_df=None, top=10, titl
     
     return merged_df
 
+def plot_combined_heatmap(df_tcga=None):
+    if not df_tcga:
+        df_tcga = load_TCGA()
+        df_tcga['case'] = df_tcga['Tumor_Sample_Barcode'].str[:12]
+    # df_tcga_uni['uniprot'] = df_tcga_uni['SWISSPROT'].str.split('_').str[0]
+    # df_tcga_uni['uniprot2'] = df_tcga_uni['TREMBL'].str.split(',').str[0].str.split('_').str[0]
 
-#%%
-# df_tcga = load_TCGA()
+    cases = [True,False]
+    test_df = pd.read_csv('../downloads/test_prots_gene_names.csv').rename({'gene_name':'gene'}, axis=1)
+    csvs = {
+        'all proteins': "../downloads/all_prots.csv", 
+        'test proteins with BindingDB': test_df,
+        'test proteins': test_df[test_df.db != 'BindingDB'],
+        }
 
-# df_tcga_uni['case'] = df_tcga_uni['Tumor_Sample_Barcode'].str[:12]
-# df_tcga_uni['uniprot'] = df_tcga_uni['SWISSPROT'].str.split('_').str[0]
-# df_tcga_uni['uniprot2'] = df_tcga_uni['TREMBL'].str.split(',').str[0].str.split('_').str[0]
+    _, axes = plt.subplots(len(csvs),len(cases), figsize=(12*len(cases),8*len(csvs)))
 
-# print(df_tcga_uni['Study Abbreviation'].value_counts())
+    for i, DROP_DUP_CASES in enumerate(cases):
+        df_tcga_uni = df_tcga.drop_duplicates(subset='case') if DROP_DUP_CASES else df_tcga
+        
+        for j, k in enumerate(csvs.keys()):
+            merged_df = plot_tcga_heat_map(csvs[k], df_tcga_uni, merged_df=None, 
+                                        top=20,
+                                        title_prot_subset=k, 
+                                        title_postfix=' (unique cases)' if DROP_DUP_CASES else '',
+                                        axis=axes[j][i], show=False)
+            
+    plt.tight_layout()
 
-#%% 
-cases = [True,False]
+
+# %%
 test_df = pd.read_csv('../downloads/test_prots_gene_names.csv').rename({'gene_name':'gene'}, axis=1)
-csvs = {
-    'all proteins': "../downloads/all_prots.csv", 
-    'test proteins with BindingDB': test_df,
-    'test proteins': test_df[test_df.db != 'BindingDB'],
-    }
-
-_, axes = plt.subplots(len(csvs),len(cases), figsize=(12*len(cases),8*len(csvs)))
-
-for i, DROP_DUP_CASES in enumerate([True, False]):
+_, axes = plt.subplots(1,2, figsize=(12*2,8))
+for i, DROP_DUP_CASES in enumerate([False, True]):
     df_tcga_uni = df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode') if DROP_DUP_CASES else df_tcga
-    
-    for j, k in enumerate(csvs.keys()):
-        merged_df = plot_tcga_heat_map(csvs[k], df_tcga_uni, merged_df=None, 
-                                       top=20,
-                                       title_prot_subset=k, 
-                                       title_postfix=' (unique cases)' if DROP_DUP_CASES else '',
-                                       axis=axes[j][i], show=False)
-
+    merged_df = plot_tcga_heat_map(test_df[~test_df.db.isin(['BindingDB', 'PDBbindDataset'])], df_tcga_uni, merged_df=None, 
+                                top=20,
+                                title_prot_subset='test proteins without PDBbindDataset', 
+                                title_postfix=' (unique cases)' if DROP_DUP_CASES else '', show=False,
+                                axis=axes[i])
+        
+plt.tight_layout()
 # %%
