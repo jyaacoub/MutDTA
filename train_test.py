@@ -46,7 +46,7 @@ torch.manual_seed(args.rand_seed)
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False, # forces full training
-                            patience=50, min_delta=0.2)
+                            patience=50)
 
 # %% Training loop
 metrics = {}
@@ -73,7 +73,7 @@ for (MODEL, DATA,
     os.makedirs(f'{media_save_p}/train_log/', exist_ok=True)
 
 
-    # ==== LOAD DATA ====    
+    # ==== LOAD DATA ====
     loaders = Loader.load_DataLoaders(data=DATA, pro_feature=FEATURE, edge_opt=EDGEW, path=cfg.DATA_ROOT, 
                                         ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                         batch_train=BATCH_SIZE,
@@ -88,6 +88,7 @@ for (MODEL, DATA,
                                 ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                 **unknown_args).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
+    cp_saver.min_delta = 0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.05
     
     if DEBUG: 
         # run single batch through model

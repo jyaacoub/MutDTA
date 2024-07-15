@@ -143,7 +143,7 @@ def dtrain(args, unknown_args):
     
     cp_saver = CheckpointSaver(model=model, save_path=f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
-                            patience=50, min_delta=0.2,
+                            patience=50, min_delta=(0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.05),
                             dist_rank=args.rank)
     # load ckpnt
     if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
