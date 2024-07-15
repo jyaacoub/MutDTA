@@ -1,3 +1,31 @@
+# %% oncokb proteins
+import pandas as pd
+
+kb_df = pd.read_csv('/cluster/home/t122995uhn/projects/downloads/oncoKB_DrugGenePairList.csv')
+kb_prots = set(kb_df.gene)
+
+
+davis_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/davis/test.csv')
+davis_df['gene'] = davis_df.prot_id.str.split('(').str[0]
+kiba_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/kiba/test.csv')
+pdb_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/pdbbind/test.csv')
+
+davis_df['db'] = 'davis'
+kiba_df['db'] = 'kiba'
+pdb_df['db'] = 'pdbbind'
+
+#%%
+all_df = pd.concat([davis_df, kiba_df, pdb_df], axis=0)
+new_order = ['db'] + [x for x in all_df.columns if x != 'db']
+all_df = all_df[new_order].drop(['seq_len', 
+                                'gene_matched_on_pdb_id', 
+                                'gene_matched_on_uniprot_id'], axis=1)
+
+all_df.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/all_tests.csv')
+
+kb_overlap_test = all_df[all_df.gene.isin(kb_prots)]
+
+kb_overlap_test.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/all_tests_oncokb.csv')
 # %%
 ########################################################################
 ########################## VIOLIN PLOTTING #############################
