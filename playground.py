@@ -26,6 +26,11 @@ all_df.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/all_tests.csv')
 kb_overlap_test = all_df[all_df.gene.isin(kb_prots)]
 
 kb_overlap_test.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/all_tests_oncokb.csv')
+
+['BRAF', 'ERBB2', 'FGFR2', 'FGFR3', 'KIT', 'PDGFRA', 'PIK3CA', 
+ 'RAF1', 'CHEK1', 'CHEK2', 'FGFR1', 'MAP2K1', 'MAP2K2', 'MTOR', 
+ 'EZH2', 'KDM6A', 'HRAS', 'KRAS', 'IDH1', 'PTEN', 'ESR1', 'BRIP1']
+
 # %%
 ########################################################################
 ########################## VIOLIN PLOTTING #############################
