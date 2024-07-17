@@ -115,9 +115,15 @@ class Loader():
                         pro_feat='all', # to include all feats (esm + 52 from DGraphDTA)
                         edge_weight_opt=pro_edge)
         elif model == 'EDI':
+            pro_emb_dim = 512 # increase embedding size
+            if "pro_emb_dim" in kwargs:
+                pro_emb_dim = kwargs['pro_emb_dim']
+                logging.warning(f'pro_emb_dim changed from default of {512} to {pro_emb_dim} for model EDI')
+                del kwargs['pro_emb_dim']
+                
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
                         num_features_pro=320,
-                        pro_emb_dim=512, # increase embedding size
+                        pro_emb_dim=pro_emb_dim,
                         dropout=dropout,
                         pro_feat='esm_only',
                         edge_weight_opt=pro_edge,
