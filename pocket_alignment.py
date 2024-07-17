@@ -6,7 +6,6 @@ mask from a binding pocket sequence.
 from Bio import Align
 from Bio.Align import substitution_matrices
 import torch
-from torch_geometric.data import Data
 
 
 def create_pocket_mask(target_seq: str, query_seq: str) -> list[bool]:
@@ -65,9 +64,17 @@ def mask_graph(data, mask: list[bool]):
 
     Return
     ------
-    masked_data : torch_geometric.data.Data
-        A data object with the same attributes as data, but representing only
-        the binding pocket part of the sequence in the graph
+    data : torch_geometric.data.Data
+        The same data object that is in the parameters, with the following
+        additional attributes:
+        -pocket_mask : list[bool]
+            The mask specified by the mask parameter of dimension [full_seuqence_length]
+        -pocket_mask_x : torch.Tensor
+            The nodes of only the pocket of the protein sequence of dimension
+            [pocket_sequence_length, num_features]
+        -pocket_mask_edge_index : torch.Tensor
+            The edge connections in COO format only relating to 
+            the pocket nodes of the protein sequence of dimension [2, num_pocket_edges]
     """
     nodes = data.x[mask]
     edges = data.edge_index
@@ -79,13 +86,10 @@ def mask_graph(data, mask: list[bool]):
         edge_mask.append(True) if mask[node_1] and mask[node_2] else edge_mask.append(False)  
     edges = torch.transpose(torch.transpose(edges, 0, 1)[edge_mask], 0, 1)
     
-    masked_data = Data(
-        x=nodes,
-        edge_index=edges,
-        pro_seq=data.pro_seq,
-        prot_id=data.prot_id
-    )
-    return masked_data
+    data.pocket_mask = mask
+    data.pocket_mask_x = nodes
+    data.pocket_mask_edge_index = edges
+    return data
 
 
 if __name__ == '__main__':
