@@ -1,4 +1,18 @@
 #%%
+# test gvpl model to make sure it worked correctly!
+from src.utils.loader import Loader
+
+m = Loader.init_model('GVPL', 'nomsa', 'binary')
+
+#%%
+import torch
+smi, lig = next(iter(torch.load('../data/DavisKibaDataset/davis/nomsa_binary_gvp_binary/test/data_mol.pt').items()))
+pid, pro = next(iter(torch.load('../data/DavisKibaDataset/davis/nomsa_binary_gvp_binary/test/data_pro.pt').items()))
+
+m(pro,lig)
+
+
+#%%
 train_genes = ["CDC2L1", "ABL1(E255K)", "IRAK1", "AAK1", "RET(M918T)", "RSK1(KinDom.2-C-terminal)", "HIPK1", "CSNK1G3,"
     "CHEK2", "PDPK1", "EGFR(S752I759del)", "CDC2L2", "ERN1", "CDK4-cyclinD1", "PLK3", "TIE1", "TIE2", "CDKL5,"
     "RSK4(KinDom.2-C-terminal)", "WEE1", "RIPK4", "TNK2", "SGK3", "MRCKA", "SLK", "MAK", "GCN2(KinDom2S808G),"
@@ -43,6 +57,38 @@ import pandas as pd
 train_df = pd.read_csv('/cluster/home/t122995uhn/projects/data/DavisKibaDataset/davis/nomsa_binary_original_binary/full/XY.csv')
 test_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/davis/test.csv')
 train_df = train_df[~train_df.prot_id.isin(set(test_df.prot_id))]
+
+# %%
+import pandas as pd
+
+davis_test_df = pd.read_csv(f"/home/jean/projects/MutDTA/splits/davis/test.csv")
+davis_test_df['gene'] = davis_test_df['prot_id'].str.split('(').str[0]
+
+#%% ONCO KB MERGE
+onco_df = pd.read_csv("../data/oncoKB_DrugGenePairList.csv")
+davis_join_onco = davis_test_df.merge(onco_df.drop_duplicates("gene"), on="gene", how="inner")
+
+# %%
+onco_df = pd.read_csv("../data/oncoKB_DrugGenePairList.csv")
+onco_df.merge(davis_test_df.drop_duplicates("gene"), on="gene", how="inner").value_counts("gene")
+
+
+
+
+
+
+
+
+
+# %%
+from src.train_test.splitting import resplit
+from src import cfg
+
+db_p = lambda x: f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_{x}_gvp_binary'
+
+db = resplit(dataset=db_p('binary'), split_files=db_p('aflow'), use_train_set=True)
+
+
 
 # %%
 ########################################################################
