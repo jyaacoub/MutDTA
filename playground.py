@@ -9,7 +9,28 @@ import torch
 smi, lig = next(iter(torch.load('../data/DavisKibaDataset/davis/nomsa_binary_gvp_binary/test/data_mol.pt').items()))
 pid, pro = next(iter(torch.load('../data/DavisKibaDataset/davis/nomsa_binary_gvp_binary/test/data_pro.pt').items()))
 
-m(pro,lig)
+#%%
+from copy import deepcopy
+s0 = deepcopy(m.state_dict())
+
+# %% train with single sample
+from torch import nn
+criterion = nn.MSELoss()
+optim = torch.optim.Adam(m.parameters(), lr=1)
+
+m.train()
+loss = criterion(m(pro, lig), torch.tensor([1.0]))
+
+optim.zero_grad()
+loss.backward()
+optim.step()
+#%%
+for k in m.state_dict():
+    v1 = s0[k]
+    v2 = m.state_dict()[k]
+    if torch.allclose(v1, v2):
+        print(k)
+
 
 
 #%%
