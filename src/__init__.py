@@ -119,6 +119,61 @@ TUNED_MODEL_CONFIGS = {
     #####################################################
     ############## kiba #################################
     #####################################################
+    'kiba_DG': { #DGM_kiba0D_nomsaF_binaryE_128B_0.0001LR_0.4D_2000E
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.kiba,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+      	'lr': 0.0001,
+    	'batch_size': 128,
+    
+    	'architecture_kwargs': {
+    		'dropout': 0.4,
+            'output_dim': 128,
+    	}
+    },
+    'kiba_aflow':{
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.kiba,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                 
+        'lr': 0.0001139464546302261, 
+        'batch_size': 64, 
+        
+        'architecture_kwargs': {
+            'dropout': 0.4321620419748407, 
+            'output_dim': 512
+        }
+    },
+    'kiba_esm':{ #EDIM_kiba0D_nomsaF_binaryE_48B_0.0001LR_0.4D_2000E
+        "model": cfg.MODEL_OPT.EDI,
+                
+        "dataset": cfg.DATA_OPT.kiba,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+ 
+        'lr': 0.0001, 
+        'batch_size': 48, # global batch size (local was 12)
+        
+        'architecture_kwargs': {
+            'dropout': 0.4, 
+            'dropout_prot': 0.0, 
+            'output_dim': 128, 
+            'pro_extra_fc_lyr': False, 
+            'pro_emb_dim': 512 # just for reference since this is the default for EDI
+        }
+    },
+    
     'kiba_gvpl_aflow': {
         "model": cfg.MODEL_OPT.GVPL,
                 
