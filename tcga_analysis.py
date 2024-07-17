@@ -51,7 +51,8 @@ def load_TCGA(tcga_maf= "../data/tcga/mc3/mc3.v0.2.8.PUBLIC.maf", tcga_code_tabl
 
 def plot_tcga_heat_map(prots_df=None, tcga_df=None, merged_df=None, top=10, title_prot_subset="all proteins",
                        title_postfix='', axis=None, show=True, tf_idf_score=False):
-    """Returns merged dataframe of prots and tcga maf file on "gene" column"""
+    """ THIS IS THE OLD HEAT MAP, USE THE OTHER FUNCTION (`normalized_heatmap`).
+    Returns merged dataframe of prots and tcga maf file on "gene" column"""
     if isinstance(prots_df, str):
         prots_df = add_gene_name(pd.read_csv(prots_df))
 
@@ -103,72 +104,10 @@ def plot_tcga_heat_map(prots_df=None, tcga_df=None, merged_df=None, top=10, titl
     
     return merged_df
 
-def plot_combined_heatmap(df_tcga=None):
-    if not df_tcga:
-        df_tcga = load_TCGA()
-        df_tcga['case'] = df_tcga['Tumor_Sample_Barcode'].str[:12]
-    # df_tcga_uni['uniprot'] = df_tcga_uni['SWISSPROT'].str.split('_').str[0]
-    # df_tcga_uni['uniprot2'] = df_tcga_uni['TREMBL'].str.split(',').str[0].str.split('_').str[0]
-
-    cases = [True,False]
-    test_df = pd.read_csv('../downloads/test_prots_gene_names.csv').rename({'gene_name':'gene'}, axis=1)
-    csvs = {
-        'all proteins': "../downloads/all_prots.csv", 
-        'test proteins with BindingDB': test_df,
-        'test proteins': test_df[test_df.db != 'BindingDB'],
-        }
-
-    _, axes = plt.subplots(len(csvs),len(cases), figsize=(12*len(cases),8*len(csvs)))
-
-    for i, drop_duplicates in enumerate(cases):
-        df_tcga_uni = df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode') if drop_duplicates else df_tcga
-        
-        for j, k in enumerate(csvs.keys()):
-            merged_df = plot_tcga_heat_map(csvs[k], df_tcga_uni, merged_df=None, 
-                                        top=20,
-                                        title_prot_subset=k, 
-                                        title_postfix=' (unique cases)' if drop_duplicates else '',
-                                        axis=axes[j][i], show=False)
-            
-    plt.tight_layout()
-
-def box_plot(df_tcga, normalize=False, limit=20):
-    groups = df_tcga.groupby(['Study Abbreviation', 'Tumor_Sample_Barcode']).size().reset_index(name='counts')
-    # Group by 'Study Abbreviation' to get the size of each group
-    group_sizes = groups.groupby('Study Abbreviation').groups
-
-    # Convert the dictionary to a DataFrame suitable for seaborn
-    df = pd.DataFrame([(k, v) for k, lst in group_sizes.items() for v in lst], columns=['Study Abbreviation', 'Group Size'])
-    df.sort_values(by='Group Size', ascending=False, inplace=True)
-
-    # limiting to top x cancers:
-    cancer_size = df.groupby('Study Abbreviation').sum().sort_values(by="Group Size", ascending=False).iloc[:limit]
-    cancer_size.rename({"Group Size": "Total"}, axis=1, inplace=True)
-    top_x_cancers = cancer_size.index
-
-    df = df[df['Study Abbreviation'].isin(top_x_cancers)]
-
-    if normalize:
-        # Merge the original dataframe with the aggregated counts dataframe
-        df = df.merge(cancer_size, on='Study Abbreviation')
-
-        # Normalize the 'Group Size' by dividing by the 'Aggregated Count'
-        df['Normalized Group Size'] = df['Group Size'] / df['Total']
-        
-        
-    # Plotting the boxplot with seaborn
-    plt.figure(figsize=(12, 8))
-    sns.boxplot(x='Study Abbreviation', y=f'{"Normalized " if normalize else ""}Group Size', 
-                data=df)
-    plt.xlabel('Cancer type')
-    plt.ylabel(f'Mutation counts{" (normalized by cancer size)" if normalize else ""}')
-    plt.title(f'Boxplot of {"normalized " if normalize else ""}patient mutation count by cancer type')
-    plt.xticks(rotation=45)
-    plt.show()
-
 def normalized_heatmap(merged_df, top=100, tfidf=False, normalize=True, normalize_by='avg',
                         biomart_csv='/cluster/home/t122995uhn/projects/downloads/mart_export.tsv',
                         variant=None, axis=None, merged_df_name='ALL TCGA'):
+    """Normalize_by can take on the following values: [avg, max, None], if "None" then we normalize by the gene counts"""
     df_gene_len = pd.read_csv(biomart_csv, sep='\t')
     df_gene_len.dropna(inplace=True)
 
@@ -250,10 +189,73 @@ def normalized_heatmap(merged_df, top=100, tfidf=False, normalize=True, normaliz
     axis.set_xlabel('Gene Name')
     plt.colorbar(heatmap)
 
+def plot_combined_heatmap(df_tcga=None):
+    """Plotting heatmaps filtered for different test sets"""
+    if not df_tcga:
+        df_tcga = load_TCGA()
+        df_tcga['case'] = df_tcga['Tumor_Sample_Barcode'].str[:12]
+    # df_tcga_uni['uniprot'] = df_tcga_uni['SWISSPROT'].str.split('_').str[0]
+    # df_tcga_uni['uniprot2'] = df_tcga_uni['TREMBL'].str.split(',').str[0].str.split('_').str[0]
+
+    cases = [True,False]
+    test_df = pd.read_csv('../downloads/test_prots_gene_names.csv').rename({'gene_name':'gene'}, axis=1)
+    csvs = {
+        'all proteins': "../downloads/all_prots.csv", 
+        'test proteins with BindingDB': test_df,
+        'test proteins': test_df[test_df.db != 'BindingDB'],
+        }
+
+    _, axes = plt.subplots(len(csvs),len(cases), figsize=(12*len(cases),8*len(csvs)))
+
+    for i, drop_duplicates in enumerate(cases):
+        df_tcga_uni = df_tcga.drop_duplicates(subset='Tumor_Sample_Barcode') if drop_duplicates else df_tcga
+        
+        for j, k in enumerate(csvs.keys()):
+            merged_df = plot_tcga_heat_map(csvs[k], df_tcga_uni, merged_df=None, 
+                                        top=20,
+                                        title_prot_subset=k, 
+                                        title_postfix=' (unique cases)' if drop_duplicates else '',
+                                        axis=axes[j][i], show=False)
+            
+    plt.tight_layout()
+
+def box_plot(df_tcga, normalize=False, limit=20):
+    groups = df_tcga.groupby(['Study Abbreviation', 'Tumor_Sample_Barcode']).size().reset_index(name='counts')
+    # Group by 'Study Abbreviation' to get the size of each group
+    group_sizes = groups.groupby('Study Abbreviation').groups
+
+    # Convert the dictionary to a DataFrame suitable for seaborn
+    df = pd.DataFrame([(k, v) for k, lst in group_sizes.items() for v in lst], columns=['Study Abbreviation', 'Group Size'])
+    df.sort_values(by='Group Size', ascending=False, inplace=True)
+
+    # limiting to top x cancers:
+    cancer_size = df.groupby('Study Abbreviation').sum().sort_values(by="Group Size", ascending=False).iloc[:limit]
+    cancer_size.rename({"Group Size": "Total"}, axis=1, inplace=True)
+    top_x_cancers = cancer_size.index
+
+    df = df[df['Study Abbreviation'].isin(top_x_cancers)]
+
+    if normalize:
+        # Merge the original dataframe with the aggregated counts dataframe
+        df = df.merge(cancer_size, on='Study Abbreviation')
+
+        # Normalize the 'Group Size' by dividing by the 'Aggregated Count'
+        df['Normalized Group Size'] = df['Group Size'] / df['Total']
+        
+        
+    # Plotting the boxplot with seaborn
+    plt.figure(figsize=(12, 8))
+    sns.boxplot(x='Study Abbreviation', y=f'{"Normalized " if normalize else ""}Group Size', 
+                data=df)
+    plt.xlabel('Cancer type')
+    plt.ylabel(f'Mutation counts{" (normalized by cancer size)" if normalize else ""}')
+    plt.title(f'Boxplot of {"normalized " if normalize else ""}patient mutation count by cancer type')
+    plt.xticks(rotation=45)
+    plt.show()
+
 
 # %%
 df_tcga = load_TCGA()
-
 
 # %%
 variants = [None, 'Missense_Mutation', 'Silent', "3'UTR", "Nonsense_Mutation"]
@@ -275,5 +277,3 @@ for j, (k,subset) in enumerate(subsets.items()):
         normalized_heatmap(merged_df, normalize_by='avg', variant=v, axis=axes[i][j], merged_df_name=k)
     
 plt.tight_layout()
-
-# %%
