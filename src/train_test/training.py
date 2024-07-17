@@ -16,7 +16,7 @@ from src.models.utils import BaseModel
 
 class CheckpointSaver:
     # Adapted from https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-    def __init__(self, model:BaseModel, save_path=None, train_all=True, patience=30, 
+    def __init__(self, model:BaseModel, save_path=None, train_all=True, patience=100, 
                  min_delta=0.2, debug=False, dist_rank:int=None):
         """
         Early stopping and checkpoint saving class.
@@ -163,9 +163,10 @@ def train(model: BaseModel, train_loader:DataLoader, val_loader:DataLoader,
     CRITERION = torch.nn.MSELoss()
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=lr_0, **kwargs)
     # gamma = (lr_e/lr_0)**(step_size/epochs) # calculate gamma based on final lr chosen.
-    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', patience=saver.patience-1, 
-                                  threshold=saver.min_delta*0.1, 
-                                  min_lr=5e-7, factor=0.8,
+    SCHEDULER = ReduceLROnPlateau(OPTIMIZER, mode='min', 
+                                  patience=int(saver.patience*0.9), 
+                                  threshold=saver.min_delta*0.1, # more sensitive than early stopper 
+                                  min_lr=5e-7, factor=0.5,
                                   verbose=True)
 
     logs = {'train_loss': [], 'val_loss': []}
