@@ -933,14 +933,15 @@ class DavisKibaDataset(BaseDataset):
             # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
             no_confs.append('TESK1')
            
-            print(f'Number of codes missing af2 configurations: {len(no_confs)} / {len(codes)}')
+            logging.warning(f'Number of codes missing {"aflow" if self.alphaflow else "af2"} ' + \
+                            f'conformations: {len(no_confs)} / {len(codes)}')
            
         invalid_codes = set(no_aln + no_cmap + no_confs)
         # filtering out invalid codes and storing their index vals.
         lig_r = [r for i,r in enumerate(lig_r) if codes[prot_c[i]] not in invalid_codes]
         prot_c = [c for c in prot_c if codes[c] not in invalid_codes]
         
-        assert len(prot_c) > 10, f"Not enough proteins in dataset, {len(prot_c)} total."
+        assert len(prot_c) > 10, f"Not enough proteins in dataset, {len(prot_c)} total from {self.af_conf_dir}"
         
         # creating binding dataframe:
         #   code,SMILE,pkd,prot_seq

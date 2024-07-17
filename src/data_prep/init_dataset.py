@@ -62,7 +62,7 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
     for data,     FEATURE,      EDGE, ligand_feature, ligand_edge in itertools.product(
         data_opt, feat_opt, edge_opt, ligand_features, ligand_edges):
         
-        print('\n', data, FEATURE, EDGE)
+        print('\n', data, FEATURE, EDGE, ligand_feature, ligand_edge)
         if data in ['davis', 'kiba']:
             if FEATURE == 'msa':
                 # position frequency matrix creation -> important for msa feature
