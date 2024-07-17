@@ -5,9 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from src.analysis.utils import combine_dataset_pids
-from src import config as cfg
-
 # get all prots
 def add_gene_name(df, biomart="/cluster/home/t122995uhn/projects/data/tcga/mart_export.tsv"):
     bdf = pd.read_csv(biomart, sep='\t')
