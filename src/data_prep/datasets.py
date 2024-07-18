@@ -654,7 +654,7 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         # Get binding data:
         df_binding = PDBbindProcessor.get_binding_data(self.raw_paths[0]) # _data.2020
         df_binding.drop(columns=['resolution', 'release_year'], inplace=True)
-        df_binding.rename({'lig_name':'lig_id'}, inplace=True)
+        df_binding.rename({'lig_name':'lig_id'}, inplace=True, axis=1)
         pdb_codes = df_binding.index # pdbcodes
         
         ############## validating codes #############
