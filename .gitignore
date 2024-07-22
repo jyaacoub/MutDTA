@@ -225,4 +225,4 @@ results/model_media/*/test_set_pred/*
 results/model_media/test_set_pred
 
 splits/**/*.csv
-results/v113/model_media/*/train_log/*.json
+results/*/model_media/*/train_log/*.json
