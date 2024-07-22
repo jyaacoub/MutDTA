@@ -84,7 +84,7 @@ class LIG_FEAT_OPT(StringEnum):
 #############################
 # save paths
 #############################
-DATA_ROOT = os.path.abspath('../data/')
+from pathlib import Path
 
 # Model save paths
 issue_number = 113  # 113 is for unifying all splits for cross validation so that we are more confident 
@@ -113,18 +113,21 @@ if 'uhnh4h' in DOMAIN_NAME:
     SLURM_PARTITION = 'gpu'
     SLURM_CONSTRAINT = 'gpu32g'
     SLURM_ACCOUNT = 'kumargroup_gpu'
+    DATA_ROOT = os.path.abspath('../data/')
 elif 'graham' in DOMAIN_NAME:
     CLUSTER = 'graham'
     SLURM_CONSTRAINT = 'cascade,v100'
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
 elif 'cedar' in DOMAIN_NAME:
     CLUSTER = 'cedar'
     SLURM_GPU_NAME = 'v100l'
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
 elif 'narval' in DOMAIN_NAME:
     CLUSTER = 'narval'
     SLURM_GPU_NAME = 'a100'
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
     
 # bin paths
-from pathlib import Path
 FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
 MMSEQ2_BIN = f'{Path.home()}/lib/mmseqs/bin/mmseqs'
 RING3_BIN = f'{Path.home()}/lib/ring-3.0.0/ring/bin/ring'
