@@ -173,7 +173,6 @@ TUNED_MODEL_CONFIGS = {
             'pro_emb_dim': 512 # just for reference since this is the default for EDI
         }
     },
-    
     'kiba_gvpl_aflow': {
         "model": cfg.MODEL_OPT.GVPL,
                 
@@ -214,6 +213,62 @@ TUNED_MODEL_CONFIGS = {
     #####################################################
     ########### PDBbind #################################
     #####################################################
+    #DGM_PDBbind0D_nomsaF_binaryE_64B_0.0001LR_0.4D_2000E
+    'PDBbind_DG': {
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+                
+      	'lr': 0.0001,
+    	'batch_size': 64,
+    
+    	'architecture_kwargs': {
+    		'dropout': 0.4,
+            'output_dim': 128,
+    	}
+    },
+    'PDBbind_aflow':{
+        "model": cfg.MODEL_OPT.DG,
+                
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+            
+        'lr': 0.0009185598967356679, 
+        'batch_size': 128, 
+        
+        'architecture_kwargs': {
+            'dropout': 0.22880989869337157, 
+            'output_dim': 256
+        }
+    },
+    #EDIM_PDBbind1D_nomsaF_binaryE_48B_0.0001LR_0.4D_2000E
+    'PDBbind_esm':{
+        "model": cfg.MODEL_OPT.EDI,
+                
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+ 
+        'lr': 0.0001, 
+        'batch_size': 48, # global batch size (local was 12)
+        
+        'architecture_kwargs': {
+            'dropout': 0.4, 
+            'dropout_prot': 0.0, 
+            'output_dim': 128, 
+            'pro_extra_fc_lyr': False, 
+            'pro_emb_dim': 512 # just for reference since this is the default for EDI
+        }
+    },
     #GVPLM_PDBbind0D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE
     'PDBbind_gvpl_aflow':{
         "model": cfg.MODEL_OPT.GVPL,
@@ -248,23 +303,6 @@ TUNED_MODEL_CONFIGS = {
         'architecture_kwargs': {
             'dropout': 0.4661593536060576, 
             'output_dim': 512
-        }
-    },
-    'PDBbind_aflow':{
-        "model": cfg.MODEL_OPT.DG,
-                
-        "dataset": cfg.DATA_OPT.PDBbind,
-        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
-        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
-        "lig_feat_opt": cfg.LIG_FEAT_OPT.original,
-        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
-            
-        'lr': 0.0009185598967356679, 
-        'batch_size': 128, 
-        
-        'architecture_kwargs': {
-            'dropout': 0.22880989869337157, 
-            'output_dim': 256
         }
     },
 }
