@@ -14,25 +14,43 @@ from src.models.prior_work import DGraphDTA
 from src.models.ring3 import Ring3Branch
 
 
-class GVPLigand_DGPro(DGraphDTA):
+class GVPLigand_DGPro(BaseModel):
     """
     DG model with GVP Ligand branch
+    
+    model = GVPLigand_DGPro(num_features_pro=num_feat_pro,
+                                    dropout=dropout, 
+                                    edge_weight_opt=pro_edge,
+                                    **kwargs)
     """
     def __init__(self, num_features_pro=54,
-                 num_features_mol=78, 
                  output_dim=512,
                  dropout=0.2,
                  num_GVPLayers=3,
                  edge_weight_opt='binary', **kwargs):
         output_dim = int(output_dim)
-        super(GVPLigand_DGPro, self).__init__(num_features_pro, 
-                                                num_features_mol, output_dim, 
-                                                dropout, edge_weight_opt)
+        super(GVPLigand_DGPro, self).__init__(pro_feat=None,
+                                              edge_weight_opt=edge_weight_opt)
         
         self.gvp_ligand = GVPBranchLigand(num_layers=num_GVPLayers, 
                                           final_out=output_dim,
                                           drop_rate=dropout)
         
+        # protein branch:
+        emb_feat= 54 # to ensure constant embedding size regardless of input size (for fair comparison)
+        self.pro_conv1 = GCNConv(num_features_pro, emb_feat)
+        self.pro_conv2 = GCNConv(emb_feat, emb_feat * 2)
+        self.pro_conv3 = GCNConv(emb_feat * 2, emb_feat * 4)
+        self.pro_fc = nn.Sequential(
+            nn.Linear(emb_feat * 4, 1024),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(1024, output_dim),
+            nn.Dropout(dropout)
+        )
+        self.relu = nn.ReLU()
+        
+        # concat branch to feedforward network
         self.dense_out = nn.Sequential(
             nn.Linear(2*output_dim, 1024),
             nn.Dropout(dropout),
@@ -50,6 +68,30 @@ class GVPLigand_DGPro(DGraphDTA):
     
     def forward_mol(self, data):
         return self.gvp_ligand(data)
+    
+    def forward_pro(self, data):
+        # get protein input
+        target_x, ei, target_batch = data.x, data.edge_index, data.batch
+        # if edge_weight doesnt exist no error is thrown it just passes it as None
+        ew = data.edge_weight if self.edge_weight else None
+
+        xt = self.pro_conv1(target_x, ei, ew)
+        xt = self.relu(xt)
+
+        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
+        xt = self.pro_conv2(xt, ei, ew)
+        xt = self.relu(xt)
+        
+        # target_edge_index, _ = dropout_adj(target_edge_index, training=self.training)
+        xt = self.pro_conv3(xt, ei, ew)
+        xt = self.relu(xt)
+
+        # xt = self.pro_conv4(xt, target_edge_index)
+        # xt = self.relu(xt)
+        xt = gep(xt, target_batch)  # global pooling
+
+        # FFNN
+        return self.pro_fc(xt)
     
     def forward(self, data_pro, data_mol):
         xm = self.forward_mol(data_mol)

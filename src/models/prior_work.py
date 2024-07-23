@@ -68,7 +68,8 @@ class DGraphDTA(BaseModel):
         xt = gep(xt, target_batch)  # global pooling
 
         # flatten
-        xt = self.relu(self.pro_fc_g1(xt))
+        xt = self.pro_fc_g1(xt)
+        xt = self.relu(xt)
         xt = self.dropout(xt)
         xt = self.pro_fc_g2(xt)
         xt = self.dropout(xt)

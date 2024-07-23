@@ -1,46 +1,47 @@
-# %% oncokb proteins
+# %%
+import pandas as pd
+train_df = pd.read_csv('/cluster/home/t122995uhn/projects/data/DavisKibaDataset/davis/nomsa_binary_original_binary/full/XY.csv')
+test_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/davis/test.csv')
+train_df = train_df[~train_df.prot_id.isin(set(test_df.prot_id))]
+
+# %%
 import pandas as pd
 
-kb_df = pd.read_csv('/cluster/home/t122995uhn/projects/downloads/oncoKB_DrugGenePairList.csv')
-kb_prots = set(kb_df.gene)
+davis_test_df = pd.read_csv(f"/home/jean/projects/MutDTA/splits/davis/test.csv")
+davis_test_df['gene'] = davis_test_df['prot_id'].str.split('(').str[0]
+
+#%% ONCO KB MERGE
+onco_df = pd.read_csv("../data/oncoKB_DrugGenePairList.csv")
+davis_join_onco = davis_test_df.merge(onco_df.drop_duplicates("gene"), on="gene", how="inner")
+
+# %%
+onco_df = pd.read_csv("../data/oncoKB_DrugGenePairList.csv")
+onco_df.merge(davis_test_df.drop_duplicates("gene"), on="gene", how="inner").value_counts("gene")
 
 
-davis_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/davis/test.csv')
-davis_df['gene'] = davis_df.prot_id.str.split('(').str[0]
-kiba_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/kiba/test.csv')
-pdb_df = pd.read_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/pdbbind/test.csv')
 
-davis_df['db'] = 'davis'
-kiba_df['db'] = 'kiba'
-pdb_df['db'] = 'pdbbind'
 
-#%%
-all_df = pd.concat([davis_df, kiba_df, pdb_df], axis=0)
-new_order = ['db'] + [x for x in all_df.columns if x != 'db']
-all_df = all_df[new_order].drop(['seq_len', 
-                                'gene_matched_on_pdb_id', 
-                                'gene_matched_on_uniprot_id'], axis=1)
 
-all_df.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/all_tests.csv')
 
-kb_overlap_test = all_df[all_df.gene.isin(kb_prots)]
 
-kb_overlap_test.to_csv('/cluster/home/t122995uhn/projects/MutDTA/splits/all_tests_oncokb.csv')
 
-['BRAF', 'ERBB2', 'FGFR2', 'FGFR3', 'KIT', 'PDGFRA', 'PIK3CA', 
- 'RAF1', 'CHEK1', 'CHEK2', 'FGFR1', 'MAP2K1', 'MAP2K2', 'MTOR', 
- 'EZH2', 'KDM6A', 'HRAS', 'KRAS', 'IDH1', 'PTEN', 'ESR1', 'BRIP1']
+
+# %%
+from src.train_test.splitting import resplit
+from src import cfg
+
+db_p = lambda x: f'{cfg.DATA_ROOT}/DavisKibaDataset/davis/nomsa_{x}_gvp_binary'
+
+db = resplit(dataset=db_p('binary'), split_files=db_p('aflow'), use_train_set=True)
+
+
 
 # %%
 ########################################################################
 ########################## VIOLIN PLOTTING #############################
 ########################################################################
 import logging
-from typing import OrderedDict
-
-import seaborn as sns
 from matplotlib import pyplot as plt
-from statannotations.Annotator import Annotator
 
 from src.analysis.figures import prepare_df, fig_combined, custom_fig
 
@@ -49,7 +50,7 @@ dfv = prepare_df('./results/v115/model_media/model_stats_val.csv')
 
 models = {
     'DG': ('nomsa', 'binary', 'original', 'binary'),
-    # 'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
     'aflow': ('nomsa', 'aflow', 'original', 'binary'),
     # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
     'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
@@ -70,15 +71,19 @@ fig, axes = fig_combined(dfv, datasets=['davis'], fig_callable=custom_fig,
              fig_scale=(10,5), add_stats=True, title_postfix=" validation set performance", box=True, fold_labels=True)
 plt.xticks(rotation=45)
 
-
-# %%
+#%%
+########################################################################
+########################## BUILD DATASETS ##############################
+########################################################################
 from src.data_prep.init_dataset import create_datasets
 from src import cfg
+import logging
+cfg.logger.setLevel(logging.DEBUG)
 
-splits = '/cluster/home/t122995uhn/projects/MutDTA/splits/davis/'
-create_datasets(cfg.DATA_OPT.davis, 
+splits = '/cluster/home/t122995uhn/projects/MutDTA/splits/pdbbind/'
+create_datasets(cfg.DATA_OPT.PDBbind, 
                 feat_opt=cfg.PRO_FEAT_OPT.nomsa, 
-                edge_opt=cfg.PRO_EDGE_OPT.aflow,
+                edge_opt=[cfg.PRO_EDGE_OPT.binary, cfg.PRO_EDGE_OPT.aflow],
                 ligand_features=[cfg.LIG_FEAT_OPT.original, cfg.LIG_FEAT_OPT.gvp], 
                 ligand_edges=cfg.LIG_EDGE_OPT.binary,
                 k_folds=5, 
