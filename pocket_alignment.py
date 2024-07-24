@@ -31,6 +31,8 @@ def create_pocket_mask(target_seq: str, query_seq: str) -> list[bool]:
         A boolean list of indices that are True if the residue at that
         position is part of the binding pocket and false otherwise
     """
+    # Ensure that no '-' characters are present in the query sequence
+    query_seq = query_seq.replace('-', 'X')
     # Taken from tutorial https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html
     aligner = Align.PairwiseAligner()
     # Pairwise alignment parameters as specified in paragraph 2
@@ -120,7 +122,7 @@ def _parse_json(json_path: str) -> str:
 def get_dataset_binding_pockets(
         dataset_path: str = 'data/DavisKibaDataset/kiba/',
         pockets_path: str = 'data/DavisKibaDataset/kiba_pocket'
-    ) -> None:
+    ) -> tuple[dict[str, str], set[str]]:
     """
     Get all binding pocket sequences for a dataset
 
@@ -132,6 +134,11 @@ def get_dataset_binding_pockets(
         or 'PDBbind' (e.g., 'data/DavisKibaDataset/kiba')
     pockets_path: str
         The path to the new dataset directory after all the binding pockets have been found
+    
+    Returns
+    -------
+    sequences : tuple[dict[str, str], set[str]]
+        A map of protein ID, binding pocket sequence pairs
     """
     csv_path = os.path.join(dataset_path, 'nomsa_binary_original_binary', 'full', 'cleaned_XY.csv')
     df = pd.read_csv(csv_path, usecols=['prot_id'])
@@ -140,7 +147,49 @@ def get_dataset_binding_pockets(
     seq_save_dir = os.path.join(pockets_path, 'pockets')
     os.makedirs(seq_save_dir, exist_ok=True)
     download_check = dl.download_pocket_seq(prot_ids, seq_save_dir)
-    print(download_check)
+    download_errors = set()
+    for key, val in download_check.items():
+        if val == 400:
+            download_errors.add(key)
+    sequences = {}
+    for file in os.listdir(seq_save_dir):
+        pocket_seq = _parse_json(os.path.join(seq_save_dir, file))
+        if len(pocket_seq) == 0:
+            download_errors.add(file.split('.')[0])
+        else:
+            sequences[file.split('.')[0]] = pocket_seq
+    return (sequences, download_errors)
+
+
+def create_binding_pocket_dataset(
+    dataset_path: str,
+    pocket_sequences: dict[str, str],
+    download_errors: set[str],
+    new_dataset_path: str
+) -> None:
+    """
+    Apply the graph mask based on binding pocket sequence for each
+    Data object in a PyTorch dataset.
+
+    dataset_path : str
+        The path to the PyTorch dataset object to be transformed
+    pocket_sequences : dict[str, str]
+        A map of protein ID, binding pocket sequence pairs
+    download_errors : set[str]
+        A set of protein IDs that have no binding pocket sequence
+        to be downloaded from KLIFS
+    new_dataset_path : str
+        A path to where the new dataset should be saved
+    """
+    dataset = torch.load(dataset_path)
+    new_dataset = {}
+    for id, data in dataset.items():
+        if id not in download_errors:
+            mask = create_pocket_mask(data.pro_seq, pocket_sequences[id])
+            new_data = mask_graph(data, mask)
+            new_dataset[id] = new_data
+    os.makedirs(new_dataset_path, exist_ok=True)
+    torch.save(dataset, new_dataset_path)
 
 
 if __name__ == '__main__':
@@ -155,9 +204,10 @@ if __name__ == '__main__':
         binding_pocket_sequence
     )
     masked_data = mask_graph(graph_data, mask)
-    # print(masked_data)
-    # dl = Downloader()
-    # seqs = Downloader.download_pocket_seq(['O00141', 'O14920', 'O15111'])
-    # print(seqs)
-    # get_dataset_binding_pockets()
-    _parse_json('data/DavisKibaDataset/kiba_pocket/pockets/O00141.json')
+    pocket_map, download_errors = get_dataset_binding_pockets()
+    create_binding_pocket_dataset(
+        'data/DavisKibaDataset/kiba/nomsa_binary_original_binary/full/data_pro.pt',
+        pocket_map,
+        download_errors,
+        'data/DavisKibaDataset/kiba_pocket/nomsa_binary_original_binary/full/data_pro.pt '
+    )
