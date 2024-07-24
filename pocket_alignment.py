@@ -137,8 +137,10 @@ def get_dataset_binding_pockets(
     
     Returns
     -------
-    sequences : tuple[dict[str, str], set[str]]
-        A map of protein ID, binding pocket sequence pairs
+    tuple[dict[str, str], set[str]]
+        A tuple consisting of:
+            -A map of protein ID, binding pocket sequence pairs
+            -A set of protein IDs with no KLIFS binding pockets
     """
     csv_path = os.path.join(dataset_path, 'nomsa_binary_original_binary', 'full', 'cleaned_XY.csv')
     df = pd.read_csv(csv_path, usecols=['prot_id'])
@@ -192,22 +194,70 @@ def create_binding_pocket_dataset(
     torch.save(dataset, new_dataset_path)
 
 
-if __name__ == '__main__':
-    graph_data = torch.load('sample_pro_data.torch')
-    seq = graph_data.pro_seq
-    seq = seq[:857] + 'R' + seq[858:]
-    graph_data.pro_seq = seq
-    torch.save(graph_data, 'sample_pro_data_unmutated.torch')
-    binding_pocket_sequence = 'KVLGSGAFGTVYKVAIKELEILDEAYVMASVDPHVCRLLGIQLITQLMPFGCLLDYVREYLEDRRLVHRDLAARNVLVITDFGLA'
-    mask = create_pocket_mask(
-        graph_data.pro_seq,
-        binding_pocket_sequence
-    )
-    masked_data = mask_graph(graph_data, mask)
+def binding_pocket_filter(dataset_csv_path: str, download_errors: set[str], csv_save_path: str):
+    """
+    Filter out protein IDs that do not have a corresponding KLIFS
+    binding pocket sequence from the dataset.
+
+    Parameters
+    ----------
+    dataset_csv_path : str
+        The path to the original cleaned CSV. Will probably be a CSV named cleaned_XY.csv
+        or something like that.
+    download_errors : set[str]
+        A set of protein IDs with no KLIFS binding pocket sequences.
+    csv_save_path : str
+        The path to save the new CSV file to.
+    """
+    df = pd.read_csv(dataset_csv_path)
+    df = df[~df['prot_id'].isin(download_errors)]
+    os.makedirs(os.path.dirname(csv_save_path), exist_ok=True)
+    df.to_csv(csv_save_path)
+
+
+def pocket_dataset_full(
+    dataset_dir: str,
+    save_dir: str
+) -> None:
+    """
+    Create all elements of a dataset that includes binding pockets. This
+    function assumes the PyTorch object holding the dataset is named 'data_pro.pt'
+    and the CSV holding the cleaned data is named 'cleaned_XY.csv'.
+
+    Parameters
+    ----------
+    dataset_dir : str
+        The path to the dataset to be transformed
+    save_dir : str
+        The path to where the new dataset is to be saved
+    """
     pocket_map, download_errors = get_dataset_binding_pockets()
     create_binding_pocket_dataset(
-        'data/DavisKibaDataset/kiba/nomsa_binary_original_binary/full/data_pro.pt',
+        os.path.join(dataset_dir, 'data_pro.pt'),
         pocket_map,
         download_errors,
-        'data/DavisKibaDataset/kiba_pocket/nomsa_binary_original_binary/full/data_pro.pt '
+        os.path.join(save_dir, 'data_pro.pt')
+    )
+    binding_pocket_filter(
+        os.path.join(dataset_dir, 'cleaned_XY.csv'),
+        download_errors,
+        os.path.join(save_dir, 'cleaned_XY.csv')
+    )
+
+
+if __name__ == '__main__':
+    # graph_data = torch.load('sample_pro_data.torch')
+    # seq = graph_data.pro_seq
+    # seq = seq[:857] + 'R' + seq[858:]
+    # graph_data.pro_seq = seq
+    # torch.save(graph_data, 'sample_pro_data_unmutated.torch')
+    # binding_pocket_sequence = 'KVLGSGAFGTVYKVAIKELEILDEAYVMASVDPHVCRLLGIQLITQLMPFGCLLDYVREYLEDRRLVHRDLAARNVLVITDFGLA'
+    # mask = create_pocket_mask(
+    #     graph_data.pro_seq,
+    #     binding_pocket_sequence
+    # )
+    # masked_data = mask_graph(graph_data, mask)
+    pocket_dataset_full(
+        'data/DavisKibaDataset/kiba/nomsa_binary_original_binary/full/',
+        'data/DavisKibaDataset/kiba_pocket/nomsa_binary_original_binary/full/'
     )
