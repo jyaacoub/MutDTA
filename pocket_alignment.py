@@ -14,7 +14,7 @@ import torch
 from src.data_prep.downloaders import Downloader
 
 
-def create_pocket_mask(target_seq: str, query_seq: str) -> list[bool]:
+def create_pocket_mask(target_seq: str, pocket_seq: str) -> list[bool]:
     """
     Return an index mask of a pocket on a protein sequence.
     
@@ -22,7 +22,7 @@ def create_pocket_mask(target_seq: str, query_seq: str) -> list[bool]:
     ----------
     target_seq : str
         The protein sequence you want to query in
-    query_seq : str
+    pocket_seq : str
         The binding pocket sequence for the protein
 
     Returns
@@ -32,7 +32,7 @@ def create_pocket_mask(target_seq: str, query_seq: str) -> list[bool]:
         position is part of the binding pocket and false otherwise
     """
     # Ensure that no '-' characters are present in the query sequence
-    query_seq = query_seq.replace('-', 'X')
+    query_seq = pocket_seq.replace('-', 'X')
     # Taken from tutorial https://biopython.org/docs/dev/Tutorial/chapter_pairwise.html
     aligner = Align.PairwiseAligner()
     # Pairwise alignment parameters as specified in paragraph 2
@@ -188,7 +188,7 @@ def create_binding_pocket_dataset(
             mask = create_pocket_mask(data.pro_seq, pocket_sequences[id])
             new_data = mask_graph(data, mask)
             new_dataset[id] = new_data
-    os.makedirs(new_dataset_path, exist_ok=True)
+    os.makedirs(os.path.dirname(new_dataset_path), exist_ok=True)
     torch.save(dataset, new_dataset_path)
 
 
