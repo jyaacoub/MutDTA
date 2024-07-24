@@ -3,9 +3,15 @@ A collection of functions that generate a graph
 mask from a binding pocket sequence.
 """
 
+import json
+import os
+
 from Bio import Align
 from Bio.Align import substitution_matrices
+import pandas as pd
 import torch
+
+from src.data_prep.downloaders import Downloader
 
 
 def create_pocket_mask(target_seq: str, query_seq: str) -> list[bool]:
@@ -92,6 +98,51 @@ def mask_graph(data, mask: list[bool]):
     return data
 
 
+def _parse_json(json_path: str) -> str:
+    """
+    Parse a JSON file that holds binding pocket data downloaded from KLIFS.
+
+    Parameters
+    ----------
+    json_path : str 
+        The path to the JSON file
+
+    Returns
+    -------
+    str
+        The binding pocket sequence
+    """
+    with open(json_path, 'r') as json_file:
+        data = json.load(json_file)
+        return data[0]['pocket']
+
+
+def get_dataset_binding_pockets(
+        dataset_path: str = 'data/DavisKibaDataset/kiba/',
+        pockets_path: str = 'data/DavisKibaDataset/kiba_pocket'
+    ) -> None:
+    """
+    Get all binding pocket sequences for a dataset
+
+    Parameters
+    ----------
+    dataset_path : str
+        The path to the directory containing the dataset (as of July 24, 2024,
+        only expecting Kiba dataset). Specify only the path to one of 'davis', 'kiba',
+        or 'PDBbind' (e.g., 'data/DavisKibaDataset/kiba')
+    pockets_path: str
+        The path to the new dataset directory after all the binding pockets have been found
+    """
+    csv_path = os.path.join(dataset_path, 'nomsa_binary_original_binary', 'full', 'cleaned_XY.csv')
+    df = pd.read_csv(csv_path, usecols=['prot_id'])
+    prot_ids = list(set(df['prot_id']))
+    dl = Downloader()
+    seq_save_dir = os.path.join(pockets_path, 'pockets')
+    os.makedirs(seq_save_dir, exist_ok=True)
+    download_check = dl.download_pocket_seq(prot_ids, seq_save_dir)
+    print(download_check)
+
+
 if __name__ == '__main__':
     graph_data = torch.load('sample_pro_data.torch')
     seq = graph_data.pro_seq
@@ -104,3 +155,9 @@ if __name__ == '__main__':
         binding_pocket_sequence
     )
     masked_data = mask_graph(graph_data, mask)
+    # print(masked_data)
+    # dl = Downloader()
+    # seqs = Downloader.download_pocket_seq(['O00141', 'O14920', 'O15111'])
+    # print(seqs)
+    # get_dataset_binding_pockets()
+    _parse_json('data/DavisKibaDataset/kiba_pocket/pockets/O00141.json')
