@@ -371,7 +371,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             tasks = [(df_pid_groups[pid], code, pid, seq, af_conf_dir, is_pdbbind, files) \
                             for code, (pid, seq) in df_unique[['prot_id', 'prot_seq']].iterrows()]
 
-            for pid, new_seq in tqdm(pool.imap_unordered(process_protein_multiprocessing, tasks), 
+            for pid, new_seq in tqdm(pool.imap_unordered(BaseDataset.process_protein_multiprocessing, tasks), 
                             desc='Filtering out proteins with missing PDB files for multiple confirmations', 
                             total=len(tasks)):
                 if new_seq is not None:
