@@ -413,6 +413,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             filtered_df = df
         
         if len(mismatched) > 0:
+            filtered_df = df[~df.prot_id.isin(mismatched)]
             # adjust all in dataframe to the ones with the correct pid
             logging.warning(f'{len(mismatched)} mismatched pids')
             
@@ -466,7 +467,7 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             pro_feat = torch.Tensor() # for adding additional features
             # extra_feat is Lx54 or Lx34 (if shannon=True)
             try:
-                pro_cmap = np.load(self.cmap_p(prot_id)) #TODO: this would also have to be adjusted!
+                pro_cmap = np.load(self.cmap_p(prot_id))
                 # updated_seq is for updated foldseek 3di combined seq
                 aln_file = self.aln_p(code) if node_feat in cfg.OPT_REQUIRES_MSA_ALN else None
                 updated_seq, extra_feat, edge_idx = target_to_graph(target_sequence=pro_seq, 
@@ -646,8 +647,6 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
         # check to make sure arg is a pid
         if self.df is not None and pid in self.df.index:
             pid = self.df.loc[pid]['prot_id']
-            
-        # TODO: make this dynamic to check against alphaflow confs 
         return os.path.join(self.data_root, 'cmaps', f'{pid}.npy')
     
     def aln_p(self, code):
