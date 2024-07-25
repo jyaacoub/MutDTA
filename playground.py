@@ -8,7 +8,7 @@ from src.utils.residue import Chain
 from multiprocessing import Pool, cpu_count
 from src.data_prep.datasets import BaseDataset
 
-df = pd.read_csv("/cluster/home/t122995uhn/projects/MutDTA/df_base.csv", index_col=0)
+# df = pd.read_csv("/cluster/home/t122995uhn/projects/MutDTA/df_base.csv", index_col=0)
 df = pd.read_csv("/cluster/home/t122995uhn/projects/MutDTA/df_base_filtered.csv", index_col=0)
 logging.getLogger().setLevel(logging.DEBUG)
 
@@ -54,6 +54,8 @@ def process_protein_multiprocessing(args):
             #     return pid, af_seq
             return pid, matching_code
         
+    if matching_code != code:
+        return None, matching_code
     return None, None
 
 #%% check_missing_confs method
@@ -131,17 +133,18 @@ for file in tqdm(os.listdir(alphaflow_dir)):
 ########################################################################
 ########################## BUILD DATASETS ##############################
 ########################################################################
+import os
 from src.data_prep.init_dataset import create_datasets
 from src import cfg
 import logging
 cfg.logger.setLevel(logging.DEBUG)
 
-splits = '/cluster/home/t122995uhn/projects/MutDTA/splits/pdbbind/'
-create_datasets([cfg.DATA_OPT.PDBbind, cfg.DATA_OPT.davis], 
+splits = '/cluster/home/t122995uhn/projects/MutDTA/splits/davis/'
+create_datasets(cfg.DATA_OPT.davis, 
                 feat_opt=cfg.PRO_FEAT_OPT.nomsa, 
-                edge_opt=cfg.PRO_EDGE_OPT.aflow,
-                ligand_features=cfg.LIG_FEAT_OPT.original, #[cfg.LIG_FEAT_OPT.original, cfg.LIG_FEAT_OPT.gvp], 
-                ligand_edges=cfg.LIG_EDGE_OPT.binary, overwrite=False,
+                edge_opt=[cfg.PRO_EDGE_OPT.aflow, cfg.PRO_EDGE_OPT.binary],
+                ligand_features=[cfg.LIG_FEAT_OPT.original, cfg.LIG_FEAT_OPT.gvp], 
+                ligand_edges=cfg.LIG_EDGE_OPT.binary, overwrite=True,
                 k_folds=5, 
                 test_prots_csv=f'{splits}/test.csv',
                 val_prots_csv=[f'{splits}/val{i}.csv' for i in range(5)],

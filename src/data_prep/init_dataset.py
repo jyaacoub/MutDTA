@@ -89,7 +89,7 @@ def create_datasets(data_opt:list[str]|str, feat_opt:list[str]|str, edge_opt:lis
         elif data == 'PDBbind':
             if 'af_conf_dir' not in kwargs:
                 if EDGE in cfg.OPT_REQUIRES_AFLOW_CONF:
-                    kwargs['af_conf_dir'] = f'{data_root}/pdbbind/alphaflow_io/out_pdb_MD-distilled/'
+                    kwargs['af_conf_dir'] = f'{data_root}/pdbbind/alphaflow_io/out_pid_ln/'
                 else:
                     kwargs['af_conf_dir'] = f'{data_root}/pdbbind/pdbbind_af2_out/all_ln/'
             dataset = PDBbindDataset(
