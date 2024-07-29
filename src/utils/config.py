@@ -87,7 +87,7 @@ class LIG_FEAT_OPT(StringEnum):
 from pathlib import Path
 
 # Model save paths
-issue_number = 113  # 113 is for unifying all splits for cross validation so that we are more confident 
+issue_number = 115  # 113 is for unifying all splits for cross validation so that we are more confident 
                     # when comparing results that they were trained in the same manner.
 RESULTS_PATH = os.path.abspath(f'results/v{issue_number}/')
 MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'
@@ -117,15 +117,15 @@ if 'uhnh4h' in DOMAIN_NAME:
 elif 'graham' in DOMAIN_NAME:
     CLUSTER = 'graham'
     SLURM_CONSTRAINT = 'cascade,v100'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
 elif 'cedar' in DOMAIN_NAME:
     CLUSTER = 'cedar'
     SLURM_GPU_NAME = 'v100l'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
 elif 'narval' in DOMAIN_NAME:
     CLUSTER = 'narval'
     SLURM_GPU_NAME = 'a100'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
     
 # bin paths
 FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
