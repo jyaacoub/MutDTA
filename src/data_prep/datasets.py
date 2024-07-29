@@ -14,6 +14,7 @@ import torch_geometric as torchg
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 from src.data_prep.feature_extraction.gvp_feats import GVPFeaturesProtein, GVPFeaturesLigand
 from src.utils import config as cfg
@@ -241,8 +242,6 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
     
     def load(self): 
         # loading cleaned XY.csv file
-        # if self.df is None: # WARNING: HOT FIX to be compatible with old datasets
-        #    self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         self.df = pd.read_csv(self.processed_paths[3], index_col=0)
         
         self._indices = self.df.index
@@ -311,7 +310,68 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         self.subset = subset_name
         self.load()
         
-    def clean_XY(self, df:pd.DataFrame, max_seq_len=None):
+    @staticmethod    
+    def process_protein_multiprocessing(args):
+        """
+        Checks if protein has conf file and correct sequence, returns:
+            - None, None - if it has a conf file and is correct
+            - pid,  None - is missing a conf file
+            - pid,  matching_code - has the correct number of conf files but is not the correct sequence.
+            - None, matching_code - correct seq, # of confs, but under a different file name
+        """
+        pid, seq, af_conf_dir, is_pdbbind, files = args
+        MIN_MODEL_COUNT = 5
+        
+        af_confs = []
+        if is_pdbbind:
+            fp = os.path.join(af_conf_dir, f'{pid}.pdb')
+            if os.path.exists(fp):
+                af_confs = [os.path.join(af_conf_dir, f'{pid}.pdb')]
+        else:
+            af_confs = [os.path.join(af_conf_dir, f) for f in files if f.startswith(pid)]
+        
+        if len(af_confs) == 0:
+            return pid, None
+        
+        # either all models in one pdb file (alphaflow) or spread out across multiple files (AF2 msa subsampling)
+        model_count = len(af_confs) if len(af_confs) > 1 else Chain.get_model_count(af_confs[0])
+        
+        if model_count < MIN_MODEL_COUNT:
+            return pid, None
+        
+        af_seq = Chain(af_confs[0]).sequence
+        if seq != af_seq:
+            logging.debug(f'Mismatched sequence for {pid}')
+            return pid, af_seq
+        
+        return None, None
+            
+    @staticmethod
+    def check_missing_confs(df_unique:pd.DataFrame, af_conf_dir:str, is_pdbbind=False):
+        logging.debug(f'Getting af_confs from {af_conf_dir}')
+
+        missing = set()
+        mismatched = {}
+        # total of 3728 unique proteins with alphaflow confs (named by pdb ID)
+        files = None
+        if not is_pdbbind:
+            files = [f for f in os.listdir(af_conf_dir) if f.endswith('.pdb')]
+
+        with Pool(processes=cpu_count()) as pool:
+            tasks = [(pid, seq, af_conf_dir, is_pdbbind, files) \
+                            for _, (pid, seq) in df_unique[['prot_id', 'prot_seq']].iterrows()]
+
+            for pid, correct_seq in tqdm(pool.imap_unordered(BaseDataset.process_protein_multiprocessing, tasks), 
+                            desc='Filtering out proteins with missing PDB files for multiple confirmations', 
+                            total=len(tasks)):
+                if correct_seq is not None:
+                    mismatched[pid] = correct_seq
+                elif pid is not None: # just pid -> missing af files
+                    missing.add(pid)
+        
+        return missing, mismatched
+    
+    def clean_XY(self, df:pd.DataFrame, max_seq_len=None):        
         max_seq_len = self.max_seq_len
         
         # Filter proteins greater than max length
@@ -331,47 +391,32 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         df.set_index(idx_name, inplace=True)
         
         # Filter out proteins that are missing pdbs for confirmations
-        missing_conf = set()
+        missing = set()
+        mismatched = {}
         if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
-            files = [f for f in os.listdir(self.af_conf_dir) if f.endswith('.pdb')]
-            
-            for _, (pid, seq) in tqdm(df_unique[['prot_id', 'prot_seq']].iterrows(),
-                    desc='Filtering out proteins with missing PDB files for multiple confirmations',
-                    total=len(df_unique)):
-                
-                af_confs = [os.path.join(self.af_conf_dir, f) for f in files \
-                                            if f.startswith(pid)]
-                
-                # for alphaflow  af_confs will be a single file with multiple models
-                if self.alphaflow and len(af_confs) > 0:
-                    model_count = Chain.get_model_count(af_confs[0])
-                else:
-                    model_count = len(af_confs)
-                                            
-                if model_count < 5:
-                    missing_conf.add(pid)
-                    logging.debug(f'missing conf for {pid} in {self.af_conf_dir}')
-                    continue
-                
-                af_seq = Chain(af_confs[0]).sequence
-                if seq != af_seq:
-                    logging.debug(f'Mismatched sequence for {pid}')
-                    missing_conf.add(pid)
-                    continue
+            missing, mismatched = self.check_missing_confs(df_unique, self.af_conf_dir, self.__class__ is PDBbindDataset)
         
-        if len(missing_conf) > 0:
-            filtered_df = df[~df.prot_id.isin(missing_conf)]
-            logging.warning(f'{len(missing_conf)} mismatched or missing pids')
+        if len(missing) > 0:
+            filtered_df = df[~df.prot_id.isin(missing)]
+            logging.warning(f'{len(missing)} missing pids')
         else:
             filtered_df = df
         
+        if len(mismatched) > 0:
+            filtered_df = filtered_df[~filtered_df.prot_id.isin(mismatched)]
+            # adjust all in dataframe to the ones with the correct pid
+            logging.warning(f'{len(mismatched)} mismatched pids')
+            
+            
         logging.debug(f'Number of codes: {len(filtered_df)}/{len(df)}')
         
         # we are done filtering if ligand doesnt need filtering
         if not (self.ligand_edge in cfg.OPT_REQUIRES_SDF or 
                 self.ligand_feature in cfg.OPT_REQUIRES_SDF):
             return filtered_df
-            
+        
+        ###########
+        # filter ligands
         # removing rows with ligands that have missing sdf files:
         unique_lig = filtered_df[['lig_id']].drop_duplicates()
         missing = set()
@@ -526,12 +571,12 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             self.df.to_csv(self.processed_paths[3])
             logging.info('Created cleaned_XY.csv file')
             
+        ###### Get Protein Graphs ######
+        processed_prots = self._create_protein_graphs(self.df, self.pro_feat_opt, self.pro_edge_opt)
+        
         
         ###### Get Ligand Graphs ######
         processed_ligs = self._create_ligand_graphs(self.df, self.ligand_feature, self.ligand_edge)
-        
-        ###### Get Protein Graphs ######
-        processed_prots = self._create_protein_graphs(self.df, self.pro_feat_opt, self.pro_edge_opt)
         
         ###### Save ######
         logging.info('Saving...')
@@ -569,12 +614,12 @@ class PDBbindDataset(BaseDataset): # InMemoryDataset is used if the dataset is s
                                              aln_dir=aln_dir, cmap_threshold=cmap_threshold,
                                              feature_opt=feature_opt, *args, **kwargs)
     
-    def af_conf_files(self, pid) -> list[str]|str:
-        if self.df is not None and pid in self.df.index:
+    def af_conf_files(self, pid, map_to_pid=True) -> list[str]|str:
+        if self.df is not None and pid in self.df.index and map_to_pid:
             pid = self.df.loc[pid]['prot_id']
             
         if self.alphaflow:
-            fp = f'{self.af_conf_dir}/{pid}.pdb'
+            fp = os.path.join(self.af_conf_dir, f'{pid}.pdb')
             fp = fp if os.path.exists(fp) else None
             return fp
             
@@ -905,12 +950,12 @@ class DavisKibaDataset(BaseDataset):
             no_aln = [c for c in codes if (not Processor.check_aln_lines(self.aln_p(c)))]
                     
             # filters out those that do not have aln file
-            print(f'Number of codes with invalid aln files: {len(no_aln)} / {len(codes)}')
+            print(f'Number of codes with valid aln files: {len(codes)-len(no_aln)} / {len(codes)}')
                     
         # Checking that contact maps are present for each code:
         #       (Created by psconsc4)
         no_cmap = [c for c in codes if not os.path.isfile(self.cmap_p(c))]
-        print(f'Number of codes without cmap files: {len(no_cmap)} out of {len(codes)}')
+        print(f'Number of codes with cmap files: {len(codes)-len(no_cmap)} / {len(codes)}')
         
         # Checking that structure and af_confs files are present if required:
         no_confs = []
@@ -931,7 +976,7 @@ class DavisKibaDataset(BaseDataset):
                             (len(self.af_conf_files(c)) < 5))] # only if not for foldseek
            
             # WARNING: TEMPORARY FIX FOR DAVIS (TESK1 highQ structure is mismatched...)
-            no_confs.append('TESK1')
+            if not self.alphaflow: no_confs.append('TESK1')
            
             logging.warning(f'Number of codes missing {"aflow" if self.alphaflow else "af2"} ' + \
                             f'conformations: {len(no_confs)} / {len(codes)}')

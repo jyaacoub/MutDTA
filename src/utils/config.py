@@ -117,15 +117,15 @@ if 'uhnh4h' in DOMAIN_NAME:
 elif 'graham' in DOMAIN_NAME:
     CLUSTER = 'graham'
     SLURM_CONSTRAINT = 'cascade,v100'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
 elif 'cedar' in DOMAIN_NAME:
     CLUSTER = 'cedar'
     SLURM_GPU_NAME = 'v100l'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
 elif 'narval' in DOMAIN_NAME:
     CLUSTER = 'narval'
     SLURM_GPU_NAME = 'a100'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data' )
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
     
 # bin paths
 FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'

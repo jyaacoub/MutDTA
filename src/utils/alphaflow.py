@@ -8,7 +8,7 @@
 #%%
 from src.data_prep.datasets import BaseDataset
 import pandas as pd
-csv_p = "/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_ring3_original_binary/full/XY.csv"
+csv_p = "/cluster/home/t122995uhn/projects/data/PDBbindDataset/nomsa_binary_original_binary/full/XY.csv"
 
 df = pd.read_csv(csv_p, index_col=0)
 df_unique = BaseDataset.get_unique_prots(df)
@@ -30,25 +30,27 @@ for link_file in tqdm(os.listdir(ln_dir), desc="Checking for broken links"):
 
 
 # %% files are .pdb with 50 "models" in each
+created = {}
 for file in tqdm(os.listdir(alphaflow_dir)):
     if not file.endswith('.pdb'):
         continue
     
     code, _ = os.path.splitext(file)
-    pid = df_unique.loc[code].prot_id
+    pid = df.loc[code].prot_id
     src, dst = f"{alphaflow_dir}/{file}", f"{ln_dir}/{pid}.pdb"
     if not os.path.exists(dst):
+        created[src] = dst
         os.symlink(src,dst)
     
 
 # %% RUN RING3
-# %% Run RING3 on finished confirmations from AlphaFlow
-from src.utils.residue import Ring3Runner
+# # %% Run RING3 on finished confirmations from AlphaFlow
+# from src.utils.residue import Ring3Runner
 
-files = [os.path.join(ln_dir, f) for f in \
-            os.listdir(ln_dir) if f.endswith('.pdb')]
+# files = [os.path.join(ln_dir, f) for f in \
+#             os.listdir(ln_dir) if f.endswith('.pdb')]
 
-Ring3Runner.run_multiprocess(pdb_fps=files)
+# Ring3Runner.run_multiprocess(pdb_fps=files)
 
 
 # %% checking the number of models in each file, flagging any issues:
