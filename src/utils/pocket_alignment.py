@@ -120,7 +120,7 @@ def _parse_json(json_path: str) -> str:
 
 
 def get_dataset_binding_pockets(
-        dataset_path: str = 'data/DavisKibaDataset/kiba/',
+        dataset_path: str = 'data/DavisKibaDataset/kiba/nomsa_binary_original_binary/full',
         pockets_path: str = 'data/DavisKibaDataset/kiba_pocket'
     ) -> tuple[dict[str, str], set[str]]:
     """
@@ -142,9 +142,12 @@ def get_dataset_binding_pockets(
             -A map of protein ID, binding pocket sequence pairs
             -A set of protein IDs with no KLIFS binding pockets
     """
-    csv_path = os.path.join(dataset_path, 'nomsa_binary_original_binary', 'full', 'cleaned_XY.csv')
+    csv_path = os.path.join(dataset_path, 'cleaned_XY.csv')
     df = pd.read_csv(csv_path, usecols=['prot_id'])
     prot_ids = list(set(df['prot_id']))
+    # Strip out mutations and '-(alpha, beta, gamma)' tags if they are present,
+    # the binding pocket sequence will be the same for mutated and non-mutated genes
+    prot_ids = [id.split('(')[0].split('-')[0] for id in prot_ids]
     dl = Downloader()
     seq_save_dir = os.path.join(pockets_path, 'pockets')
     os.makedirs(seq_save_dir, exist_ok=True)
@@ -156,7 +159,7 @@ def get_dataset_binding_pockets(
     sequences = {}
     for file in os.listdir(seq_save_dir):
         pocket_seq = _parse_json(os.path.join(seq_save_dir, file))
-        if len(pocket_seq) == 0:
+        if pocket_seq == 0 or len(pocket_seq) == 0:
             download_errors.add(file.split('.')[0])
         else:
             sequences[file.split('.')[0]] = pocket_seq
@@ -186,8 +189,10 @@ def create_binding_pocket_dataset(
     dataset = torch.load(dataset_path)
     new_dataset = {}
     for id, data in dataset.items():
-        if id not in download_errors:
-            mask = create_pocket_mask(data.pro_seq, pocket_sequences[id])
+        # If there are any mutations or (-alpha,beta,gamma) tags, strip them
+        stripped_id = id.split('(')[0].split('-')[0]
+        if stripped_id not in download_errors:
+            mask = create_pocket_mask(data.pro_seq, pocket_sequences[stripped_id])
             new_data = mask_graph(data, mask)
             new_dataset[id] = new_data
     os.makedirs(os.path.dirname(new_dataset_path), exist_ok=True)
@@ -217,6 +222,7 @@ def binding_pocket_filter(dataset_csv_path: str, download_errors: set[str], csv_
 
 def pocket_dataset_full(
     dataset_dir: str,
+    pocket_dir: str,
     save_dir: str
 ) -> None:
     """
@@ -228,10 +234,14 @@ def pocket_dataset_full(
     ----------
     dataset_dir : str
         The path to the dataset to be transformed
+    pocket_dir : str
+        The path to where the dataset raw pocket sequences are to be saved
     save_dir : str
         The path to where the new dataset is to be saved
     """
-    pocket_map, download_errors = get_dataset_binding_pockets()
+    pocket_map, download_errors = get_dataset_binding_pockets(dataset_dir, pocket_dir)
+    print(f'Binding pocket sequences were not found for the following {len(download_errors)} protein IDs:')
+    print(','.join(list(download_errors)))
     create_binding_pocket_dataset(
         os.path.join(dataset_dir, 'data_pro.pt'),
         pocket_map,
@@ -246,18 +256,8 @@ def pocket_dataset_full(
 
 
 if __name__ == '__main__':
-    # graph_data = torch.load('sample_pro_data.torch')
-    # seq = graph_data.pro_seq
-    # seq = seq[:857] + 'R' + seq[858:]
-    # graph_data.pro_seq = seq
-    # torch.save(graph_data, 'sample_pro_data_unmutated.torch')
-    # binding_pocket_sequence = 'KVLGSGAFGTVYKVAIKELEILDEAYVMASVDPHVCRLLGIQLITQLMPFGCLLDYVREYLEDRRLVHRDLAARNVLVITDFGLA'
-    # mask = create_pocket_mask(
-    #     graph_data.pro_seq,
-    #     binding_pocket_sequence
-    # )
-    # masked_data = mask_graph(graph_data, mask)
     pocket_dataset_full(
         'data/DavisKibaDataset/kiba/nomsa_binary_original_binary/full/',
+        'data/DavisKibaDataset/kiba_pocket',
         'data/DavisKibaDataset/kiba_pocket/nomsa_binary_original_binary/full/'
     )
