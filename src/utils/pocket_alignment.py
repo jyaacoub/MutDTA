@@ -5,6 +5,7 @@ mask from a binding pocket sequence.
 
 import json
 import os
+import shutil
 
 from Bio import Align
 from Bio.Align import substitution_matrices
@@ -253,6 +254,7 @@ def pocket_dataset_full(
         download_errors,
         os.path.join(save_dir, 'cleaned_XY.csv')
     )
+    shutil.copy2(os.path.join(dataset_dir, 'data_mol.pt'), os.path.join(save_dir, 'data_mol.pt'))
 
 
 if __name__ == '__main__':
