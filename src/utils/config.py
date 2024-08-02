@@ -87,8 +87,8 @@ class LIG_FEAT_OPT(StringEnum):
 from pathlib import Path
 
 # Model save paths
-issue_number = 128  # 113 is for unifying all splits for cross validation so that we are more confident 
-                    # when comparing results that they were trained in the same manner.
+issue_number = 131
+DATA_BASENAME = f'data/{f"v{issue_number}" if issue_number else ""}'
 RESULTS_PATH = os.path.abspath(f'results/v{issue_number}/')
 MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'
 MODEL_STATS_CSV     = f'{RESULTS_PATH}/model_media/model_stats.csv'
@@ -113,20 +113,21 @@ if 'uhnh4h' in DOMAIN_NAME:
     SLURM_PARTITION = 'gpu'
     SLURM_CONSTRAINT = 'gpu32g'
     SLURM_ACCOUNT = 'kumargroup_gpu'
-    DATA_ROOT = os.path.abspath('../data/')
+    DATA_ROOT = os.path.abspath(f'../{DATA_BASENAME}')
 elif 'graham' in DOMAIN_NAME:
     CLUSTER = 'graham'
     SLURM_CONSTRAINT = 'cascade,v100'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / DATA_BASENAME)
 elif 'cedar' in DOMAIN_NAME:
     CLUSTER = 'cedar'
     SLURM_GPU_NAME = 'v100l'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / DATA_BASENAME)
 elif 'narval' in DOMAIN_NAME:
     CLUSTER = 'narval'
     SLURM_GPU_NAME = 'a100'
-    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / 'data')
-    
+    DATA_ROOT = os.path.abspath(Path.home() / 'scratch' / DATA_BASENAME)
+
+
 # bin paths
 FOLDSEEK_BIN = f'{Path.home()}/lib/foldseek/bin/foldseek'
 MMSEQ2_BIN = f'{Path.home()}/lib/mmseqs/bin/mmseqs'
