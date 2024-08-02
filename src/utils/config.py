@@ -113,7 +113,7 @@ if 'uhnh4h' in DOMAIN_NAME:
     SLURM_PARTITION = 'gpu'
     SLURM_CONSTRAINT = 'gpu32g'
     SLURM_ACCOUNT = 'kumargroup_gpu'
-    DATA_ROOT = os.path.abspath('../data/test')
+    DATA_ROOT = os.path.abspath('../data/')
 elif 'graham' in DOMAIN_NAME:
     CLUSTER = 'graham'
     SLURM_CONSTRAINT = 'cascade,v100'
