@@ -2,7 +2,22 @@
 from src.utils.arg_parse import parse_train_test_args
 
 args, unknown_args = parse_train_test_args(verbose=True,
-                             jyp_args='-m DG -d PDBbind -f nomsa -e binary -bs 64')
+                             jyp_args='--model_opt DG \
+                     --data_opt davis \
+                     \
+                     --feature_opt nomsa \
+                     --edge_opt binary \
+                     --ligand_feature_opt original \
+                     --ligand_edge_opt binary \
+                     \
+                     --learning_rate 0.00012 \
+                     --batch_size 128 \
+                     --dropout 0.24 \
+                     --output_dim 128 \
+                     \
+                     --train \
+                     --fold_selection 0 \
+                     --num_epochs 2000')
 FORCE_TRAINING = args.train
 DEBUG = args.debug
 

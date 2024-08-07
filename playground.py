@@ -1,3 +1,37 @@
+# # %%
+# import numpy as np
+# import torch
+
+# d = torch.load("/cluster/home/t122995uhn/projects/data/v131/DavisKibaDataset/davis/nomsa_aflow_original_binary/full/data_pro.pt")
+# np.array(list(d['ABL1(F317I)p'].pro_seq))[d['ABL1(F317I)p'].pocket_mask].shape
+
+
+
+# %%
+# building pocket datasets:
+from src.utils.pocket_alignment import pocket_dataset_full
+import shutil
+import os
+
+data_dir = '/cluster/home/t122995uhn/projects/data/'
+db_type = ['kiba', 'davis']
+db_feat = ['nomsa_binary_original_binary', 'nomsa_aflow_original_binary', 
+           'nomsa_binary_gvp_binary',      'nomsa_aflow_gvp_binary']
+
+for t in db_type:
+    for f in db_feat:
+        print(f'\n---{t}-{f}---\n')
+        dataset_dir= f"{data_dir}/DavisKibaDataset/{t}/{f}/full"
+        save_dir   = f"{data_dir}/v131/DavisKibaDataset/{t}/{f}/full"
+        
+        pocket_dataset_full(
+            dataset_dir= dataset_dir,
+            pocket_dir = f"{data_dir}/{t}/",
+            save_dir   = save_dir,
+            skip_download=True
+        )
+        
+
 #%%
 import pandas as pd
 
@@ -37,45 +71,65 @@ get_test_oncokbs(train_df=train_df)
 
 
 #%%
-########################################################################
-########################## BUILD DATASETS ##############################
-########################################################################
+##############################################################################
+########################## BUILD/SPLIT DATASETS ##############################
+##############################################################################
 import os
 from src.data_prep.init_dataset import create_datasets
 from src import cfg
 import logging
 cfg.logger.setLevel(logging.DEBUG)
 
-splits = '/cluster/home/t122995uhn/projects/MutDTA/splits/davis/'
-create_datasets([cfg.DATA_OPT.PDBbind, cfg.DATA_OPT.davis, cfg.DATA_OPT.kiba], 
+dbs = [cfg.DATA_OPT.davis, cfg.DATA_OPT.kiba]
+splits = ['davis', 'kiba']
+splits = ['/cluster/home/t122995uhn/projects/MutDTA/splits/' + s for s in splits]
+print(splits)
+
+#%%
+for split, db in zip(splits, dbs):
+    print('\n',split, db)
+    create_datasets(db, 
                 feat_opt=cfg.PRO_FEAT_OPT.nomsa, 
                 edge_opt=[cfg.PRO_EDGE_OPT.binary, cfg.PRO_EDGE_OPT.aflow],
                 ligand_features=[cfg.LIG_FEAT_OPT.original, cfg.LIG_FEAT_OPT.gvp], 
                 ligand_edges=cfg.LIG_EDGE_OPT.binary, overwrite=False,
                 k_folds=5,
-                test_prots_csv=f'{splits}/test.csv',
-                val_prots_csv=[f'{splits}/val{i}.csv' for i in range(5)],)
-                # data_root=os.path.abspath('../data/test/'))
+                test_prots_csv=f'{split}/test.csv',
+                val_prots_csv=[f'{split}/val{i}.csv' for i in range(5)])
 
-# %% Copy splits to commit them:
-#from to:
-import shutil
-from_dir_p = '/cluster/home/t122995uhn/projects/data/v131/'
-to_dir_p = '/cluster/home/t122995uhn/projects/MutDTA/splits/'
-from_db = ['PDBbindDataset', 'DavisKibaDataset/kiba', 'DavisKibaDataset/davis']
-to_db = ['pdbbind', 'kiba', 'davis']
+#%% TEST INFERENCE
+from src import cfg
+from src.utils.loader import Loader
 
-from_db = [f'{from_dir_p}/{f}/nomsa_binary_original_binary/' for f in from_db]
-to_db = [f'{to_dir_p}/{f}' for f in to_db]
+# db2 = Loader.load_dataset(cfg.DATA_OPT.davis, 
+#                          cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+#                          path='/cluster/home/t122995uhn/projects/data/',
+#                          subset="full")
 
-for src, dst in zip(from_db, to_db):
-    for x in ['train', 'val']:
-        for i in range(5):
-            print(f"{src}/{x}{i}/XY.csv", f"{dst}/{x}{i}.csv")
-            shutil.copy(f"{src}/{x}{i}/XY.csv", f"{dst}/{x}{i}.csv")
-    
-    print(f"{src}/test/XY.csv", f"{dst}/test.csv")
-    shutil.copy(f"{src}/test/XY.csv", f"{dst}/test.csv")
-    
-    
+db2 = Loader.load_DataLoaders(cfg.DATA_OPT.davis, 
+                         cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+                         path='/cluster/home/t122995uhn/projects/data/v131',
+                         training_fold=0,
+                         batch_train=2)
+for b2 in db2['test']: break
+
+
+# %%
+m = Loader.init_model(cfg.MODEL_OPT.DG, cfg.PRO_FEAT_OPT.nomsa, cfg.PRO_EDGE_OPT.aflow,
+                  dropout=0.3480, output_dim=256,
+                  )
+
+#%%
+# m(b['protein'], b['ligand'])
+m(b2['protein'], b2['ligand'])
+#%%
+model = m
+loaders = db2
+device = 'cpu'
+NUM_EPOCHS = 1
+LEARNING_RATE = 0.001
+from src.train_test.training import train
+
+logs = train(model, loaders['train'], loaders['val'], device, 
+            epochs=NUM_EPOCHS, lr_0=LEARNING_RATE)
 # %%
