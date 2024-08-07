@@ -31,7 +31,6 @@ for t in db_type:
             skip_download=True
         )
         
-
 #%%
 import pandas as pd
 
@@ -66,10 +65,6 @@ train_df = pd.concat([train_df, val_df])
 
 get_test_oncokbs(train_df=train_df)
 
-
-
-
-
 #%%
 ##############################################################################
 ########################## BUILD/SPLIT DATASETS ##############################
@@ -94,6 +89,7 @@ for split, db in zip(splits, dbs):
                 ligand_features=[cfg.LIG_FEAT_OPT.original, cfg.LIG_FEAT_OPT.gvp], 
                 ligand_edges=cfg.LIG_EDGE_OPT.binary, overwrite=False,
                 k_folds=5,
+
                 test_prots_csv=f'{split}/test.csv',
                 val_prots_csv=[f'{split}/val{i}.csv' for i in range(5)])
 

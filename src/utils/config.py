@@ -87,7 +87,7 @@ class LIG_FEAT_OPT(StringEnum):
 from pathlib import Path
 
 # Model save paths
-issue_number = 131
+issue_number = 103
 DATA_BASENAME = f'data/{f"v{issue_number}" if issue_number else ""}'
 RESULTS_PATH = os.path.abspath(f'results/v{issue_number}/')
 MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'

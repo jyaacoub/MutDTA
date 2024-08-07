@@ -348,7 +348,7 @@ def resplit(dataset:str|BaseDataset, split_files:dict|str=None, use_train_set=Fa
     del split_files['test']
     
     # Building the folds
-    for k, v in split_files.items():
+    for k, v in tqdm(split_files.items(), desc="Building folds from split files"):
         prots = set(pd.read_csv(v)['prot_id'])
         val_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in prots]    
         assert len(val_idxs) > 100, f"Error in splitting, not enough entries in {k} split - {v}"
