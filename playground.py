@@ -1,4 +1,12 @@
 #%%
+from src import cfg
+
+#%%
+from src.utils.mutate_model import run_modeller
+
+run_modeller('/cluster/home/t122995uhn/projects/tmp/d1/O00141.pdb', 50, "MET", "A")
+
+#%%
 import pandas as pd
 
 def get_test_oncokbs(train_df=pd.read_csv('/cluster/home/t122995uhn/projects/data/test/PDBbindDataset/nomsa_binary_original_binary/full/cleaned_XY.csv'),
