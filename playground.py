@@ -1,9 +1,133 @@
-# # %%
-# import numpy as np
-# import torch
+#%%
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# d = torch.load("/cluster/home/t122995uhn/projects/data/v131/DavisKibaDataset/davis/nomsa_aflow_original_binary/full/data_pro.pt")
-# np.array(list(d['ABL1(F317I)p'].pro_seq))[d['ABL1(F317I)p'].pocket_mask].shape
+new = '/cluster/home/t122995uhn/projects/splits/new/pdbbind/'
+
+train_df = pd.concat([pd.read_csv(f'{new}train0.csv'), 
+                      pd.read_csv(f'{new}val0.csv')], axis=0)
+test_df = pd.read_csv(f'{new}test.csv')
+
+all_df = pd.concat([train_df, test_df], axis=0)
+print(len(all_df))
+
+
+#%%
+old = '/cluster/home/t122995uhn/projects/splits/old/pdbbind/'
+old_test_df = pd.read_csv(f'{old}test.csv')
+old_train_df = all_df[~all_df['code'].isin(old_test_df['code'])]
+
+# %%
+# this will give us an estimate to how well targeted the training proteins are vs the test proteins
+def proteins_targeted(train_df, test_df, split='new', min_freq=0, normalized=False):
+    # protein count comparison (number of diverse proteins)
+    plt.figure(figsize=(18,8))
+    # x-axis is the normalized frequency, y-axis is the number of proteins that have that frequency (also normalized)
+    vc = train_df.prot_id.value_counts()
+    vc = vc[vc > min_freq]
+    train_counts = list(vc/len(test_df)) if normalized else vc.values
+    vc = test_df.prot_id.value_counts()
+    vc = vc[vc > min_freq]
+    test_counts = list(vc/len(test_df)) if normalized else vc.values
+
+    sns.histplot(train_counts, 
+                bins=50, stat='density', color='green', alpha=0.4)
+    sns.histplot(test_counts, 
+                bins=50,stat='density', color='blue', alpha=0.4)
+
+    sns.kdeplot(train_counts, color='green', alpha=0.8)
+    sns.kdeplot(test_counts, color='blue', alpha=0.8)
+
+    plt.xlabel(f"{'normalized ' if normalized else ''} frequency")
+    plt.ylabel("normalized number of proteins with that frequency")
+    plt.title(f"Targeted differences for {split} split{f' (> {min_freq})' if min_freq else ''}")
+    if not normalized:
+        plt.xlim(-8,100)
+
+# proteins_targeted(old_train_df, old_test_df, split='oncoKB')
+# plt.show()
+# proteins_targeted(train_df, test_df, split='random')
+# plt.show()
+
+
+proteins_targeted(old_test_df, test_df, split='oncoKB(green) vs random(blue) test')
+plt.show()
+proteins_targeted(old_test_df, test_df, split='oncoKB(green) vs random(blue) test', min_freq=5)
+plt.show()
+proteins_targeted(old_test_df, test_df, split='oncoKB(green) vs random(blue) test', min_freq=10)
+plt.show()
+proteins_targeted(old_test_df, test_df, split='oncoKB(green) vs random(blue) test', min_freq=15)
+plt.show()
+proteins_targeted(old_test_df, test_df, split='oncoKB(green) vs random(blue) test', min_freq=20)
+plt.show()
+# proteins_targeted(old_train_df, train_df, split='oncoKB(green) vs random train')
+# plt.show()
+#%% sequence length comparison
+def seq_kde(all_df, train_df, test_df, split='new'):
+    plt.figure(figsize=(12, 8))
+
+    sns.kdeplot(all_df.prot_seq.str.len().reset_index()['prot_seq'], label='All', color='blue')
+    sns.kdeplot(train_df.prot_seq.str.len().reset_index()['prot_seq'], label='Train', color='green')
+    sns.kdeplot(test_df.prot_seq.str.len().reset_index()['prot_seq'], label='Test', color='red')
+
+    plt.xlabel('Sequence Length')
+    plt.ylabel('Density')
+    plt.title(f'Sequence Length Distribution ({split} split)')
+    plt.legend()
+
+seq_kde(all_df,train_df,test_df, split='new')
+plt.show()
+seq_kde(all_df,old_train_df,old_test_df, split='old')
+
+# %%
+from Bio import pairwise2
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Align import substitution_matrices
+
+from tqdm import tqdm
+import random
+
+def get_group_similarity(group1, group2):
+    # Choose a substitution matrix (e.g., BLOSUM62)
+    matrix = substitution_matrices.load("BLOSUM62")
+
+    # Define gap penalties
+    gap_open = -10
+    gap_extend = -0.5
+
+    # Function to calculate pairwise similarity score
+    def calculate_similarity(seq1, seq2):
+        alignments = pairwise2.align.globalds(seq1, seq2, matrix, gap_open, gap_extend)
+        return alignments[0][2]  # Return the score of the best alignment
+
+    # Compute pairwise similarity between all sequences in group1 and group2
+    similarity_scores = []
+    for seq1 in group1:
+        for seq2 in group2:
+            score = calculate_similarity(seq1, seq2)
+            similarity_scores.append(score)
+
+    # Calculate the average similarity score
+    average_similarity = sum(similarity_scores) / len(similarity_scores)
+    return similarity_scores, average_similarity
+
+
+# sample 10 sequences randomly 100x
+train_seq = old_train_df.prot_seq.drop_duplicates().to_list()
+test_seq = old_test_df.prot_seq.drop_duplicates().to_list()
+sample_size = 5
+trials = 100
+
+est_similarity = 0
+for _ in tqdm(range(trials)):
+    _, avg = get_group_similarity(random.sample(train_seq, sample_size), 
+                                  random.sample(test_seq, sample_size))
+    est_similarity += avg
+
+print(est_similarity/1000)
+
 
 
 

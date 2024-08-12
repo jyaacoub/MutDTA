@@ -61,6 +61,7 @@ torch.manual_seed(args.rand_seed)
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False, # forces full training
+                            min_delta=0.2,
                             patience=100)
 
 # %% Training loop
@@ -103,13 +104,12 @@ for (MODEL, DATA,
                                 ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                 **unknown_args).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
-    cp_saver.min_delta = 0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.05
+    cp_saver.min_delta = 0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.03
     
     if DEBUG: 
         # run single batch through model
         debug(model, loaders['train'], device)
         continue # skip training
-    
     
     # ==== TRAINING ====
     # check if model has already been trained:
