@@ -13,6 +13,9 @@ from src.models.ring3 import Ring3DTA
 from src.models.gvp_models import GVPModel, GVPLigand_DGPro, GVPLigand_RNG3, GVPL_ESM
 from src.data_prep.datasets import PDBbindDataset, DavisKibaDataset, PlatinumDataset, BaseDataset
 from src.utils import config  as cfg # sets up os env for HF
+from src import TUNED_MODEL_CONFIGS
+from glob import glob
+
 
 def validate_args(valid_options):
     def decorator(func):
@@ -61,6 +64,49 @@ class Loader():
         
         return Loader.init_model("DG", "nomsa", "binary", 0.5)
         
+    @staticmethod
+    @validate_args({'tuned_model':TUNED_MODEL_CONFIGS.keys()})
+    def load_tuned_model(tuned_model='davis_DG', fold=0):
+        MODEL_TUNED_PARAMS = TUNED_MODEL_CONFIGS[tuned_model]
+
+        def reformat_kwargs(model_kwargs):
+            return {
+                'model': model_kwargs['model'],
+                'data': model_kwargs['dataset'],
+                'pro_feature': model_kwargs['feature_opt'],
+                'edge': model_kwargs['edge_opt'],
+                'batch_size': model_kwargs['batch_size'],
+                'lr': model_kwargs['lr'],
+                'dropout': model_kwargs['architecture_kwargs']['dropout'],
+                'n_epochs': model_kwargs.get('n_epochs', 2000),  # Assuming a default value for n_epochs
+                'pro_overlap': model_kwargs.get('pro_overlap', False),  # Assuming a default or None
+                'fold': model_kwargs.get('fold', fold),  # Assuming a default or None
+                'ligand_feature': model_kwargs['lig_feat_opt'],
+                'ligand_edge': model_kwargs['lig_edge_opt']
+            }
+        model_kwargs = reformat_kwargs(MODEL_TUNED_PARAMS)
+        MODEL_KEY = Loader.get_model_key(**model_kwargs)
+        
+        model_p = f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model'
+        glob_p = glob(model_p+'*')
+
+        if len(glob_p) == 0:
+            glob_p = glob(model_p.replace('_originalLF_binaryLE', '')+'*')
+
+        assert len(glob_p) < 2, f"TOO MANY MODEL CHECKPOINTS FOR {model_p} - {glob_p}"
+        assert len(glob_p) == 1, f"MISSING MODEL CHECKPOINT FOR {model_p}"
+
+        # if there was a mismatch we want to update this to keep things simple
+        if model_p != glob_p[0]:
+            logging.warning(f'\n\t{glob_p[0]} -> \n\t{model_p}')
+            os.rename(glob_p[0], model_p)
+        model_p = glob_p[0]
+
+        logging.debug(f'loading: {model_p}')
+        model = Loader.init_model(model=model_kwargs['model'], pro_feature=model_kwargs['pro_feature'], 
+                                pro_edge=model_kwargs['edge'], **MODEL_TUNED_PARAMS['architecture_kwargs'])
+        return model
+    
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
                     'ligand_feature':cfg.LIG_FEAT_OPT, 'ligand_edge':cfg.LIG_EDGE_OPT})
@@ -117,8 +163,9 @@ class Loader():
         elif model == 'EDI':
             pro_emb_dim = 512 # increase embedding size
             if "pro_emb_dim" in kwargs:
+                if pro_emb_dim != kwargs['pro_emb_dim']:
+                    logging.warning(f'pro_emb_dim changed from default of {512} to {pro_emb_dim} for model EDI')
                 pro_emb_dim = kwargs['pro_emb_dim']
-                logging.warning(f'pro_emb_dim changed from default of {512} to {pro_emb_dim} for model EDI')
                 del kwargs['pro_emb_dim']
                 
             model = EsmDTA(esm_head='facebook/esm2_t6_8M_UR50D',
