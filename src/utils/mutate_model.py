@@ -61,8 +61,11 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_path:
         raise FileExistsError('would overwrite existing file at "{modelname}.pdb"')
     
     respos = str(respos)
-    log.verbose()
+    log.none()
 
+    TMP_FILE_PATH = modelname+restyp+respos+'.tmp'
+    OUT_FILE_PATH = f"{modelname}-{restyp}_{respos}.pdb"
+    
     # Set a different value for rand_seed to get a different final model
     env = Environ(rand_seed=-49837)
 
@@ -120,9 +123,8 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_path:
     #before proceeding, because not all sequence related information about MODEL
     #is changed by this command (e.g., internal coordinates, charges, and atom
     #types and radii are not updated).
-
-    mdl1.write(file=modelname+restyp+respos+'.tmp')
-    mdl1.read(file=modelname+restyp+respos+'.tmp')
+    mdl1.write(file=TMP_FILE_PATH)
+    mdl1.read(file=TMP_FILE_PATH)
 
     #set up restraints before computing energy
     #we do this a second time because the model has been written out and read in,
@@ -157,7 +159,8 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_path:
     s.energy()
 
     #give a proper name
-    mdl1.write(file=f"{modelname}-{restyp}_{respos}.pdb")
+    mdl1.write(file=OUT_FILE_PATH)
 
     #delete the temporary file
-    os.remove(modelname+restyp+respos+'.tmp')
+    os.remove(TMP_FILE_PATH)
+    return OUT_FILE_PATH
