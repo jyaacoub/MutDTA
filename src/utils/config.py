@@ -111,7 +111,7 @@ SLURM_PARTITION = None
 SLURM_ACCOUNT = None
 SLURM_GPU_NAME = 'v100'
 
-if 'uhnh4h' in DOMAIN_NAME:
+if ('uhnh4h' in DOMAIN_NAME or 'h4h' in DOMAIN_NAME):
     CLUSTER = 'h4h'
     SLURM_PARTITION = 'gpu'
     SLURM_CONSTRAINT = 'gpu32g'

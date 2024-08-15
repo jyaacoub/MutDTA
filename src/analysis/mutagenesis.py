@@ -4,29 +4,38 @@ import matplotlib.patheffects as PathEffects
 
 from src.utils.residue import ResInfo, Chain
 from src.utils.mutate_model import run_modeller
+import copy
 
-
-def plot_sequence(muta, pep_opts, pro_seq):
+def plot_sequence(muta, pep_opts, pro_seq, delta=False):
+    if delta:
+        muta = copy.deepcopy(muta)
+        original_pkd = None
+        for i, AA in enumerate(pep_opts):
+            if AA == pro_seq[0]:
+                original_pkd = muta[i,0]
+            
+        muta -= original_pkd
+                
+    
     # Create the plot
     plt.figure(figsize=(len(pro_seq), 20))  # Adjust the figure size as needed
     plt.imshow(muta, aspect='auto', cmap='coolwarm', interpolation='none')
 
     # Set the x-ticks to correspond to positions in the protein sequence
-    plt.xticks(ticks=np.arange(len(pro_seq)), labels=[ResInfo.code_to_pep[p] for p in pro_seq], rotation=45, fontsize=16)
+    plt.xticks(ticks=np.arange(len(pro_seq)), labels=pro_seq, fontsize=16)
     plt.yticks(ticks=np.arange(len(pep_opts)), labels=pep_opts, fontsize=16)
-    plt.xlabel('Protein Sequence Position', fontsize=75)
-    plt.ylabel('Peptide Options', fontsize=75)
+    plt.xlabel('Original Protein Sequence', fontsize=75)
+    plt.ylabel('Mutated to Amino Acid code', fontsize=75)
 
     # Add text labels to each square
     for i in range(len(pep_opts)):
         for j in range(len(pro_seq)):
-            text = plt.text(j, i, f'{ResInfo.pep_to_code[pep_opts[i]]}', ha='center', va='center', color='black', fontsize=8)
+            text = plt.text(j, i, f'{pep_opts[i]}', ha='center', va='center', color='black', fontsize=12)
             # Add a white outline to the text
             text.set_path_effects([
                 PathEffects.Stroke(linewidth=1, foreground='white'),
                 PathEffects.Normal()
             ])
-            break
 
 
     # Adjust gridlines to be off-center, forming cell boundaries
@@ -45,14 +54,6 @@ def plot_sequence(muta, pep_opts, pro_seq):
 
 
 if __name__ == "__main__":
-    pro_id = "P67870"
-    pdb_file = f'/cluster/home/t122995uhn/projects/tmp/kiba/{pro_id}.pdb'
-
-
-    plot_sequence(np.load('muta-100_200.npy'), pep_opts=list(ResInfo.pep_to_code.keys()),
-                pro_seq=Chain(pdb_file).sequence)
-    
-    
     # %%
     import os
     import logging
@@ -114,10 +115,9 @@ if __name__ == "__main__":
     print(original_pkd)
 
     # %% mutate and regenerate graphs
-    muta = np.zeros(shape=(len(ResInfo.pep_to_code.keys()), len(pro_seq)))
 
     # zero indexed res range to mutate:
-    res_range = (100, 200)
+    res_range = (0,250)
     res_range = (max(res_range[0], 0),
                 min(res_range[1], len(pro_seq)))
 
@@ -125,29 +125,57 @@ if __name__ == "__main__":
     from src.utils.mutate_model import run_modeller
 
     amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
+    muta = np.zeros(shape=(len(amino_acids), len(pro_seq)))
 
+    n_continued = 0
     with tqdm(range(*res_range), ncols=80, total=(res_range[1]-res_range[0])) as t:
         for j in t:
             for i, AA in enumerate(amino_acids):
                 if i%2 == 0:
                     t.set_postfix(res=j, AA=i+1)
                 
-                if pro_seq[i] == AA:
+                if pro_seq[j] == AA:
                     muta[i,j] = original_pkd
+                    n_continued += 1
                     continue
                     
                 pro_id = "P67870"
                 pdb_file = f'/cluster/home/t122995uhn/projects/tmp/kiba/{pro_id}.pdb'
-                out_pdb_fp = run_modeller(pdb_file, 1, ResInfo.code_to_pep[AA], "A")
+                out_pdb_fp = run_modeller(pdb_file, j+1, ResInfo.code_to_pep[AA], "A")
                 
                 pro, _ = get_protein_features(pro_id, out_pdb_fp)
+                assert pro.pro_seq != pro_seq and pro.pro_seq[j] == AA, "ERROR in modeller"
                 muta[i,j] = m(pro, lig)
                 
                 # delete after use
                 os.remove(out_pdb_fp)
-                
+    print('n_continued:', n_continued)  
     #%%
     np.save(f"muta-{res_range[0]}_{res_range[1]}.npy", muta)
+
+    exit()
+
+    # %%
+    import numpy as np
+    from src.analysis.mutagenesis import plot_sequence
+    from src.utils.residue import ResInfo, Chain
+
+    pro_id = "P67870"
+    pdb_file = f'/cluster/home/t122995uhn/projects/tmp/kiba/{pro_id}.pdb'
+    res_range = (0,215)
+    muta = np.load(f'muta-{res_range[0]}_{res_range[1]}.npy')
+
+    # pkd -> kd
+    # muta = 10**(-muta)
+    # %%
+    amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
+
+    plot_sequence(muta[:,res_range[0]:res_range[1]], pep_opts=amino_acids,
+                pro_seq=Chain(pdb_file).sequence[res_range[0]:res_range[1]])
+
+    plot_sequence(muta[:,res_range[0]:res_range[1]], pep_opts=amino_acids,
+                pro_seq=Chain(pdb_file).sequence[res_range[0]:res_range[1]], delta=True)
+
 
 
 
