@@ -18,7 +18,7 @@ class EsmDTA(BaseModel):
     def __init__(self, esm_head:str='facebook/esm2_t6_8M_UR50D', 
                  num_features_pro=320, pro_emb_dim=54, num_features_mol=78, 
                  output_dim=128, dropout=0.2, pro_feat='esm_only', edge_weight_opt='binary',
-                 dropout_prot=0.0, pro_extra_fc_lyr=False):
+                 dropout_prot=0.0, pro_extra_fc_lyr=False, **kwargs):
         
         super(EsmDTA, self).__init__(pro_feat, edge_weight_opt)
 
@@ -75,12 +75,19 @@ class EsmDTA(BaseModel):
         
         # removing <sep> token by applying mask
         L_max = esm_emb.shape[1] # L_max+1
-        mask = torch.arange(L_max)[None, :] < torch.tensor([len(seq) for seq in data.pro_seq])[:, None]
+        mask = torch.arange(L_max)[None, :] < torch.tensor([len(seq) for seq in data.pro_seq])[:, None]        
         mask = mask.flatten(0,1) # [B*L_max+1]
         
         # flatten from [B, L_max+1, emb_dim] 
         esm_emb = esm_emb.flatten(0,1) # to [B*L_max+1, emb_dim]
         esm_emb = esm_emb[mask] # [B*L, emb_dim]
+        
+        # applying pocket mask if relevant
+        if "pocket_mask" in data:
+            # pocket mask must be a flattened mask from [B,L] to [B*L]
+            mask = [torch.tensor(d, dtype=torch.bool) for d in data.pocket_mask]# [B, L]
+            mask = torch.cat(mask)
+            esm_emb = esm_emb[mask]
         
         if self.esm_only:
             target_x = esm_emb # [B*L, emb_dim]

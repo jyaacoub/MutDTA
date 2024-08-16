@@ -291,7 +291,7 @@ class Loader():
             bs = 1 if d == 'test' else batch_train
             loader = DataLoader(dataset=loaded_datasets[d], 
                                 batch_size=bs, 
-                                shuffle=False)
+                                shuffle=True)
             loaders[d] = loader
             
         return loaders
@@ -327,7 +327,7 @@ class Loader():
                                 sampler=sampler,
                                 batch_size=bs, # should be per gpu batch size (local batch size)
                                 num_workers=num_workers,
-                                shuffle=False,
+                                shuffle=True,
                                 pin_memory=True,
                                 drop_last=True) # drop last batch if not divisible by batch size
             loaders[d] = loader
