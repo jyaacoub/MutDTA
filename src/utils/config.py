@@ -89,7 +89,8 @@ class LIG_FEAT_OPT(StringEnum):
 from pathlib import Path
 
 # Model save paths
-issue_number = 131
+issue_number = None
+
 DATA_BASENAME = f'data/{f"v{issue_number}" if issue_number else ""}'
 RESULTS_PATH = os.path.abspath(f'results/{f"v{issue_number}/" if issue_number else ""}')
 MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'
@@ -110,7 +111,7 @@ SLURM_PARTITION = None
 SLURM_ACCOUNT = None
 SLURM_GPU_NAME = 'v100'
 
-if 'uhnh4h' in DOMAIN_NAME:
+if ('uhnh4h' in DOMAIN_NAME or 'h4h' in DOMAIN_NAME):
     CLUSTER = 'h4h'
     SLURM_PARTITION = 'gpu'
     SLURM_CONSTRAINT = 'gpu32g'
