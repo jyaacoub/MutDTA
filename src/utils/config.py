@@ -1,6 +1,8 @@
 import os
 # for huggingface models:
 os.environ['TRANSFORMERS_CACHE'] = os.path.abspath('../hf_models/')
+os.environ['HF_HOME'] = os.environ['TRANSFORMERS_CACHE'] 
+os.environ['HF_HUB_OFFLINE'] = '1'
 
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody
@@ -89,7 +91,7 @@ from pathlib import Path
 # Model save paths
 issue_number = 103
 DATA_BASENAME = f'data/{f"v{issue_number}" if issue_number else ""}'
-RESULTS_PATH = os.path.abspath(f'results/v{issue_number}/')
+RESULTS_PATH = os.path.abspath(f'results/{f"v{issue_number}/" if issue_number else ""}')
 MEDIA_SAVE_DIR      = f'{RESULTS_PATH}/model_media/'
 MODEL_STATS_CSV     = f'{RESULTS_PATH}/model_media/model_stats.csv'
 MODEL_STATS_CSV_VAL = f'{RESULTS_PATH}/model_media/model_stats_val.csv'

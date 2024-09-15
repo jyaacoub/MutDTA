@@ -1,7 +1,6 @@
 # %%
 from src.data_prep.feature_extraction.ligand import smile_to_graph
 from src.data_prep.feature_extraction.protein import target_to_graph
-from src.data_prep.feature_extraction.protein_edges import get_target_edge_weights
 from src import cfg
 import torch
 import torch_geometric as torchg
@@ -21,7 +20,6 @@ lig = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol
                     lig_seq=lig_seq)
 
 #%% build protein graph
-# predicted using - https://zhanggroup.org/NeBcon/
 prot_id = 'EGFR(L858R)'
 pro_seq = 'MRPSGTAGAALLALLAALCPASRALEEKKVCQGTSNKLTQLGTFEDHFLSLQRMFNNCEVVLGNLEITYVQRNYDLSFLKTIQEVAGYVLIALNTVERIPLENLQIIRGNMYYENSYALAVLSNYDANKTGLKELPMRNLQEILHGAVRFSNNPALCNVESIQWRDIVSSDFLSNMSMDFQNHLGSCQKCDPSCPNGSCWGAGEENCQKLTKIICAQQCSGRCRGKSPSDCCHNQCAAGCTGPRESDCLVCRKFRDEATCKDTCPPLMLYNPTTYQMDVNPEGKYSFGATCVKKCPRNYVVTDHGSCVRACGADSYEMEEDGVRKCKKCEGPCRKVCNGIGIGEFKDSLSINATNIKHFKNCTSISGDLHILPVAFRGDSFTHTPPLDPQELDILKTVKEITGFLLIQAWPENRTDLHAFENLEIIRGRTKQHGQFSLAVVSLNITSLGLRSLKEISDGDVIISGNKNLCYANTINWKKLFGTSGQKTKIISNRGENSCKATGQVCHALCSPEGCWGPEPRDCVSCRNVSRGRECVDKCNLLEGEPREFVENSECIQCHPECLPQAMNITCTGRGPDNCIQCAHYIDGPHCVKTCPAGVMGENNTLVWKYADAGHVCHLCHPNCTYGCTGPGLEGCPTNGPKIPSIATGMVGALLLLLVVALGIGLFMRRRHIVRKRTLRRLLQERELVEPLTPSGEAPNQALLRILKETEFKKIKVLGSGAFGTVYKGLWIPEGEKVKIPVAIKELREATSPKANKEILDEAYVMASVDNPHVCRLLGICLTSTVQLITQLMPFGCLLDYVREHKDNIGSQYLLNWCVQIAKGMNYLEDRRLVHRDLAARNVLVKTPQHVKITDFGLAKLLGAEEKEYHAEGGKVPIKWMALESILHRIYTHQSDVWSYGVTVWELMTFGSKPYDGIPASEISSILEKGERLPQPPICTIDVYMIMVKCWMIDADSRPKFRELIIEFSKMARDPQRYLVIQGDERMHLPSPTDSNFYRALMDEEDMDDVVDADEYLIPQQGFFSSPSTSRTPLLSSLSATSNNSTVACIDRNGLQSCPIKEDSFLQRYSSDPTGALTEDSIDDTFLPVPEYINQSVPKRPAGSVQNPVYHNQPLNPAPSRDPHYQDPHSTAVGNPEYLNTVQPTCVNSTFDSPAHWAQKGSHQISLDNPDYQQDFFPKEAKPNGIFKGSTAENAEYLRVAPQSSEFIGA'
 cmap_p = f'/cluster/home/t122995uhn/projects/data/davis/pconsc4/{prot_id}.npy'
@@ -43,42 +41,13 @@ pro = torchg.data.Data(x=torch.Tensor(pro_feat),
                     edge_weight=None)
 
 #%% Loading the model
+import logging
 from src.utils.loader import Loader
-from src import TUNED_MODEL_CONFIGS
-import os
+logging.getLogger().setLevel(logging.DEBUG)
 
-def reformat_kwargs(model_kwargs):
-    return {
-        'model': model_kwargs['model'],
-        'data': model_kwargs['dataset'],
-        'pro_feature': model_kwargs['feature_opt'],
-        'edge': model_kwargs['edge_opt'],
-        'batch_size': model_kwargs['batch_size'],
-        'lr': model_kwargs['lr'],
-        'dropout': model_kwargs['architecture_kwargs']['dropout'],
-        'n_epochs': model_kwargs.get('n_epochs', 2000),  # Assuming a default value for n_epochs
-        'pro_overlap': model_kwargs.get('pro_overlap', False),  # Assuming a default or None
-        'fold': model_kwargs.get('fold', 0),  # Assuming a default or None
-        'ligand_feature': model_kwargs['lig_feat_opt'],
-        'ligand_edge': model_kwargs['lig_edge_opt']
-    }
+m = Loader.load_tuned_model('davis_esm', fold=1)
 
-
-model_kwargs = reformat_kwargs(TUNED_MODEL_CONFIGS['davis_esm'])
-
-MODEL_KEY = Loader.get_model_key(**model_kwargs)
-
-model_p_tmp = f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model_tmp'
-model_p = f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model'
-
-# MODEL_KEY = 'DDP-' + MODEL_KEY # distributed model
-model_p = model_p if os.path.isfile(model_p) else model_p_tmp
-assert os.path.isfile(model_p), f"MISSING MODEL CHECKPOINT {model_p}"
-
-print(model_p)
 # %%
-args = model_kwargs
-model = Loader.init_model(model=args['model'], pro_feature=args['pro_feature'], 
-                          pro_edge=args['edge'], **args['architecture_kwargs'])
+m(pro, lig)
 
-
+# %%

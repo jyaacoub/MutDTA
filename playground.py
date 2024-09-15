@@ -252,4 +252,3 @@ from src.train_test.training import train
 
 logs = train(model, loaders['train'], loaders['val'], device, 
             epochs=NUM_EPOCHS, lr_0=LEARNING_RATE)
-# %%
