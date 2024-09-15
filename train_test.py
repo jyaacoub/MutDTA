@@ -2,7 +2,24 @@
 from src.utils.arg_parse import parse_train_test_args
 
 args, unknown_args = parse_train_test_args(verbose=True,
-                             jyp_args='-m DG -d PDBbind -f nomsa -e binary -bs 64')
+                             jyp_args='--model_opt EDI \
+                             --data_opt davis \
+                             --fold_selection 0 \
+		                     \
+		                     --feature_opt nomsa \
+		                     --edge_opt binary \
+		                     --ligand_feature_opt original \
+		                     --ligand_edge_opt binary \
+		                     \
+		                     --learning_rate 0.0001 \
+		                     --batch_size 12 \
+							 \
+		                     --dropout 0.4 \
+							 --dropout_prot 0.0 \
+		                     --output_dim 128 \
+		                     --pro_emb_dim 512 \
+							 --pro_extra_fc_lyr False\
+                            --debug')
 FORCE_TRAINING = args.train
 DEBUG = args.debug
 
@@ -46,6 +63,7 @@ torch.manual_seed(args.rand_seed)
 cp_saver = CheckpointSaver(model=None, 
                             save_path=None, 
                             train_all=False, # forces full training
+                            min_delta=0.2,
                             patience=100)
 
 # %% Training loop
@@ -88,13 +106,12 @@ for (MODEL, DATA,
                                 ligand_feature=ligand_feature, ligand_edge=ligand_edge,
                                 **unknown_args).to(device)
     cp_saver.new_model(model, save_path=model_save_p)
-    cp_saver.min_delta = 0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.05
+    cp_saver.min_delta = 0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.03
     
     if DEBUG: 
         # run single batch through model
         debug(model, loaders['train'], device)
         continue # skip training
-    
     
     # ==== TRAINING ====
     # check if model has already been trained:

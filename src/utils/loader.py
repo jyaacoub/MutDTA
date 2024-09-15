@@ -338,7 +338,7 @@ class Loader():
             bs = 1 if d == 'test' else batch_train
             loader = DataLoader(dataset=loaded_datasets[d], 
                                 batch_size=bs, 
-                                shuffle=False)
+                                shuffle=True)
             loaders[d] = loader
             
         return loaders
@@ -365,7 +365,7 @@ class Loader():
         loaders = {}
         for d in loaded_datasets:
             dataset = loaded_datasets[d]
-            sampler = DistributedSampler(dataset, shuffle=True,
+            sampler = DistributedSampler(dataset, shuffle=False,
                                             num_replicas=num_replicas,
                                             rank=rank, seed=seed)
                                             
@@ -374,7 +374,7 @@ class Loader():
                                 sampler=sampler,
                                 batch_size=bs, # should be per gpu batch size (local batch size)
                                 num_workers=num_workers,
-                                shuffle=False,
+                                shuffle=False, # mut exclusive with DDP
                                 pin_memory=True,
                                 drop_last=True) # drop last batch if not divisible by batch size
             loaders[d] = loader

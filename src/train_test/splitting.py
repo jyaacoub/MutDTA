@@ -343,19 +343,22 @@ def resplit(dataset:str|BaseDataset, split_files:dict|str=None, use_train_set=Fa
     split_files = split_files.copy()
     test_prots = set(pd.read_csv(split_files['test'])['prot_id'])
     test_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in test_prots]
+    assert len(test_idxs) > 100, f"Error in splitting, not enough entries in test split - {split_files['test']}"
     dataset.save_subset(test_idxs, 'test')
     del split_files['test']
     
     # Building the folds
     for k, v in tqdm(split_files.items(), desc="Building folds from split files"):
         prots = set(pd.read_csv(v)['prot_id'])
-        val_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in prots]
+        val_idxs = [i for i in range(len(dataset.df)) if dataset.df.iloc[i]['prot_id'] in prots]    
+        assert len(val_idxs) > 100, f"Error in splitting, not enough entries in {k} split - {v}"
         dataset.save_subset(val_idxs, k)
         
         if not use_train_set:
             # Build training set from all proteins not in the val/test set
             idxs = set(val_idxs + test_idxs)
             train_idxs = [i for i in range(len(dataset.df)) if i not in idxs]
+            assert len(train_idxs) > 100, f"Error in splitting, not enough entries in train split"
             dataset.save_subset(train_idxs, k.replace('val', 'train'))
     
     return dataset
