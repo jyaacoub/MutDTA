@@ -45,7 +45,7 @@ import logging
 from src.utils.loader import Loader
 logging.getLogger().setLevel(logging.DEBUG)
 
-m = Loader.load_tuned_model('davis_esm', fold=1)
+m, _ = Loader.load_tuned_model('davis_esm', fold=1)
 
 # %%
 m(pro, lig)

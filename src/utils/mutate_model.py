@@ -63,7 +63,7 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_path:
     respos = str(respos)
     log.none()
 
-    TMP_FILE_PATH = modelname+restyp+respos+'.tmp'
+    TMP_FILE_PATH = f"{modelname}-{restyp}_{respos}.tmp"
     OUT_FILE_PATH = f"{modelname}-{restyp}_{respos}.pdb"
     
     # Set a different value for rand_seed to get a different final model
