@@ -105,7 +105,7 @@ class Loader():
         logging.debug(f'loading: {model_p}')
         model = Loader.init_model(model=model_kwargs['model'], pro_feature=model_kwargs['pro_feature'], 
                                 pro_edge=model_kwargs['edge'], **MODEL_TUNED_PARAMS['architecture_kwargs'])
-        return model
+        return model, model_kwargs
     
     @staticmethod
     @validate_args({'model': model_opt, 'edge': edge_opt, 'pro_feature': pro_feature_opt,
