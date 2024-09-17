@@ -56,8 +56,8 @@ if __name__ == "__main__":
     
     res_range = (0,215)
     muta = np.load(f'muta-{res_range[0]}_{res_range[1]}.npy')
-    plot_sequence(muta[:,res_range[0]:res_range[1]], 
-                  pro_seq=Chain(pdb_file).sequence[res_range[0]:res_range[1]])
+    #plot_sequence(muta[:,res_range[0]:res_range[1]], 
+    #              pro_seq=Chain(pdb_file).sequence[res_range[0]:res_range[1]])
 
 
 
