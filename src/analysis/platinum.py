@@ -1,3 +1,28 @@
+import argparse
+parser = argparse.ArgumentParser(description='Runs model on platinum dataset to evaluate it.')
+parser.add_argument('--model_opt', type=str, default='davis_DG', 
+                    choices=['davis_DG',    'davis_gvpl',   'davis_esm', 
+                             'kiba_DG',     'kiba_esm',     'kiba_gvpl',
+                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl'],
+                    help='Model option. See MutDTA/src/__init__.py for details.')
+parser.add_argument('--fold', type=int, default=1, 
+                    help='Which model fold to use (there are 5 models for each option due to 5-fold CV).')
+parser.add_argument('--out_dir', type=str, default='./', 
+                    help='Output directory path to save csv file for prediction results.')
+
+args = parser.parse_args()
+MODEL_OPT = args.model_opt
+FOLD = args.fold
+OUT_DIR = args.out_dir
+
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
+logging.debug("#"*50)
+logging.debug(f"MODEL_OPT: {MODEL_OPT}")
+logging.debug(f"FOLD: {FOLD}")
+logging.debug(f"OUT_DIR: {OUT_DIR}")
+logging.debug("#"*50)
+
 import torch, os
 import pandas as pd
 
@@ -5,43 +30,37 @@ from src import cfg
 from src import TUNED_MODEL_CONFIGS
 from src.utils.loader import Loader
 from src.train_test.training import test
-device = torch.cuda.device(0) if torch.cuda.is_available() else torch.device('cpu')
 
-CONFIG = TUNED_MODEL_CONFIGS['davis_gvpl_aflow']
-#%% load up model:
-cp_dir = cfg.CHECKPOINT_SAVE_DIR
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+MODEL_PARAMS = TUNED_MODEL_CONFIGS[MODEL_OPT]
 
-MODEL_KEY = lambda fold: Loader.get_model_key(CONFIG['model'], CONFIG['dataset'], CONFIG['feature_opt'], CONFIG['edge_opt'], 
-                                 CONFIG['batch_size'], CONFIG['lr'], CONFIG['architecture_kwargs']['dropout'],
-                                 n_epochs=2000, fold=fold, 
-                                 ligand_feature=CONFIG['lig_feat_opt'], ligand_edge=CONFIG['lig_edge_opt'])
-cp = lambda fold: f"{cp_dir}/{MODEL_KEY(fold)}.model"
+### Loading the model
+logging.debug(f"Loading the model {MODEL_OPT}")
+model, model_kwargs = Loader.load_tuned_model(MODEL_OPT, fold=FOLD)
+MODEL_KEY = Loader.get_model_key(**model_kwargs)
+model.to(DEVICE)
+model.eval()
 
-out_dir = f'{cfg.MEDIA_SAVE_DIR}/test_set_pred/'
-os.makedirs(out_dir, exist_ok=True)
-
-model = Loader.init_model(model=CONFIG["model"], pro_feature=CONFIG["feature_opt"],
-                            pro_edge=CONFIG["edge_opt"],**CONFIG['architecture_kwargs'])
-
-#%%
-# load up platinum test db
+### Loading the data and Test
+logging.debug("Loading platinum test dataloader for model")
 loaders = Loader.load_DataLoaders(cfg.DATA_OPT.platinum,
-                               pro_feature    = CONFIG['feature_opt'], 
-                               edge_opt       = CONFIG['edge_opt'],
-                               ligand_feature = CONFIG['lig_feat_opt'], 
-                               ligand_edge    = CONFIG['lig_edge_opt'],
+                               pro_feature    = MODEL_PARAMS['feature_opt'], 
+                               edge_opt       = MODEL_PARAMS['edge_opt'],
+                               ligand_feature = MODEL_PARAMS['lig_feat_opt'], 
+                               ligand_edge    = MODEL_PARAMS['lig_edge_opt'],
                                datasets=['test'])
 
-for i in range(5):
-    model.safe_load_state_dict(torch.load(cp(i), map_location=device))
-    model.to(device)
-    model.eval()
+logging.debug("Running inference on test loader")
+loss, pred, actual = test(model, loaders['test'], DEVICE, verbose=True)
 
-    loss, pred, actual = test(model, loaders['test'], device, verbose=True)
-    
-    # saving as csv with columns code, pred, actual
-    # get codes from test loader
-    codes, pid = [b['code'][0] for b in loaders['test']], [b['prot_id'][0] for b in loaders['test']]
-    df = pd.DataFrame({'prot_id': pid, 'pred': pred, 'actual': actual}, index=codes)
-    df.index.name = 'code'
-    df.to_csv(f'{out_dir}/{MODEL_KEY(i)}_PLATINUM.csv')
+# save as a CSV with cols: code, prot_id, pred, actual
+logging.debug(f"Saving output to '{OUT_DIR}/{MODEL_KEY}_PLATINUM.csv'")
+df = pd.DataFrame({
+    'prot_id': [b['prot_id'][0] for b in loaders['test']], 
+    'pred': pred, 
+    'actual': actual
+    },
+    index=[b['code'][0] for b in loaders['test']])
+
+df.index.name = 'code'
+df.to_csv(f'{OUT_DIR}/{MODEL_KEY}_PLATINUM.csv')
