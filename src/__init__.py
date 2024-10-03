@@ -3,7 +3,7 @@ from src.utils import config as cfg
 
 
 TUNED_MODEL_CONFIGS = {
-    #DGM_davis0D_nomsaF_binaryE_128B_0.00012LR_0.24D_2000E
+    #DGM_davis0D_nomsaF_binaryE_128B_0.00012LR_0.24D_2000E.model
     'davis_DG':{
         "model": cfg.MODEL_OPT.DG,
                 

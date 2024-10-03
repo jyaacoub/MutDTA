@@ -12,7 +12,7 @@ parser.add_argument('--model_opt', type=str, default='davis_DG',
                     choices=['davis_DG',    'davis_gvpl',   'davis_esm', 
                              'kiba_DG',     'kiba_esm',     'kiba_gvpl',
                              'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl'],
-                    help='Model option.')
+                    help='Model option. See MutDTA/src/__init__.py for details.')
 parser.add_argument('--fold', type=int, default=1, 
                     help='Which model fold to use (there are 5 models for each option due to 5-fold CV).')
 
@@ -82,10 +82,11 @@ def get_protein_features(pdb_file_path, cmap_thresh=8.0):
                                             edge_opt=MODEL_PARAMS['edge_opt'],
                                             cmap=pro_cmap,
                                             n_modes=5, n_cpu=4)
-        if len(pro_edge_weight.shape) == 2:
-            pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
-        elif len(pro_edge_weight.shape) == 3: # has edge attr! (This is our GVPL features)
-            pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1], :])
+        if pro_edge_weight:
+            if len(pro_edge_weight.shape) == 2:
+                pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1]])
+            elif len(pro_edge_weight.shape) == 3: # has edge attr! (This is our GVPL features)
+                pro_edge_weight = torch.Tensor(pro_edge_weight[edge_idx[0], edge_idx[1], :])
     
     pro_feat = torch.Tensor(extra_feat)
 
@@ -96,10 +97,10 @@ def get_protein_features(pdb_file_path, cmap_thresh=8.0):
                             edge_weight=pro_edge_weight)
     return pro, pdb
 
-################################################
-# Loading the model and get original pkd value #
-################################################
-m = Loader.load_tuned_model(MODEL_OPT, fold=FOLD)
+##################################################
+### Loading the model and get original pkd value #
+##################################################
+m, _ = Loader.load_tuned_model(MODEL_OPT, fold=FOLD)
 m.to(DEVICE)
 m.eval()
 
@@ -108,22 +109,23 @@ mol_feat, mol_edge = smile_to_graph(LIGAND_SMILE, lig_feature=MODEL_PARAMS['lig_
 lig = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol_edge), lig_seq=LIGAND_SMILE)
 
 # build protein graph
-pro, pdb = get_protein_features(PDB_FILE)
+pro, pdb_original = get_protein_features(PDB_FILE)
+original_seq = pdb_original.sequence
 
 original_pkd = m(pro.to(DEVICE), lig.to(DEVICE))
-print("Original pkd:",original_pkd)
+print("Original pkd:", original_pkd)
 
 
-################################################
-# Mutate and regenerate graphs #################
-################################################
+##################################################
+### Mutate and regenerate graphs #################
+##################################################
 # zero indexed res range to mutate:
 res_range = (max(RES_START, 0),
-            min(RES_END, len(pdb.sequence)))
+            min(RES_END, len(original_seq)))
 
 from src.utils.mutate_model import run_modeller
 amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
-muta = np.zeros(shape=(len(amino_acids), len(pdb.sequence)))
+muta = np.zeros(shape=(len(amino_acids), len(original_seq)))
 
 with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), desc='Mutating') as t:
     for j in t:
@@ -131,13 +133,14 @@ with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), desc=
             if i%2 == 0:
                 t.set_postfix(res=j, AA=i+1)
             
-            if pdb.sequence[j] == AA:
+            if original_seq[j] == AA: # skip same AA modifications 
                 muta[i,j] = original_pkd
                 continue
             out_pdb_fp = run_modeller(PDB_FILE, j+1, ResInfo.code_to_pep[AA], "A")
             
-            pro, pdb = get_protein_features(PDB_FILE)
-            assert pro.pro_seq != pdb.sequence and pro.pro_seq[j] == AA, "ERROR in modeller"
+            pro, _ = get_protein_features(out_pdb_fp)
+            assert pro.pro_seq != original_seq and pro.pro_seq[j] == AA, \
+                f"ERROR in modeller, {pro.pro_seq} == {original_seq} \nor {pro.pro_seq[j]} != {AA}"
             
             muta[i,j] = m(pro.to(DEVICE), lig.to(DEVICE))
             
