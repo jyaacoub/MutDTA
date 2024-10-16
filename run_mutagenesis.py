@@ -28,22 +28,20 @@ FOLD = args.fold
 RES_START = args.res_start
 RES_END = args.res_end
 
-# Your code logic here
-print("#"*50)
-print(f"LIGAND_SMILE: {LIGAND_SMILE}")
-print(f"LIGAND_SMILE_NAME: {LIGAND_SMILE_NAME}")
-print(f"PDB_FILE: {PDB_FILE}")
-print(f"OUT_PATH: {OUT_PATH}")
-print(f"MODEL_OPT: {MODEL_OPT}")
-print(f"FOLD: {FOLD}")
-print(f"RES_START: {RES_START}")
-print(f"RES_END: {RES_END}")
-print("#"*50)
-
-import os
 import logging
 logging.getLogger().setLevel(logging.DEBUG)
+logging.debug("#"*50)
+logging.debug(f"LIGAND_SMILE: {LIGAND_SMILE}")
+logging.debug(f"LIGAND_SMILE_NAME: {LIGAND_SMILE_NAME}")
+logging.debug(f"PDB_FILE: {PDB_FILE}")
+logging.debug(f"OUT_PATH: {OUT_PATH}")
+logging.debug(f"MODEL_OPT: {MODEL_OPT}")
+logging.debug(f"FOLD: {FOLD}")
+logging.debug(f"RES_START: {RES_START}")
+logging.debug(f"RES_END: {RES_END}")
+logging.debug("#"*50)
 
+import os
 import numpy as np
 import torch
 import torch_geometric as torchg
