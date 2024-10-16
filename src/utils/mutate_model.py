@@ -1,9 +1,14 @@
 import sys
 import os
+import logging
 
-from modeller import *
-from modeller.optimizers import MolecularDynamics, ConjugateGradients
-from modeller.automodel import autosched
+# try catch around modeller since it is only really needed for run_mutagenesis.py
+try:
+    from modeller import *
+    from modeller.optimizers import MolecularDynamics, ConjugateGradients
+    from modeller.automodel import autosched
+except ImportError:
+    logging.warning("Modeller failed to import - will not able to run mutagenesis scripts.")
 
 
 def optimize(atmsel, sched):
