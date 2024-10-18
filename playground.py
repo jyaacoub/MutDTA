@@ -1,4 +1,42 @@
 #%%
+import torch
+from tqdm import tqdm
+import os
+from src import cfg
+
+from src.utils.loader import Loader
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+print("os.env - ", os.environ['HF_HOME'])
+m, _ = Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
+m.eval()
+
+
+print("done")
+
+exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns

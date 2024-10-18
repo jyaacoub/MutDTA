@@ -148,7 +148,7 @@ with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), desc=
 
 # Save mutagenesis matrix
 OUT_DIR = f'{OUT_PATH}/{LIGAND_SMILE_NAME}/{MODEL_OPT}'
-os.makedirs(OUT_DIR)
+os.makedirs(OUT_DIR, exist_ok=True)
 OUT_FP = f"{OUT_DIR}/{res_range[0]}_{res_range[1]}.npy"
 print("Saving mutagenesis numpy matrix to", OUT_FP)
 np.save(OUT_FP, muta)
