@@ -2,6 +2,7 @@ import os
 import logging
 from functools import wraps
 from typing import Iterable
+import torch
 from torch.utils.data.distributed import DistributedSampler
 from torch_geometric.loader import DataLoader
 
@@ -66,7 +67,7 @@ class Loader():
         
     @staticmethod
     @validate_args({'tuned_model':TUNED_MODEL_CONFIGS.keys()})
-    def load_tuned_model(tuned_model='davis_DG', fold=0):
+    def load_tuned_model(tuned_model='davis_DG', fold=0, device=torch.device('cpu')):
         MODEL_TUNED_PARAMS = TUNED_MODEL_CONFIGS[tuned_model]
 
         def reformat_kwargs(model_kwargs):
@@ -105,6 +106,10 @@ class Loader():
         logging.debug(f'loading: {model_p}')
         model = Loader.init_model(model=model_kwargs['model'], pro_feature=model_kwargs['pro_feature'], 
                                 pro_edge=model_kwargs['edge'], **MODEL_TUNED_PARAMS['architecture_kwargs'])
+        # load checkpoint
+        logging.debug(f'Loading checkpoint {model_p}')
+        model.to(device)
+        model.load_state_dict(torch.load(model_p, map_location=device))
         return model, model_kwargs
     
     @staticmethod
