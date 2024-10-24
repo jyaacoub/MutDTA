@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -t 10:00
+#SBATCH -t 30:00
 #SBATCH --job-name=run_mutagenesis_davis_esm
 #SBATCH --mem=10G
 
