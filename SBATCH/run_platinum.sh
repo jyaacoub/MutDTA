@@ -14,8 +14,8 @@
 
 # Then to get most accurate mutagenesis you can average these matrices
 # and visualize them with src.analysis.mutagenesis_plot.plot_sequence
-
-cd /home/jyaacoub/projects/def-sushant/jyaacoub/MutDTA
+ROOT_DIR="/lustre06/project/6069023"
+cd ${ROOT_DIR}/jyaacoub/MutDTA
 source .venv/bin/activate
 
 python -u run_platinum.py \

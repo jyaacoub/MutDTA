@@ -11,7 +11,8 @@ parser.add_argument('--res_end', type=int, default=float('inf'), help='End index
 parser.add_argument('--model_opt', type=str, default='davis_DG', 
                     choices=['davis_DG',    'davis_gvpl',   'davis_esm', 
                              'kiba_DG',     'kiba_esm',     'kiba_gvpl',
-                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl'],
+                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
+                             'PDBbind_gvpl_aflow'],
                     help='Model option. See MutDTA/src/__init__.py for details.')
 parser.add_argument('--fold', type=int, default=1, 
                     help='Which model fold to use (there are 5 models for each option due to 5-fold CV).')
@@ -98,8 +99,7 @@ def get_protein_features(pdb_file_path, cmap_thresh=8.0):
 ##################################################
 ### Loading the model and get original pkd value #
 ##################################################
-m, _ = Loader.load_tuned_model(MODEL_OPT, fold=FOLD)
-m.to(DEVICE)
+m, _ = Loader.load_tuned_model(MODEL_OPT, fold=FOLD, device=DEVICE)
 m.eval()
 
 # build ligand graph
@@ -110,6 +110,7 @@ lig = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol
 pro, pdb_original = get_protein_features(PDB_FILE)
 original_seq = pdb_original.sequence
 
+print("Model Loaded")
 original_pkd = m(pro.to(DEVICE), lig.to(DEVICE))
 print("Original pkd:", original_pkd)
 
@@ -148,7 +149,7 @@ with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), desc=
 
 # Save mutagenesis matrix
 OUT_DIR = f'{OUT_PATH}/{LIGAND_SMILE_NAME}/{MODEL_OPT}'
-os.makedirs(OUT_DIR)
+os.makedirs(OUT_DIR, exist_ok=True)
 OUT_FP = f"{OUT_DIR}/{res_range[0]}_{res_range[1]}.npy"
 print("Saving mutagenesis numpy matrix to", OUT_FP)
 np.save(OUT_FP, muta)

@@ -1,4 +1,49 @@
 #%%
+import os
+print("os.env.TRANSFORMERS_CACHE - ", os.environ.get('TRANSFORMERS_CACHE'))
+print("           os.env.HF_HOME - ", os.environ.get('HF_HOME'))
+print("    os.env.HF_HUB_OFFLINE - ", os.environ.get('HF_HUB_OFFLINE'))
+
+import torch
+from tqdm import tqdm
+from src import cfg
+
+from src.utils.loader import Loader
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+print("\n############### After imports: #############")
+print("os.env.TRANSFORMERS_CACHE - ", os.environ['TRANSFORMERS_CACHE'])
+print("           os.env.HF_HOME - ", os.environ['HF_HOME'])
+print("    os.env.HF_HUB_OFFLINE - ", os.environ['HF_HUB_OFFLINE'])
+m, _ = Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
+m.eval()
+
+
+print("done")
+
+exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
