@@ -305,4 +305,25 @@ TUNED_MODEL_CONFIGS = {
             'output_dim': 512
         }
     },
+    'PDBbind_gvpl_esm':{
+        "model": cfg.MODEL_OPT.GVPL_ESM,
+                
+        "dataset": cfg.DATA_OPT.PDBbind,
+        "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
+        "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
+        "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
+ 
+        'lr': 0.0001, 
+        'batch_size': 40, # global batch size (local is 10)
+        
+        'architecture_kwargs': {
+            'dropout': 0.2328, 
+            'output_dim': 128, 
+            'num_GVPLayers': 3, 
+            'pro_dropout_gnn': 0.1582, 
+            'pro_extra_fc_lyr': False, 
+            'pro_emb_dim': 512,
+        }
+    }
 }
