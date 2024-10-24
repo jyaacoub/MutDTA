@@ -6,7 +6,7 @@
 #SBATCH --gpus-per-node=a100:1
 #SBATCH --cpus-per-task=4
 
-#SBATCH --output=./%x_%a.out
+#SBATCH --output=./outs/%x_%a.out
 #SBATCH --array=0
 
 # runs across all folds for a model
