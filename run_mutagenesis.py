@@ -110,6 +110,7 @@ lig = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol
 pro, pdb_original = get_protein_features(PDB_FILE)
 original_seq = pdb_original.sequence
 
+print("Model Loaded")
 original_pkd = m(pro.to(DEVICE), lig.to(DEVICE))
 print("Original pkd:", original_pkd)
 
