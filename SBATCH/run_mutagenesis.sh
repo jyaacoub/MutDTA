@@ -15,7 +15,7 @@
 # Then to get most accurate mutagenesis you can average these matrices
 # and visualize them with src.analysis.mutagenesis_plot.plot_sequence
 ROOT_DIR="/lustre06/project/6069023"
-SCRATCH_DIR="/lustre07/scratch/jyaacoub/" # this is used for outputs on narval
+OUT_DIR="/lustre07/scratch/jyaacoub/mutagenesis_tests" # this is used for outputs on narval
 BIN_DIR="${ROOT_DIR}/jyaacoub/bin" # for modeller
 
 # Modeller is needed for this to run... (see: Generic install - https://salilab.org/modeller/10.5/release.html#unix)
@@ -35,7 +35,7 @@ python -u run_mutagenesis.py \
                     --ligand_smile "CC(C)CC(NC(=O)C(CC(=O)[O-])NC(=O)C([NH3+])CCC(=O)[O-])C(=O)[O-]" \
                     --ligand_smile_name "1a30_ligand" \
                     --pdb_file "${ROOT_DIR}/jyaacoub/data/kiba/alphaflow_io/out_pdb_MD-distilled/P67870.pdb" \
-                    --out_path "${SCRATCH_DIR}/mutagenesis_tests/" \
+                    --out_path "${OUT_DIR}/" \
                     --res_start 0 \
                     --res_end 5 \
                     --model_opt davis_esm \
