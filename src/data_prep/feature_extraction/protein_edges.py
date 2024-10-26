@@ -233,8 +233,9 @@ def get_target_edge_weights(pdb_fp:str, target_seq:str, edge_opt:str,
             chains = [c for c in chains if 0.85 < c.TM_score(template) < 0.98]
         
         # NOTE: if chains (no pdbs found) is empty then we treat all edges as the same
-        if len(chains) == 0:
-            logging.warning(f'no conf pdbs for {pdb_fp}')
+        if len(chains) <= 1:
+            logging.error(f'Not enough models for af2/aflow edges. Found only {len(chains)} model(s) '+\
+                          f'for PDB file: {pdb_fp}')
             # treat all edges as the same if no confirmations are found
             return np.ones(shape=(len(target_seq), len(target_seq)))
         
