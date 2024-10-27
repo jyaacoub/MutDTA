@@ -1,32 +1,36 @@
 import argparse
-parser = argparse.ArgumentParser(description='Runs inference on an input PDB file and a given ligand SMILES.')
-parser.add_argument('--ligand_smile', type=str, required=True, help='Ligand SMILES string.')
-parser.add_argument('--ligand_id', type=str, default='', 
-                    help='(Optional) Identifier for ligand to save in csv output.')
-parser.add_argument('--pdb_files', type=str, nargs='+', required=True, 
+parser = argparse.ArgumentParser(description='Runs inference on a given ligand SMILES and an input of pdb files.')
+parser.add_argument('-ls','--ligand_smile', type=str, required=True, help='Ligand SMILES string.')
+parser.add_argument('-pdb','--pdb_files', type=str, nargs='+', required=True, 
                     help='Paths to the PDB files. This can be the alphaflow output files with the first model for edges. '+\
                         'NOTE: file name is used for protein ID in csv output')
-parser.add_argument('--out_path', type=str, default='./', 
-                    help='Output directory path to save resulting mutagenesis numpy matrix with predicted pkd values')
-parser.add_argument('--model_opt', type=str, default='davis_DG', 
+
+parser.add_argument('-o','--csv_out', type=str, default='./predicted_pkd_values.csv', 
+                    help='Output csv to save the predicted pkd values with the following columns: \n'+\
+                        'TIMESTAMP, model, pdb_file, ligand_id, pred_pkd, SMILES, pro_seq')
+
+parser.add_argument('-m','--model_opt', type=str, default='davis_DG', 
                     choices=['davis_DG',    'davis_gvpl',   'davis_esm', 
                              'kiba_DG',     'kiba_esm',     'kiba_gvpl',
                              'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
                              'PDBbind_gvpl_aflow'],
                     help='Model option. See MutDTA/src/__init__.py for details on hyperparameters.'+\
                         'NOTE for _aflow models we expect the pdb_file to contain multiple conformations')
-parser.add_argument('--fold', type=int, default=1, 
+parser.add_argument('-f','--fold', type=int, default=1, 
                     help='Which model fold to use (there are 5 models for each option due to 5-fold CV).')
-parser.add_argument('--batch_size', type=int, default=8, 
+
+parser.add_argument('-li','--ligand_id', type=str, default='', 
+                    help='Optional identifier for ligand to save in csv output.')
+parser.add_argument('-bs','--batch_size', type=int, default=8, 
                     help='Batch size for processing the PDB files. Default is set to a conservative 8 batch size '+\
                          'since that is the max a100s can comfortably support for our largest models (ESM models).')
 args = parser.parse_args()
 
 # Assign variables
-LIGAND_SMILE = args.ligand_smile
+LIGAND_SMILES = args.ligand_smile
 LIGAND_ID = args.ligand_id
 PDB_FILES = args.pdb_files
-OUT_PATH = args.out_path
+CSV_OUT = args.csv_out
 MODEL_OPT = args.model_opt
 FOLD = args.fold
 BATCH_SIZE = args.batch_size
@@ -34,10 +38,10 @@ BATCH_SIZE = args.batch_size
 import logging
 logging.getLogger().setLevel(logging.DEBUG)
 logging.debug("#"*50)
-logging.debug(f"LIGAND_SMILE: {LIGAND_SMILE}")
+logging.debug(f"LIGAND_SMILE: {LIGAND_SMILES}")
 logging.debug(f"LIGAND_ID: {LIGAND_ID}")
 logging.debug(f"PDB_FILES: {PDB_FILES}")
-logging.debug(f"OUT_PATH: {OUT_PATH}")
+logging.debug(f"OUT_PATH: {CSV_OUT}")
 logging.debug(f"MODEL_OPT: {MODEL_OPT}")
 logging.debug(f"FOLD: {FOLD}")
 logging.debug(f"BATCH_SIZE: {BATCH_SIZE}")
@@ -99,7 +103,7 @@ def get_protein_features(pdb_file_path, prot_id=None, cmap_thresh=8.0):
                             pro_seq=updated_seq, # Protein sequence for downstream esm model
                             prot_id=prot_id,
                             edge_weight=pro_edge_weight)
-    return pro, pdb
+    return pro
 
 ##################################################
 ### Loading the model                          ###
@@ -108,8 +112,8 @@ m, _ = Loader.load_tuned_model(MODEL_OPT, fold=FOLD, device=DEVICE)
 m.eval()
 
 # Build ligand graph
-mol_feat, mol_edge = smile_to_graph(LIGAND_SMILE, lig_feature=MODEL_PARAMS['lig_feat_opt'], lig_edge=MODEL_PARAMS['lig_edge_opt'])
-lig_data = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol_edge), lig_seq=LIGAND_SMILE)
+mol_feat, mol_edge = smile_to_graph(LIGAND_SMILES, lig_feature=MODEL_PARAMS['lig_feat_opt'], lig_edge=MODEL_PARAMS['lig_edge_opt'])
+lig_data = torchg.data.Data(x=torch.Tensor(mol_feat), edge_index=torch.LongTensor(mol_edge), lig_seq=LIGAND_SMILES)
 
 # Prepare to collect results
 results = []
@@ -149,32 +153,31 @@ for batch_idx in tqdm(range(num_batches), desc="Running inference on PDB file(s)
 
     # Collect results
     predicted_pkd = predicted_pkd.cpu().numpy().flatten()
-    for pdb_file_name, pkd_value in zip(batch_pdb_file_names, predicted_pkd):
+    time_stamp = pd.Timestamp("now")
+    for pdb_file_name, pkd_value, sq in zip(batch_pdb_file_names, predicted_pkd, pro_batch.pro_seq):
         results.append({
-            'Model': MODEL_OPT,
-            'PDB_File': pdb_file_name,
-            'Ligand_SMILE': LIGAND_SMILE,
-            'Predicted_pkd': pkd_value
+            'TIMESTAMP': time_stamp,
+            'model': MODEL_OPT,
+            'pdb_file': pdb_file_name,
+            'ligand_id': LIGAND_ID,
+            'pred_pkd': pkd_value,
+            'SMILES': LIGAND_SMILES,
+            'pro_seq': sq
         })
 
 # Prepare output DataFrame
 df_new = pd.DataFrame(results)
 
-# Output CSV path
-csv_output_path = os.path.join(OUT_PATH, 'predicted_pkd_values.csv')
-
 # Check if CSV file exists
-if os.path.exists(csv_output_path):
+if os.path.exists(CSV_OUT):
     # Read existing data
-    df_existing = pd.read_csv(csv_output_path)
+    df_existing = pd.read_csv(CSV_OUT)
     # Combine new and existing data
     df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-    # Remove duplicates based on 'PDB_File' and 'Ligand_SMILE'
-    df_combined.drop_duplicates(subset=['PDB_File', 'Ligand_SMILE'], keep='first', inplace=True)
     # Write the combined data back to CSV
-    df_combined.to_csv(csv_output_path, index=False)
-    print(f"Results appended to {csv_output_path}")
+    df_combined.to_csv(CSV_OUT, index=False)
+    print(f"Results appended to {CSV_OUT}")
 else:
     # If CSV does not exist, write new data
-    df_new.to_csv(csv_output_path, index=False)
-    print(f"Results saved to {csv_output_path}")
+    df_new.to_csv(CSV_OUT, index=False)
+    print(f"Results saved to {CSV_OUT}")
