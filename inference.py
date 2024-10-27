@@ -1,4 +1,4 @@
-import argparse
+import os, logging, argparse
 parser = argparse.ArgumentParser(description='Runs inference on a given ligand SMILES and an input of pdb files.')
 parser.add_argument('-ls','--ligand_smile', type=str, required=True, help='Ligand SMILES string.')
 parser.add_argument('-pdb','--pdb_files', type=str, nargs='+', required=True, 
@@ -35,17 +35,16 @@ MODEL_OPT = args.model_opt
 FOLD = args.fold
 BATCH_SIZE = args.batch_size
 
-import logging
 logging.getLogger().setLevel(logging.DEBUG)
-logging.debug("#"*50)
-logging.debug(f"LIGAND_SMILE: {LIGAND_SMILES}")
-logging.debug(f"LIGAND_ID: {LIGAND_ID}")
-logging.debug(f"PDB_FILES: {PDB_FILES}")
-logging.debug(f"OUT_PATH: {CSV_OUT}")
-logging.debug(f"MODEL_OPT: {MODEL_OPT}")
-logging.debug(f"FOLD: {FOLD}")
-logging.debug(f"BATCH_SIZE: {BATCH_SIZE}")
-logging.debug("#"*50)
+logging.info("#"*50)
+logging.info(f"LIGAND_SMILE: {LIGAND_SMILES}")
+logging.info(f"LIGAND_ID: {LIGAND_ID}")
+logging.info(f"PDB_FILES: {PDB_FILES}")
+logging.info(f"OUT_PATH: {CSV_OUT}")
+logging.info(f"MODEL_OPT: {MODEL_OPT}")
+logging.info(f"FOLD: {FOLD}")
+logging.info(f"BATCH_SIZE: {BATCH_SIZE}")
+logging.info("#"*50)
 
 import os
 import numpy as np

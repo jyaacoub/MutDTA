@@ -1,7 +1,7 @@
-import argparse
+import os, logging, argparse
 parser = argparse.ArgumentParser(description='Runs Mutagenesis on an input PDB file and a given ligand SMILES.')
 parser.add_argument('--ligand_smile', type=str, required=True, help='Ligand SMILES string.')
-parser.add_argument('--ligand_smile_name', type=str, required=True, help='Ligand SMILES name, required for output path.')
+parser.add_argument('--ligand_id', type=str, required=True, help='Ligand SMILES identifier, required for output path.')
 parser.add_argument('--pdb_file', type=str, required=True, help='Path to the PDB file.')
 parser.add_argument('--out_path', type=str, default='./', 
                     help='Output directory path to save resulting mutagenesis numpy matrix with predicted pkd values')
@@ -21,7 +21,7 @@ args = parser.parse_args()
 
 # Assign variables
 LIGAND_SMILE = args.ligand_smile
-LIGAND_SMILE_NAME = args.ligand_smile_name
+LIGAND_ID = args.ligand_id
 PDB_FILE = args.pdb_file
 OUT_PATH = args.out_path
 MODEL_OPT = args.model_opt
@@ -29,20 +29,22 @@ FOLD = args.fold
 RES_START = args.res_start
 RES_END = args.res_end
 
-import logging
-logging.getLogger().setLevel(logging.DEBUG)
-logging.debug("#"*50)
-logging.debug(f"LIGAND_SMILE: {LIGAND_SMILE}")
-logging.debug(f"LIGAND_SMILE_NAME: {LIGAND_SMILE_NAME}")
-logging.debug(f"PDB_FILE: {PDB_FILE}")
-logging.debug(f"OUT_PATH: {OUT_PATH}")
-logging.debug(f"MODEL_OPT: {MODEL_OPT}")
-logging.debug(f"FOLD: {FOLD}")
-logging.debug(f"RES_START: {RES_START}")
-logging.debug(f"RES_END: {RES_END}")
-logging.debug("#"*50)
+OUT_DIR = f'{OUT_PATH}/{LIGAND_ID}/{MODEL_OPT}'
+os.makedirs(OUT_DIR, exist_ok=True)
 
-import os
+logging.getLogger().setLevel(logging.DEBUG)
+logging.info("#"*50)
+logging.info(f"LIGAND_SMILE: {LIGAND_SMILE}")
+logging.info(f"LIGAND_ID: {LIGAND_ID}")
+logging.info(f"PDB_FILE: {PDB_FILE}")
+logging.info(f"OUT_PATH: {OUT_PATH}")
+logging.info(f"MODEL_OPT: {MODEL_OPT}")
+logging.info(f"FOLD: {FOLD}")
+logging.info(f"RES_START: {RES_START}")
+logging.info(f"RES_END: {RES_END}")
+logging.info(f"OUT_DIR: {OUT_DIR}")
+logging.info("#"*50)
+
 import numpy as np
 import torch
 import torch_geometric as torchg
@@ -148,8 +150,6 @@ with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), desc=
 
 
 # Save mutagenesis matrix
-OUT_DIR = f'{OUT_PATH}/{LIGAND_SMILE_NAME}/{MODEL_OPT}'
-os.makedirs(OUT_DIR, exist_ok=True)
 OUT_FP = f"{OUT_DIR}/{res_range[0]}_{res_range[1]}.npy"
 print("Saving mutagenesis numpy matrix to", OUT_FP)
 np.save(OUT_FP, muta)
