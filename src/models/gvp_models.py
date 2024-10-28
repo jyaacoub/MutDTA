@@ -1,4 +1,6 @@
+from typing import Any, Mapping
 import torch
+import logging
 from torch import nn
 
 from torch_geometric.nn import (GCNConv,
@@ -12,6 +14,7 @@ from src.models.branches import GVPBranchProt, GVPBranchLigand, ESMBranch
 
 from src.models.prior_work import DGraphDTA
 from src.models.ring3 import Ring3Branch
+import src.models.state_dict_transform as dict_transform
 
 
 class GVPLigand_DGPro(BaseModel):
@@ -99,6 +102,14 @@ class GVPLigand_DGPro(BaseModel):
 
         xc = torch.cat((xm, xp), 1)
         return self.dense_out(xc)
+    def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
+        try:
+            return super().load_state_dict(state_dict, strict)
+        except RuntimeError:
+            logging.warning("Failed to load state dict applying transform")
+            state_dict = dict_transform.GVPLigand_DGPro_transform(state_dict)
+            return super().load_state_dict(state_dict, strict)
+        
     
 class GVPL_ESM(BaseModel):
     def __init__(self, 
