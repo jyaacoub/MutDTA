@@ -36,7 +36,7 @@ source .venv/bin/activate
 python -u run_mutagenesis.py \
                     --ligand_smile "CC(C)CC(NC(=O)C(CC(=O)[O-])NC(=O)C([NH3+])CCC(=O)[O-])C(=O)[O-]" \
                     --ligand_smile_name "1a30_ligand" \
-                    --pdb_file "${proj_dir}/SBATCH/samples/mutagenesis/P67870.pdb" \
+                    --pdb_file "${proj_dir}/SBATCH/samples/input/mutagenesis/P67870.pdb" \
                     --out_path "${OUT_DIR}/" \
                     --res_start 0 \
                     --res_end 5 \

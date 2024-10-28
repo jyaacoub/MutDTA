@@ -9,14 +9,8 @@
 #SBATCH --output=./outs/%x_%a.out
 #SBATCH --array=0
 
-# runs across all folds for a model
-# should produce a matrix for each fold
-
-# Then to get most accurate mutagenesis you can average these matrices
-# and visualize them with src.analysis.mutagenesis_plot.plot_sequence
 ROOT_DIR="/lustre06/project/6069023"
-CSV_OUT="${ROOT_DIR}/jyaacoub/MutDTA/SBATCH/outs/inference_test.csv" # this is used for outputs
-BIN_DIR="${ROOT_DIR}/jyaacoub/bin" # for modeller
+CSV_OUT="${ROOT_DIR}/jyaacoub/MutDTA/SBATCH/samples/out/inference_test.csv" # this is used for outputs
 proj_dir="${ROOT_DIR}/jyaacoub/MutDTA"
 
 module load StdEnv/2020 && module load gcc/9.3.0 && module load arrow/12.0.1
@@ -30,8 +24,8 @@ source .venv/bin/activate
 # OR just pass in an sdf file and the script will extract the SMILE
 
 python -u inference.py \
-            --ligand_sdf "${proj_dir}/SBATCH/samples/inference/VWW_ideal.sdf" \
-            --pdb_files ${proj_dir}/SBATCH/samples/inference/alphaflow_pdbs/*.pdb \
+            --ligand_sdf "${proj_dir}/SBATCH/samples/input/inference/VWW_ideal.sdf" \
+            --pdb_files ${proj_dir}/SBATCH/samples/input/inference/alphaflow_pdbs/*.pdb \
             --csv_out ${CSV_OUT} \
             --model_opt PDBbind_gvpl_aflow \
             --fold ${SLURM_ARRAY_TASK_ID} \

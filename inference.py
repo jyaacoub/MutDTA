@@ -1,20 +1,16 @@
 import os, logging, argparse
 parser = argparse.ArgumentParser(description='Runs inference on a given ligand SMILES and an input of pdb files.')
-
-
 # Create a mutually exclusive group for `--ligand_smiles` and `--ligand_sdf`
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('-ls', '--ligand_smiles', type=str, help='Ligand SMILES string.')
 group.add_argument('-sdf', '--ligand_sdf', type=str, help='File path to SDF file for GVPL features.')
 
-
 parser.add_argument('-pdb','--pdb_files', type=str, nargs='+', required=True, 
                     help='List of paths to the PDB files. This can be the alphaflow output files with the first model for edges. '+\
                         'NOTE: file name is used for protein ID in csv output')
-
 parser.add_argument('-o','--csv_out', type=str, default='./predicted_pkd_values.csv', 
                     help='Output csv to save the predicted pkd values with the following columns: \n'+\
-                        'TIMESTAMP, model, pdb_file, ligand_id, pred_pkd, SMILES, pro_seq')
+                        'TIMESTAMP, model, fold, pdb_file, ligand_id, pred_pkd, SMILES, pro_seq')
 
 parser.add_argument('-m','--model_opt', type=str, default='davis_DG', 
                     choices=['davis_DG',    'davis_gvpl',   'davis_esm', 
@@ -134,7 +130,8 @@ for batch_idx in tqdm(range(num_batches), desc="Running inference on PDB file(s)
     for pdb_file_name, pkd_value, sq in zip(batch_pdb_file_names, predicted_pkd, pro_batch.pro_seq):
         results.append({
             'TIMESTAMP': time_stamp,
-            'model': MODEL_OPT,
+            'model':MODEL_OPT,
+            'fold': FOLD,
             'pdb_file': pdb_file_name,
             'ligand_id': LIGAND_ID,
             'pred_pkd': round(pkd_value, 3),
