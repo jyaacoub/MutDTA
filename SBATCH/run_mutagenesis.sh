@@ -15,14 +15,16 @@
 # Then to get most accurate mutagenesis you can average these matrices
 # and visualize them with src.analysis.mutagenesis_plot.plot_sequence
 ROOT_DIR="/lustre06/project/6069023"
-OUT_DIR="/lustre07/scratch/jyaacoub/mutagenesis_tests" # this is used for outputs on narval
+OUT_DIR="${ROOT_DIR}/jyaacoub/MutDTA/SBATCH/outs/mutagenesis_tests" # this is used for outputs
 BIN_DIR="${ROOT_DIR}/jyaacoub/bin" # for modeller
+proj_dir="${ROOT_DIR}/jyaacoub/MutDTA"
 
+module load StdEnv/2020 && module load gcc/9.3.0 && module load arrow/12.0.1
 # Modeller is needed for this to run... (see: Generic install - https://salilab.org/modeller/10.5/release.html#unix)
 export PYTHONPATH="${PYTHONPATH}:${BIN_DIR}/modeller10.5/lib/x86_64-intel8/python3.3:${BIN_DIR}/modeller10.5/lib/x86_64-intel8:${BIN_DIR}/modeller10.5/modlib"
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${BIN_DIR}/modeller10.5/lib/x86_64-intel8"
 
-cd ${ROOT_DIR}/jyaacoub/MutDTA
+cd ${proj_dir}
 source .venv/bin/activate
 
 # NOTE: To get SMILE from a .mol2 or .sdf file you can use RDKIT:
@@ -34,7 +36,7 @@ source .venv/bin/activate
 python -u run_mutagenesis.py \
                     --ligand_smile "CC(C)CC(NC(=O)C(CC(=O)[O-])NC(=O)C([NH3+])CCC(=O)[O-])C(=O)[O-]" \
                     --ligand_smile_name "1a30_ligand" \
-                    --pdb_file "${ROOT_DIR}/jyaacoub/data/kiba/alphaflow_io/out_pdb_MD-distilled/P67870.pdb" \
+                    --pdb_file "${proj_dir}/SBATCH/samples/mutagenesis/P67870.pdb" \
                     --out_path "${OUT_DIR}/" \
                     --res_start 0 \
                     --res_end 5 \
