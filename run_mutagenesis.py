@@ -20,7 +20,7 @@ parser.add_argument('--model_opt', type=str, default='davis_DG',
 parser.add_argument('--fold', type=int, default=1, 
                     help='Which model fold to use (there are 5 models for each option due to 5-fold CV).')
 parser.add_argument("-D", "--only_download", help="for downloading esm models if the are missing", default=False, action="store_true")
-args = parser.parse_args()
+args = parser.parse_args() #TODO: input custom mutations like -> ["M230A"] instead of full staturation mutagenesis
 
 # Assign variables
 LIGAND_SMILES = args.ligand_smiles
@@ -104,6 +104,7 @@ from src.utils.mutate_model import run_modeller
 amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
 muta = np.zeros(shape=(len(amino_acids), len(original_seq)))
 
+# TODO: allow for custom mutations?
 with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), desc='Mutating') as t:
     for j in t:
         for i, AA in enumerate(amino_acids):
