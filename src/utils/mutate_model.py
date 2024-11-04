@@ -67,7 +67,7 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_fp:st
     """
     modelname = modelname.split('.pdb')[0]
     if out_fp and modelname == out_fp.split('.pdb')[0]:
-        if not overwrite:
+        if overwrite:
             logging.warning(f"overwritting pdb file at {out_fp}")
         else:
             raise FileExistsError(f'would overwrite existing file at "{modelname}.pdb"')
@@ -207,14 +207,14 @@ def run_modeller_multiple(modelname, mutations, chain="A", out_fp=None, check_re
         mutated PDB file.
     """
     mutations.sort()
-    out_fp = out_fp or f"{modelname.split('.pdb')[0]}_{"-".join(mutations)}.pdb"
+    out_fp = out_fp or f"{modelname.split('.pdb')[0]}_{'-'.join(mutations)}.pdb"
     native_seq = Chain(modelname).getSequence()
     
     with tqdm(mutations, ncols=100, total=len(mutations), desc="Applying mutations") as muts:
         for rpm in muts:
             muts.set_postfix(mut=rpm)
             
-            ref, pos, mut = rpm[0], rpm[1:-1], rpm[-1]
+            ref, pos, mut = rpm[0], int(rpm[1:-1]), rpm[-1]
             
             if native_seq[pos-1] != ref and check_refmatch:
                 raise KeyError(f"Reference AA {ref} at position {pos} doesnt "+ \

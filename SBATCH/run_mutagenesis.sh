@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 30:00
-#SBATCH --job-name=run_mutagenesis_davis_esm
+#SBATCH --job-name=run_mutagenesis_davis_DG_custom
 #SBATCH --mem=10G
 
 #SBATCH --gpus-per-node=a100:1
@@ -35,10 +35,9 @@ source .venv/bin/activate
 
 python -u run_mutagenesis.py \
                     --ligand_smile "CC(C)CC(NC(=O)C(CC(=O)[O-])NC(=O)C([NH3+])CCC(=O)[O-])C(=O)[O-]" \
-                    --ligand_smile_name "1a30_ligand" \
+                    --ligand_id "1a30_ligand" \
                     --pdb_file "${proj_dir}/SBATCH/samples/input/mutagenesis/P67870.pdb" \
                     --out_path "${OUT_DIR}/" \
-                    --res_start 0 \
-                    --res_end 5 \
-                    --model_opt davis_esm \
+                    --mutations E5A E6A V7A \
+                    --model_opt davis_DG \
                     --fold ${SLURM_ARRAY_TASK_ID}
