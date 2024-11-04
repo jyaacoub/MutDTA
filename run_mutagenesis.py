@@ -185,6 +185,6 @@ else:
 
 
     # Save mutagenesis matrix
-    OUT_FP = f"{OUT_DIR}/{res_range[0]}_{res_range[1]}.npy"
+    OUT_FP = f"{OUT_DIR}/{res_range[0]}_{res_range[1]}-{os.path.basename(PDB_FILE).split('.pdb')[0]}.npy"
     print("Saving mutagenesis numpy matrix to", OUT_FP)
     np.save(OUT_FP, muta)
