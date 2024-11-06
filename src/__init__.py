@@ -314,16 +314,16 @@ TUNED_MODEL_CONFIGS = {
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
  
-        'lr': 0.0001, 
-        'batch_size': 40, # global batch size (local is 10)
+        'lr': 9.326978279144084e-05, 
+        'batch_size': 32, # global batch size (local is 8)
         
         'architecture_kwargs': {
-            'dropout': 0.2328, 
-            'output_dim': 128, 
-            'num_GVPLayers': 3, 
-            'pro_dropout_gnn': 0.1582, 
+            'dropout': 0.06042135076915635, 
+            'output_dim': 512, 
+            'num_GVPLayers': 2, 
+            'pro_dropout_gnn': 0.10542576796343962, 
             'pro_extra_fc_lyr': False, 
-            'pro_emb_dim': 512,
+            'pro_emb_dim': 128,
         }
     }
 }

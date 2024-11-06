@@ -31,16 +31,16 @@ do
 						--ligand_feature_opt gvp \
 						--ligand_edge_opt binary \
 						\
-						--learning_rate 0.0001 \
-						--batch_size 40 \
+						--learning_rate 0.00009326978279144084 \
+						--batch_size 32 \
 						\
-						--dropout 0.2328 \
+						--dropout 0.06042135076915635 \
 						--dropout_prot 0.0 \
-						--output_dim 128 \
-						--num_GVPLlayers 3 \
-						--pro_dropout_gnn 0.1582 \
+						--output_dim 512 \
+						--num_GVPLlayers 2 \
+						--pro_dropout_gnn 0.10542576796343962 \
 						--pro_extra_fc_lyr False \
-						--pro_emb_dim 512 \
+						--pro_emb_dim 128 \
 						\
 						--train \
 						--fold_selection $fold \
