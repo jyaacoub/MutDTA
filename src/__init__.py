@@ -314,7 +314,7 @@ TUNED_MODEL_CONFIGS = {
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
  
-        'lr': 9.326978279144084e-05, 
+        'lr': 0.00009326978279144084, 
         'batch_size': 32, # global batch size (local is 8)
         
         'architecture_kwargs': {

@@ -3,6 +3,9 @@ import os
 os.environ['TRANSFORMERS_CACHE'] = os.path.abspath('../hf_models/')
 os.environ['HF_HOME'] = os.environ['TRANSFORMERS_CACHE'] 
 os.environ['HF_HUB_OFFLINE'] = '1'
+print("os.environ['TRANSFORMERS_CACHE'] - ",os.environ['TRANSFORMERS_CACHE'])
+print("os.environ['HF_HOME'] - ",           os.environ['HF_HOME'])
+print("os.environ['HF_HUB_OFFLINE'] - ",    os.environ['HF_HUB_OFFLINE'])
 
 from prody import confProDy
 confProDy(verbosity='none') # stop printouts from prody

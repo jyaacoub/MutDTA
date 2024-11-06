@@ -76,7 +76,6 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 import numpy as np
 import torch
-import torch_geometric as torchg
 from tqdm import tqdm
 
 from src import TUNED_MODEL_CONFIGS
