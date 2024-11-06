@@ -93,9 +93,9 @@ if __name__ == "__main__":
         "epochs": 20,
         "model": cfg.MODEL_OPT.GVPL_ESM,
                 
-        "dataset": cfg.DATA_OPT.davis,
+        "dataset": cfg.DATA_OPT.PDBbind,
         "feature_opt": cfg.PRO_FEAT_OPT.nomsa,
-        "edge_opt": cfg.PRO_EDGE_OPT.aflow,
+        "edge_opt": cfg.PRO_EDGE_OPT.binary,
         "lig_feat_opt": cfg.LIG_FEAT_OPT.gvp,
         "lig_edge_opt": cfg.LIG_EDGE_OPT.binary,
         
@@ -113,7 +113,7 @@ if __name__ == "__main__":
         },
     }
     if 'esm' in search_space['model'].lower():
-        search_space['batch_size'] = ray.tune.choice([4,8,12,16])
+        search_space['batch_size'] = ray.tune.choice([4,8,10])
         
     arch_kwargs = search_space['architecture_kwargs']
     if search_space['model'] == cfg.MODEL_OPT.GVPL:

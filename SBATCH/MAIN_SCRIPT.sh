@@ -11,7 +11,7 @@
 
 ROOT_DIR="/lustre06/project/6069023"
 proj_dir="${ROOT_DIR}/jyaacoub/" # contains the relevant alphaflow/ and MutDTA/ repos with their venvs
-MSA_DIRECTORY_PATH="${proj_dir}/MutDTASBATCH/samples/input/alphaflow/msa_input"
+MSA_DIRECTORY_PATH="${proj_dir}/MutDTA/SBATCH/samples/input/alphaflow/msa_input"
 # MSA is needed for input so that we can run it through alphaflow to get our predictions
 # MSA input format must match the following depending on its extension:
 #   1. ".aln" - purely just protein sequences (each line is a protein sequence) with the first line being the target.

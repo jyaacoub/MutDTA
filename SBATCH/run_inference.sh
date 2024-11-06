@@ -12,20 +12,17 @@
 ROOT_DIR="/lustre06/project/6069023"
 CSV_OUT="${ROOT_DIR}/jyaacoub/MutDTA/SBATCH/samples/out/inference_test.csv" # this is used for outputs
 proj_dir="${ROOT_DIR}/jyaacoub/MutDTA"
+ligand_sdf="${proj_dir}/SBATCH/samples/input/inference/VWW_ideal.sdf"
+pdb_files=${proj_dir}/SBATCH/samples/input/inference/alphaflow_pdbs/*.pdb
 
 module load StdEnv/2020 && module load gcc/9.3.0 && module load arrow/12.0.1
 cd ${proj_dir}
 source .venv/bin/activate
 
-# NOTE: To get SMILE from a .mol2 or .sdf file you can use RDKIT:
-#
-#    from rdkit import Chem
-#    Chem.MolToSmiles(Chem.MolFromMol2File(x), isomericSmiles=False)
-# OR just pass in an sdf file and the script will extract the SMILE
 
 python -u inference.py \
-            --ligand_sdf "${proj_dir}/SBATCH/samples/input/inference/VWW_ideal.sdf" \
-            --pdb_files ${proj_dir}/SBATCH/samples/input/inference/alphaflow_pdbs/*.pdb \
+            --ligand_sdf $ligand_sdf \
+            --pdb_files $pdb_files \
             --csv_out ${CSV_OUT} \
             --model_opt PDBbind_gvpl_aflow \
             --fold ${SLURM_ARRAY_TASK_ID} \
