@@ -229,3 +229,5 @@ results/*/model_media/*/train_log/*.json
 results/model_checkpoints.tar.gz
 *.out
 DDP_outs
+SBATCH/outs/*
+SBATCH/samples/*
