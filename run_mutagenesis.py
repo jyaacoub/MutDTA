@@ -146,42 +146,6 @@ else:
                 # delete after use
                 os.remove(out_pdb_fp)
 
-if MUTATIONS:
-    mut_pdb_file = run_modeller_multiple(PDB_FILE, MUTATIONS)
-    print(mut_pdb_file)
-    pro, _ = get_protein_features(mut_pdb_file, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
-    mut_pkd = MODEL(pro.to(DEVICE), lig.to(DEVICE))
-    print("\nMutated pkd:", mut_pkd)
-else:
-    logging.warning("No mutations were passed in - running full saturation mutagenesis")
-    # zero indexed res range to mutate:
-    res_range = (max(RES_START, 0), min(RES_END, len(original_seq)))
-
-    from src.utils.mutate_model import run_modeller
-    amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
-    muta = np.zeros(shape=(len(amino_acids), len(original_seq)))
-
-    with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), 
-              desc='Saturation mutagenesis') as t:
-        for j in t:
-            for i, AA in enumerate(amino_acids):
-                if i%2 == 0:
-                    t.set_postfix(res=j, AA=i+1)
-                
-                if original_seq[j] == AA: # skip same AA modifications 
-                    muta[i,j] = original_pkd
-                    continue
-                out_pdb_fp = run_modeller(PDB_FILE, j+1, ResInfo.code_to_pep[AA], "A")
-                
-                pro, _ = get_protein_features(out_pdb_fp, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
-                assert pro.pro_seq != original_seq and pro.pro_seq[j] == AA, \
-                    f"ERROR in modeller, {pro.pro_seq} == {original_seq} \nor {pro.pro_seq[j]} != {AA}"
-                
-                muta[i,j] = MODEL(pro.to(DEVICE), lig.to(DEVICE))
-                
-                # delete after use
-                os.remove(out_pdb_fp)
-
 
     # Save mutagenesis matrix
     OUT_FP = f"{OUT_DIR}/{res_range[0]}_{res_range[1]}-{os.path.basename(PDB_FILE).split('.pdb')[0]}.npy"
