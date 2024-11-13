@@ -30,7 +30,7 @@ Basically the only ones that matter are `results/model_checkpoints` and `v103`. 
   * This leads to consistently worse performance across the board.  
 * [`v115`](https://github.com/jyaacoub/MutDTA/issues/115)  \- since "aflow" (alphaflow edge weights) models had a smaller dataset (due to memory issues when running Alphaflow on AA sequences 1200+) we *artificially reduced the sizes of the training sets* for the other models so that we could have a fair comparison  
   * This didn't change much.  
-* [`v128`](https://github.com/jyaacoub/MutDTA/issues/128)   \- Test to see if new splits were the issue (they were)
+* [`v128`](https://github.com/jyaacoub/MutDTA/issues/128)   \- Test to see if new splits were the issue with weirdly low performance with oncoKB split (they were)
 
 ## OncoKB distribution drift issue with splits \- [Issue \#131](https://github.com/jyaacoub/MutDTA/issues/131)
 
