@@ -9,7 +9,7 @@
 #SBATCH -c 4
 #SBATCH --mem=4G
 
-#SBATCH --output=./outs/%x.out
+#SBATCH --output=/home/jyaacoub/projects/def-sushant/jyaacoub/MutDTA/SBATCH/outs/%x.out
 ##SBATCH --array=0-4 # WARNING: Doesnt work with submitit
 
 module load StdEnv/2020 && module load gcc/9.3.0 && module load arrow/12.0.1

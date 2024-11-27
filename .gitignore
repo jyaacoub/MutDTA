@@ -231,3 +231,4 @@ results/model_checkpoints.tar.gz
 DDP_outs
 SBATCH/outs/*
 SBATCH/samples/*
+downloaded_ligands/

@@ -49,7 +49,6 @@ def plot_sequence(muta, pro_seq, pep_opts=ResInfo.amino_acids[:-1], delta=False)
     # Add a colorbar to show the scale of mutation values
     plt.colorbar(label='Mutation Values')
     plt.title('Mutation Array Visualization', fontsize=100)
-    plt.show()
 
 
 if __name__ == "__main__":
