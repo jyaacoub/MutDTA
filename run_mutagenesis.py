@@ -141,7 +141,7 @@ else:
                 try:
                     out_pdb_fp = run_modeller(PDB_FILE, j+1, ResInfo.code_to_pep[AA], "A", n_attempts=NUM_MODELLER_ATTEMPTS)
                 except OverflowError as e:
-                    muta[i,j] = np.NAN
+                    muta[i,j] = np.nan
                     continue
                 
                 pro, _ = get_protein_features(out_pdb_fp, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
