@@ -11,7 +11,7 @@ parser.add_argument('--out_path', type=str, default='./',
                     help='Output directory path to save resulting mutagenesis numpy matrix with predicted pkd values')
 parser.add_argument('-na', '--num_modeller_attempts', type=int, required=False, default=5, 
                     help='Number of attempts for modeller to resolve steric clashes. If it cant resolve it within'+ \
-                        ' this number of attempts it is set to np.nan')
+                        ' this number of attempts it will set to np.nan. Defaults to 5.')
 
 full_mut = parser.add_argument_group('FULL SATURATION MUTAGENESIS ARGS', 
                                      description="This is the default unless mutations are specified")
