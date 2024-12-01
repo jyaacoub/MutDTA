@@ -128,9 +128,14 @@ def plot_model_results(stats_csv="./results/model_media/model_stats.csv", title_
     for i in range(3):
         axes[0][i].title.set_size(title_size)
         axes[1][i].xaxis.get_label().set_size(axis_label_size)
+        
+    # # remove xaxis 0 and 2 labels
+    # for i in [0,2]:
+    #     axes[1][i].set_xlabel('') # how do I delete this label
     
     for i in range(2):
         axes[i][0].yaxis.get_label().set_size(axis_label_size)
-
+    plt.tight_layout(pad=2)
+    
 plot_model_results()
 # %%
