@@ -65,7 +65,7 @@ def sequence_length_distributions(SPLITS_CSVS="./splits", dataset_names=['davis'
         axes[i].legend()
 
     plt.tight_layout()
-    plt.show()
+    
 def overlay_normalized_sequence_length_distribution(SPLITS_CSVS="./splits", dataset_names=['davis', 'kiba', 'pdbbind'],
                                                     figsize=(15, 5), bins=20, bw_adjust=1.5):
     """Overlay normalized distribution of sequences for multiple datasets on the same plot."""
@@ -94,4 +94,3 @@ def overlay_normalized_sequence_length_distribution(SPLITS_CSVS="./splits", data
     plt.ylabel('Normalized Frequency (Density)')
     plt.title('Overlayed Normalized Histogram of Protein Sequence Lengths')
     plt.legend()
-    plt.show()
