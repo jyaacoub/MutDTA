@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 #%% TABLE FOR DATASET COUNTS 
 def get_USED_dataset_counts(SPLITS_CSVS="./splits/"):
     """Due to memory limitations a couple records were excluded from our runs this is the full count that were actually used"""
-    
     def get_dataset_info(dataset_name):
         csvp=f"{SPLITS_CSVS}/{dataset_name}"
         df = pd.concat([
@@ -94,3 +93,44 @@ def overlay_normalized_sequence_length_distribution(SPLITS_CSVS="./splits", data
     plt.ylabel('Normalized Frequency (Density)')
     plt.title('Overlayed Normalized Histogram of Protein Sequence Lengths')
     plt.legend()
+
+
+###########################################
+#%% MODEL RESULTS
+###########################################
+from matplotlib import pyplot as plt
+from src.analysis.figures import prepare_df, fig_combined, custom_fig
+
+def plot_model_results(stats_csv="./results/model_media/model_stats.csv", title_size=24, axis_label_size=20):
+    """Plots model results as a 2x3 figure of the MSE and cindex of the 3 datasets"""
+    df = prepare_df(stats_csv)
+
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
+        'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        # 'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
+        'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
+        # 'gvpl_esm':('ESM', 'binary', 'gvp', 'binary'),
+        # 'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
+        #GVPL_ESMM_davis3D_nomsaF_aflowE_48B_0.00010636872718329864LR_0.23282479481785903D_2000E_gvpLF_binaryLE
+        # 'gvpl_esm_aflow': ('ESM', 'aflow', 'gvp', 'binary'),
+    }
+
+
+    fig, axes = fig_combined(df, datasets=['davis', 'kiba', 'PDBbind'], fig_callable=custom_fig,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, 
+                title_postfix=" test set performance", box=True, 
+                fold_labels=False)
+    for i in range(3):
+        axes[0][i].title.set_size(title_size)
+        axes[1][i].xaxis.get_label().set_size(axis_label_size)
+    
+    for i in range(2):
+        axes[i][0].yaxis.get_label().set_size(axis_label_size)
+
+plot_model_results()
+# %%
