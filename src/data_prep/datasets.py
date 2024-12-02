@@ -1131,6 +1131,7 @@ class PlatinumDataset(BaseDataset):
             raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
         
         # validate that all files are there and download any missing pdbs:
+        downloaded = {'pdbs': {}, 'sdfs': {}}
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Checking pdb files and downloading missing',
                            total=len(df_raw)):
@@ -1143,16 +1144,18 @@ class PlatinumDataset(BaseDataset):
             assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
             
             # Download if file doesnt exist:
-            if not missing_wt and (self.pdb_p(pdb_wt, id_is_pdb=True is None)): # returns None if file doesnt exist
-                Downloader.download_PDBs([pdb_wt], save_dir=self.raw_paths[1], tqdm_disable=True)
-            if not missing_mt and (self.pdb_p(pdb_mt, id_is_pdb=True is None)):
-                Downloader.download_PDBs([pdb_mt], save_dir=self.raw_paths[1], tqdm_disable=True)
+            if not missing_wt and (self.pdb_p(pdb_wt, id_is_pdb=True) is None): # returns None if file doesnt exist
+                id_status = Downloader.download_PDBs([pdb_wt], save_dir=self.raw_paths[1], tqdm_disable=True)
+                downloaded['pdbs'][pdb_wt] = id_status[pdb_wt]
+            if not missing_mt and (self.pdb_p(pdb_mt, id_is_pdb=True) is None):
+                id_status = Downloader.download_PDBs([pdb_mt], save_dir=self.raw_paths[1], tqdm_disable=True)
+                downloaded['pdbs'][pdb_mt] = id_status[pdb_mt]
             
         # Download corrected SMILEs since the ones provided in the csv file have issues 
         # (see https://github.com/jyaacoub/MutDTA/issues/27)
         os.makedirs(self.raw_paths[2], exist_ok=True)
         print(f'Downloading SDF files for ligands to {self.raw_paths[2]}')
-        sdf_resp = Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
+        downloaded['sdfs'] = Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
                                 save_dir=self.raw_paths[2])
         
         # Fixing smiles in csv file using downloaded sdf files        
@@ -1162,8 +1165,8 @@ class PlatinumDataset(BaseDataset):
         df_raw.to_csv(self.raw_paths[0])
         
         # write to done_downloading.txt
-        with open(self.raw_paths[3], 'a') as f: 
-            f.write(json.dumps(sdf_resp))
+        with open(self.raw_paths[3], 'w') as f: 
+            f.write(json.dumps(downloaded, indent=4))
     
     def _get_prot_structure(self, muts, pdb_wt, pdb_mt, t_chain):
         # Check if PDBs available (need at least 1 for sequence info)
