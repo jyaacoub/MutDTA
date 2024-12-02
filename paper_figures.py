@@ -160,10 +160,21 @@ def get_Platinum_dataset_counts():
     print("\t                 Total records:", len(db.df))
     return db
 
-#%% 
-from src.analysis.figures import tbl_dpkd_metrics_overlap, tbl_dpkd_metrics_n_mut
-MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv"
-NORMALIZE = True
+def plot_Platinum_mutations_dist():
+    df = get_Platinum_dataset_counts().df
+    df['pdb_id'] = df.prot_id.str.split("_").str[0]
+    df['n_muts'] = df.prot_id.str.split("-").str.len() # for prot_ids with "_wt" they should be set to zero 
+    df.loc[df.prot_id.str.contains("_wt", na=False), 'n_muts'] = 0
 
-print('NUM MUTATIONS:')
-mkdnm = tbl_dpkd_metrics_n_mut(MODEL, NORMALIZE, conditions=[1,2], plot=True)
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    df_view = df#[df['n_muts'] > 0] # to limit it to just mutated proteins add this
+    bin_edges = np.arange(df_view['n_muts'].min() - 0.5, df_view['n_muts'].max() + 1.5, 1)
+    plt.figure(figsize=(10,5))
+    sns.histplot(df_view['n_muts'], bins=bin_edges)
+    plt.title("Number of mutations per protein in Platinum")
+    plt.xlabel("Number of mutations")
+    plt.ylabel("Frequency")
+    plt.tight_layout()
