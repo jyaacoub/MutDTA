@@ -1093,7 +1093,8 @@ class PlatinumDataset(BaseDataset):
         # in order of download/creation:
         return ['platinum_flat_file.csv',# downloaded from website
                 'platinum_pdb',
-                'platinum_sdf']
+                'platinum_sdf',
+                'done_downloading.json']
     
     def download(self):
         """Download the raw data for the dataset."""
@@ -1142,16 +1143,16 @@ class PlatinumDataset(BaseDataset):
             assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
             
             # Download if file doesnt exist:
-            if not missing_wt and (not os.path.isfile(self.pdb_p(pdb_wt))):
+            if not missing_wt and (self.pdb_p(pdb_wt, id_is_pdb=True is None)): # returns None if file doesnt exist
                 Downloader.download_PDBs([pdb_wt], save_dir=self.raw_paths[1], tqdm_disable=True)
-            if not missing_mt and (not os.path.isfile(self.pdb_p(pdb_mt))):
+            if not missing_mt and (self.pdb_p(pdb_mt, id_is_pdb=True is None)):
                 Downloader.download_PDBs([pdb_mt], save_dir=self.raw_paths[1], tqdm_disable=True)
             
         # Download corrected SMILEs since the ones provided in the csv file have issues 
         # (see https://github.com/jyaacoub/MutDTA/issues/27)
         os.makedirs(self.raw_paths[2], exist_ok=True)
-        print('Downloading SDF files for ligands.')
-        Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
+        print(f'Downloading SDF files for ligands to {self.raw_paths[2]}')
+        sdf_resp = Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
                                 save_dir=self.raw_paths[2])
         
         # Fixing smiles in csv file using downloaded sdf files        
@@ -1159,6 +1160,10 @@ class PlatinumDataset(BaseDataset):
                             lambda x: os.path.join(self.raw_paths[2], f'{x}.sdf'))
         df_raw['smiles'] = df_raw['affin.lig_id'].map(smiles_dict)
         df_raw.to_csv(self.raw_paths[0])
+        
+        # write to done_downloading.txt
+        with open(self.raw_paths[3], 'a') as f: 
+            f.write(json.dumps(sdf_resp))
     
     def _get_prot_structure(self, muts, pdb_wt, pdb_mt, t_chain):
         # Check if PDBs available (need at least 1 for sequence info)
