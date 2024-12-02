@@ -113,14 +113,13 @@ SLURM_CONSTRAINT = None
 SLURM_PARTITION = None
 SLURM_ACCOUNT = None
 SLURM_GPU_NAME = 'v100'
-DATA_ROOT=None
+DATA_ROOT= os.path.abspath(f"../{DATA_BASENAME}/")
 
 if ('uhnh4h' in DOMAIN_NAME) or ('h4h' in DOMAIN_NAME):
     CLUSTER = 'h4h'
     SLURM_PARTITION = 'gpu'
     SLURM_CONSTRAINT = 'gpu32g'
     SLURM_ACCOUNT = 'kumargroup_gpu'
-    DATA_ROOT = os.path.abspath(f'../{DATA_BASENAME}')
 elif 'graham' in DOMAIN_NAME:
     CLUSTER = 'graham'
     SLURM_CONSTRAINT = 'cascade,v100'
