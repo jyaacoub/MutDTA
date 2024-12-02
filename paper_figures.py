@@ -178,3 +178,152 @@ def plot_Platinum_mutations_dist():
     plt.xlabel("Number of mutations")
     plt.ylabel("Frequency")
     plt.tight_layout()
+    
+#%%
+def plot_Platinum_distribution_for_wt_and_mt():
+    df = get_Platinum_dataset_counts().df
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    # Filter the datasets
+    df_wt = df[~df['prot_id'].str.contains('_wt')].copy()
+    df_mut = df[df['prot_id'].str.contains('_wt')].copy()
+
+    # Combine the data for a single plot with a 'hue' distinction
+    df_wt['Type'] = 'Wild Type'
+    df_mut['Type'] = 'Mutant'
+    combined_df = pd.concat([df_wt, df_mut])
+
+    # Plot overlayed histograms
+    plt.figure(figsize=(10, 6))
+    sns.histplot(data=combined_df, x='pkd', hue='Type', kde=True, bins=30, alpha=0.5)
+    plt.title("Distribution of pkd for Wild Type and Mutant Proteins")
+    plt.xlabel("pkd")
+    plt.ylabel("Frequency")
+    plt.show()
+
+# %%
+def plot_Platinum_delta_pkd_distribution()
+    df = get_Platinum_dataset_counts().df
+    df['pdb_id'] = df.prot_id.str.split("_").str[0]
+    df['n_muts'] = df.prot_id.str.split("-").str.len()  # Number of mutations
+    df.loc[df.prot_id.str.contains("_wt", na=False), 'n_muts'] = 0  # Set n_muts to 0 for wild type
+
+    # Separate wild-type and mutated proteins
+    df_wt = df[df['prot_id'].str.contains('_wt', na=False)].copy()
+    df_mut = df[~df['prot_id'].str.contains('_wt', na=False)].copy()
+
+    # Merge to compute delta pkd
+    delta_df = pd.merge(
+        df_mut,
+        df_wt[['pdb_id', 'pkd']],
+        on='pdb_id',
+        suffixes=('_mut', '_wt')
+    )
+
+    # Calculate delta pkd
+    delta_df['delta_pkd'] = delta_df['pkd_mut'] - delta_df['pkd_wt']
+
+    # Plot the distribution of delta pkd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from functools import partial
+    shist = partial(sns.histplot, kde=True, bins=30, alpha=0.5, stat="density")
+
+    plt.figure(figsize=(10, 6))
+    sns.histplot(delta_df['delta_pkd'], kde=True, bins=30, alpha=0.7)
+    plt.title(r"Distribution of $\Delta pkd$ (Mutant - Wild Type)")
+    plt.xlabel(r"$\Delta pkd$")
+    plt.ylabel("Frequency")
+    plt.tight_layout()
+    plt.show()
+
+#%%
+def plot_Platinum_delta_pkd_distribution_by_mutation_count():
+    df = get_Platinum_dataset_counts().df
+    df['pdb_id'] = df.prot_id.str.split("_").str[0]
+    df['n_muts'] = df.prot_id.str.split("-").str.len()  # Number of mutations
+    df.loc[df.prot_id.str.contains("_wt", na=False), 'n_muts'] = 0  # Set n_muts to 0 for wild type
+
+    # Separate wild-type and mutated proteins
+    df_wt = df[df['prot_id'].str.contains('_wt', na=False)].copy()
+    df_mut = df[~df['prot_id'].str.contains('_wt', na=False)].copy()
+
+    # Merge to compute delta pkd
+    delta_df = pd.merge(
+        df_mut,
+        df_wt[['pdb_id', 'pkd']],
+        on='pdb_id',
+        suffixes=('_mut', '_wt')
+    )
+
+    # Calculate delta pkd
+    delta_df['delta_pkd'] = delta_df['pkd_mut'] - delta_df['pkd_wt']
+
+    # Group by number of mutations
+    delta_1_mut = delta_df[delta_df['n_muts'] == 1]
+    delta_2_mut = delta_df[delta_df['n_muts'] == 2]
+    delta_3plus_mut = delta_df[delta_df['n_muts'] >= 3]
+
+    # Plot overlayed distributions
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(12, 6))
+    from functools import partial
+    shist = partial(sns.histplot, kde=True, bins=30, alpha=0.3, 
+                    line_kws={'linewidth': 3, 'linestyle': 'solid'},
+                    linewidth=2, edgecolor=None, stat="density")
+    
+    shist(delta_1_mut['delta_pkd'],     label="1 Mutation",  color="skyblue")
+    shist(delta_2_mut['delta_pkd'],     label="2 Mutations", color="lightgreen")
+    shist(delta_3plus_mut['delta_pkd'], label="3+ Mutations",color="orange")
+    
+    plt.title(r"Distribution of $\Delta pkd$ by Mutation Count")
+    plt.xlabel(r"$\Delta pkd$")
+    plt.ylabel("Density")
+    plt.legend(title="Mutation Count")
+    plt.tight_layout()
+    plt.show()
+
+# Call the method to generate the plot
+plot_Platinum_delta_pkd_distribution_by_mutation_count()
+
+#%%
+def plot_Platinum_pkd_distribution():
+    df = get_Platinum_dataset_counts().df
+    df['pdb_id'] = df.prot_id.str.split("_").str[0]
+    df['n_muts'] = df.prot_id.str.split("-").str.len()  # Number of mutations
+    df.loc[df.prot_id.str.contains("_wt", na=False), 'n_muts'] = 0  # Set n_muts to 0 for wild type
+
+    # Categorize data
+    df['Category'] = '3+ Mutations'
+    df.loc[df['n_muts'] == 1, 'Category'] = '1 Mutation'
+    df.loc[df['n_muts'] == 2, 'Category'] = '2 Mutations'
+    df.loc[df['n_muts'] == 0, 'Category'] = 'Wildtype'
+
+    # Plot the distributions of pkd
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from functools import partial
+    shist = partial(sns.histplot, x='pkd', kde=True, bins=30, alpha=0.3, 
+                    line_kws={'linewidth': 3, 'linestyle': 'solid'},
+                    linewidth=2, edgecolor=None, stat="density")
+
+    plt.figure(figsize=(12, 6))
+    
+    # Plot each category
+    shist(data=df[df['Category'] == 'Wildtype'], label="Wildtype", color='gray')
+    shist(data=df[df['Category'] == '1 Mutation'],label="1 Mutation", color='skyblue')
+    shist(data=df[df['Category'] == '2 Mutations'],label="2 Mutations", color='lightgreen')
+    shist(data=df[df['Category'] == '3+ Mutations'],label="3+ Mutations", color='orchid')
+    
+    plt.title("Distribution of $pkd$ for Wildtype and Mutated Proteins")
+    plt.xlabel("$pkd$")
+    plt.ylabel("Density")
+    plt.legend(title="Protein Category")
+    plt.tight_layout()
+    plt.show()
+
+# Call the function to generate the plot
+plot_Platinum_pkd_distribution()
