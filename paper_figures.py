@@ -178,65 +178,6 @@ def plot_Platinum_mutations_dist():
     plt.xlabel("Number of mutations")
     plt.ylabel("Frequency")
     plt.tight_layout()
-    
-#%%
-def plot_Platinum_distribution_for_wt_and_mt():
-    df = get_Platinum_dataset_counts().df
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    # Filter the datasets
-    df_wt = df[~df['prot_id'].str.contains('_wt')].copy()
-    df_mut = df[df['prot_id'].str.contains('_wt')].copy()
-
-    # Combine the data for a single plot with a 'hue' distinction
-    df_wt['Type'] = 'Wild Type'
-    df_mut['Type'] = 'Mutant'
-    combined_df = pd.concat([df_wt, df_mut])
-
-    # Plot overlayed histograms
-    plt.figure(figsize=(10, 6))
-    sns.histplot(data=combined_df, x='pkd', hue='Type', kde=True, bins=30, alpha=0.5)
-    plt.title("Distribution of pkd for Wild Type and Mutant Proteins")
-    plt.xlabel("pkd")
-    plt.ylabel("Frequency")
-    plt.show()
-
-# %%
-def plot_Platinum_delta_pkd_distribution()
-    df = get_Platinum_dataset_counts().df
-    df['pdb_id'] = df.prot_id.str.split("_").str[0]
-    df['n_muts'] = df.prot_id.str.split("-").str.len()  # Number of mutations
-    df.loc[df.prot_id.str.contains("_wt", na=False), 'n_muts'] = 0  # Set n_muts to 0 for wild type
-
-    # Separate wild-type and mutated proteins
-    df_wt = df[df['prot_id'].str.contains('_wt', na=False)].copy()
-    df_mut = df[~df['prot_id'].str.contains('_wt', na=False)].copy()
-
-    # Merge to compute delta pkd
-    delta_df = pd.merge(
-        df_mut,
-        df_wt[['pdb_id', 'pkd']],
-        on='pdb_id',
-        suffixes=('_mut', '_wt')
-    )
-
-    # Calculate delta pkd
-    delta_df['delta_pkd'] = delta_df['pkd_mut'] - delta_df['pkd_wt']
-
-    # Plot the distribution of delta pkd
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    from functools import partial
-    shist = partial(sns.histplot, kde=True, bins=30, alpha=0.5, stat="density")
-
-    plt.figure(figsize=(10, 6))
-    sns.histplot(delta_df['delta_pkd'], kde=True, bins=30, alpha=0.7)
-    plt.title(r"Distribution of $\Delta pkd$ (Mutant - Wild Type)")
-    plt.xlabel(r"$\Delta pkd$")
-    plt.ylabel("Frequency")
-    plt.tight_layout()
-    plt.show()
 
 #%%
 def plot_Platinum_delta_pkd_distribution_by_mutation_count():
@@ -286,9 +227,6 @@ def plot_Platinum_delta_pkd_distribution_by_mutation_count():
     plt.tight_layout()
     plt.show()
 
-# Call the method to generate the plot
-plot_Platinum_delta_pkd_distribution_by_mutation_count()
-
 #%%
 def plot_Platinum_pkd_distribution():
     df = get_Platinum_dataset_counts().df
@@ -324,6 +262,3 @@ def plot_Platinum_pkd_distribution():
     plt.legend(title="Protein Category")
     plt.tight_layout()
     plt.show()
-
-# Call the function to generate the plot
-plot_Platinum_pkd_distribution()
