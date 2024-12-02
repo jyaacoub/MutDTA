@@ -141,35 +141,29 @@ def plot_model_results(stats_csv="./results/model_media/model_stats.csv", title_
 ##########################################################
 #%% FIG 3 - PLATINUM DATASET - RESULTS
 ##########################################################
+#%% Table for counts for number of unique ligands and proteins
+def get_Platinum_dataset_counts():
+    from src.utils.loader import Loader
+    from src import cfg
+
+    import logging
+    logging.getLogger().setLevel(logging.WARNING)
+    db = Loader.load_dataset(cfg.DATA_OPT.platinum,
+                        pro_feature=cfg.PRO_FEAT_OPT.nomsa, 
+                        edge_opt=cfg.PRO_EDGE_OPT.binary,
+                        max_seq_len=21000)
+
+    print("Platinum Dataset details:")
+    print("\tUnique protein sequence counts:", len(db.df.prot_seq.unique()))
+    print("\t            Unique protein IDs:", len(db.df.prot_id.str.split("_").str[0].unique()))
+    print("\t          Unique ligand counts:", len(db.df.lig_id.unique()))
+    print("\t                 Total records:", len(db.df))
+    return db
+
+#%% 
 from src.analysis.figures import tbl_dpkd_metrics_overlap, tbl_dpkd_metrics_n_mut
 MODEL = lambda i: f"results/model_media/test_set_pred/GVPLM_PDBbind{i}D_nomsaF_aflowE_128B_0.00022659LR_0.02414D_2000E_gvpLF_binaryLE_PLATINUM.csv"
 NORMALIZE = True
 
 print('NUM MUTATIONS:')
 mkdnm = tbl_dpkd_metrics_n_mut(MODEL, NORMALIZE, conditions=[1,2], plot=True)
-
-#%%
-from src.utils.loader import Loader
-from src import cfg
-
-import logging
-logging.getLogger().setLevel(logging.WARNING)
-db = Loader.load_dataset(cfg.DATA_OPT.platinum,
-                    pro_feature=cfg.PRO_FEAT_OPT.nomsa, 
-                    edge_opt=cfg.PRO_EDGE_OPT.binary,
-                    max_seq_len=21000)
-
-# %%
-import pandas as pd
-from src.data_prep.downloaders import Downloader
-
-import logging
-logging.getLogger().setLevel(logging.WARNING)
-
-df = pd.read_csv("/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv", index_col=0)
-
-Downloader.download_SDFs(ligand_ids=df['affin.lig_id'].unique(),
-                         save_dir="/home/jean/projects/data/PlatinumDataset/raw/")
-
-#%%
-df['affin.lig_id'].unique()
