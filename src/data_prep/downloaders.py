@@ -107,11 +107,11 @@ class Downloader:
 
         resp = fetch_url(url(id))
         if resp.status_code >= 400 and url_backup:
-            logging.debug(f'{id}-{resp.status_code} {resp}')
+            logging.warning(f'{id}-{resp.status_code} {resp}')
             resp = fetch_url(url_backup(id))
 
         if resp.status_code >= 400:
-            logging.debug(f'\tbkup{id}-{resp.status_code} {resp}')
+            logging.warning(f'\tbkup-{id}-{resp.status_code} {resp}')
             return id, resp.status_code
         else:
             with open(fp, 'w') as f:
@@ -202,12 +202,17 @@ class Downloader:
         urls = {'CID': lambda x: f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/CID/{x}/record/SDF?record_type=3d',
                 'CHEMBL': lambda x: f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/xref/registryID/{x}/record/sdf?record_type=3d',
                 'name': lambda x: f'https://files.rcsb.org/ligands/download/{x}_ideal.sdf'}
+
+        # verify digits only
+        all_digits = True
+        for lid in ligand_ids:
+            if not lid.isdigit():
+                all_digits = False
+                break
         
-        
-        lid = ligand_ids[0]
-        if lid.isdigit():
+        if all_digits:
             url = urls['CID']
-        elif lid.startswith('CHEMBL'):
+        elif ligand_ids[0].startswith('CHEMBL'):
             url = urls['CHEMBL']
         else:
             url = urls['name']
