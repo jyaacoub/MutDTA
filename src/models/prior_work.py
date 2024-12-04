@@ -24,7 +24,6 @@ class DGraphDTA(BaseModel):
                  edge_weight_opt='binary', **kwargs):
         super(DGraphDTA, self).__init__(pro_feat=None, edge_weight_opt=edge_weight_opt)
 
-        print('DGraphDTA Loaded')
         self.mol_conv1 = GCNConv(num_features_mol, num_features_mol)
         self.mol_conv2 = GCNConv(num_features_mol, num_features_mol * 2)
         self.mol_conv3 = GCNConv(num_features_mol * 2, num_features_mol * 4)
