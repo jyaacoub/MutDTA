@@ -101,7 +101,6 @@ class Loader():
         if model_p != glob_p[0]:
             logging.warning(f'\n\t{glob_p[0]} -> \n\t{model_p}')
             os.rename(glob_p[0], model_p)
-        model_p = glob_p[0]
 
         logging.debug(f'loading: {model_p}')
         model = Loader.init_model(model=model_kwargs['model'], pro_feature=model_kwargs['pro_feature'], 

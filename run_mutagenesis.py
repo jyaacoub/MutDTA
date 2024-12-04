@@ -9,6 +9,9 @@ parser.add_argument('--ligand_id', type=str, required=True,
 parser.add_argument('--pdb_file', type=str, required=True, help='Path to the PDB file.')
 parser.add_argument('--out_path', type=str, default='./', 
                     help='Output directory path to save resulting mutagenesis numpy matrix with predicted pkd values')
+parser.add_argument('-na', '--num_modeller_attempts', type=int, required=False, default=5, 
+                    help='Number of attempts for modeller to resolve steric clashes. If it cant resolve it within'+ \
+                        ' this number of attempts it will set to np.nan. Defaults to 5.')
 
 full_mut = parser.add_argument_group('FULL SATURATION MUTAGENESIS ARGS', 
                                      description="This is the default unless mutations are specified")
@@ -50,6 +53,7 @@ FOLD = args.fold
 RES_START = args.res_start
 RES_END = args.res_end
 MUTATIONS=args.mutations
+NUM_MODELLER_ATTEMPTS = args.num_modeller_attempts
 
 OUT_DIR = f'{OUT_PATH}/{LIGAND_ID}/{MODEL_OPT}'
 ONLY_DOWNLOAD = args.only_download
@@ -82,7 +86,7 @@ from src import TUNED_MODEL_CONFIGS
 from src.utils.loader import Loader
 from src.utils.residue import ResInfo
 from src.data_prep.quick_prep import get_ligand_features, get_protein_features
-from src.utils.mutate_model import run_modeller_multiple
+from src.utils.mutate_model import run_modeller_multiple, run_modeller
 
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -111,7 +115,7 @@ original_pkd = MODEL(pro.to(DEVICE), lig.to(DEVICE))
 print("Original pkd:", original_pkd, end="\n\n")
 
 if MUTATIONS:
-    mut_pdb_file = run_modeller_multiple(PDB_FILE, MUTATIONS)
+    mut_pdb_file = run_modeller_multiple(PDB_FILE, MUTATIONS, n_attempts=NUM_MODELLER_ATTEMPTS)
     print(mut_pdb_file)
     pro, _ = get_protein_features(mut_pdb_file, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
     mut_pkd = MODEL(pro.to(DEVICE), lig.to(DEVICE))
@@ -120,8 +124,7 @@ else:
     logging.warning("No mutations were passed in - running full saturation mutagenesis")
     # zero indexed res range to mutate:
     res_range = (max(RES_START, 0), min(RES_END, len(original_seq)))
-
-    from src.utils.mutate_model import run_modeller
+    
     amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
     muta = np.zeros(shape=(len(amino_acids), len(original_seq)))
 
@@ -135,43 +138,11 @@ else:
                 if original_seq[j] == AA: # skip same AA modifications 
                     muta[i,j] = original_pkd
                     continue
-                out_pdb_fp = run_modeller(PDB_FILE, j+1, ResInfo.code_to_pep[AA], "A")
-                
-                pro, _ = get_protein_features(out_pdb_fp, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
-                assert pro.pro_seq != original_seq and pro.pro_seq[j] == AA, \
-                    f"ERROR in modeller, {pro.pro_seq} == {original_seq} \nor {pro.pro_seq[j]} != {AA}"
-                
-                muta[i,j] = MODEL(pro.to(DEVICE), lig.to(DEVICE))
-                
-                # delete after use
-                os.remove(out_pdb_fp)
-
-if MUTATIONS:
-    mut_pdb_file = run_modeller_multiple(PDB_FILE, MUTATIONS)
-    print(mut_pdb_file)
-    pro, _ = get_protein_features(mut_pdb_file, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
-    mut_pkd = MODEL(pro.to(DEVICE), lig.to(DEVICE))
-    print("\nMutated pkd:", mut_pkd)
-else:
-    logging.warning("No mutations were passed in - running full saturation mutagenesis")
-    # zero indexed res range to mutate:
-    res_range = (max(RES_START, 0), min(RES_END, len(original_seq)))
-
-    from src.utils.mutate_model import run_modeller
-    amino_acids = ResInfo.amino_acids[:-1] # not including "X" - unknown
-    muta = np.zeros(shape=(len(amino_acids), len(original_seq)))
-
-    with tqdm(range(*res_range), ncols=100, total=(res_range[1]-res_range[0]), 
-              desc='Saturation mutagenesis') as t:
-        for j in t:
-            for i, AA in enumerate(amino_acids):
-                if i%2 == 0:
-                    t.set_postfix(res=j, AA=i+1)
-                
-                if original_seq[j] == AA: # skip same AA modifications 
-                    muta[i,j] = original_pkd
+                try:
+                    out_pdb_fp = run_modeller(PDB_FILE, j+1, ResInfo.code_to_pep[AA], "A", n_attempts=NUM_MODELLER_ATTEMPTS)
+                except OverflowError as e:
+                    muta[i,j] = np.nan
                     continue
-                out_pdb_fp = run_modeller(PDB_FILE, j+1, ResInfo.code_to_pep[AA], "A")
                 
                 pro, _ = get_protein_features(out_pdb_fp, MODEL_PARAMS['feature_opt'], MODEL_PARAMS['edge_opt'])
                 assert pro.pro_seq != original_seq and pro.pro_seq[j] == AA, \

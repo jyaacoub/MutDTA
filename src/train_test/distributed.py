@@ -143,12 +143,13 @@ def dtrain(args, unknown_args):
     
     cp_saver = CheckpointSaver(model=model, save_path=f'{cfg.MODEL_SAVE_DIR}/{MODEL_KEY}.model',
                             train_all=False,
-                            patience=100, min_delta=(0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.05),
+                            patience=1000, min_delta=(0.2 if DATA == cfg.DATA_OPT.PDBbind else 0.05),
                             dist_rank=args.rank)
     # load ckpnt
-    if os.path.exists(cp_saver.save_path + '_tmp') and args.rank == 0:
+    ckpt_fp = cp_saver.save_path if os.path.exists(cp_saver.save_path) else cp_saver.save_path + '_tmp'
+    if os.path.exists(ckpt_fp) and args.rank == 0:
         print('# Model already trained, loading checkpoint')
-        model.safe_load_state_dict(torch.load(cp_saver.save_path + '_tmp', 
+        model.safe_load_state_dict(torch.load(ckpt_fp, 
                                 map_location=torch.device(f'cuda:{args.gpu}')))
         
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model) # use if model contains batchnorm.
