@@ -2,7 +2,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-#%% TABLE FOR DATASET COUNTS 
+#%% FIG 1 - TABLE FOR DATASET COUNTS 
 def get_USED_dataset_counts(SPLITS_CSVS="./splits/"):
     """Due to memory limitations a couple records were excluded from our runs this is the full count that were actually used"""
     def get_dataset_info(dataset_name):
@@ -39,7 +39,7 @@ def get_FULL_dataset_counts():
     """
     return markdown_table
 
-#%% SEQUENCE LENGTH DISTRIBUTION
+#%% FIG 1 - SEQUENCE LENGTH DISTRIBUTION
 import seaborn as sns
 def sequence_length_distributions(SPLITS_CSVS="./splits", dataset_names=['davis', 'kiba', 'pdbbind'],
                                           figsize=(15, 15), bins=20, bw_adjust=1.5):
@@ -64,7 +64,7 @@ def sequence_length_distributions(SPLITS_CSVS="./splits", dataset_names=['davis'
         axes[i].legend()
 
     plt.tight_layout()
-    
+
 def overlay_normalized_sequence_length_distribution(SPLITS_CSVS="./splits", dataset_names=['davis', 'kiba', 'pdbbind'],
                                                     figsize=(15, 5), bins=20, bw_adjust=1.5):
     """Overlay normalized distribution of sequences for multiple datasets on the same plot."""
@@ -94,10 +94,8 @@ def overlay_normalized_sequence_length_distribution(SPLITS_CSVS="./splits", data
     plt.title('Overlayed Normalized Histogram of Protein Sequence Lengths')
     plt.legend()
 
-
-###########################################
-#%% MODEL RESULTS
-###########################################
+#%% FIG 1 - MODEL RESULTS
+#########################
 from matplotlib import pyplot as plt
 from src.analysis.figures import prepare_df, fig_combined, custom_fig
 
@@ -262,3 +260,77 @@ def plot_Platinum_pkd_distribution():
     plt.legend(title="Protein Category")
     plt.tight_layout()
     plt.show()
+
+#%%
+# FIG 3 - Platinum MODEL RESULTS
+###############################
+# - Run all 5 models through platinum and save predicted pkds as platinum_preds/<model_opt>_<fold>.csv
+# def Platinum_run_inference(model:str):
+import logging
+import os
+
+import torch
+import pandas as pd
+from src.utils.loader import Loader
+from src import TUNED_MODEL_CONFIGS, cfg
+from collections import defaultdict
+from tqdm import tqdm
+logging.getLogger().setLevel(logging.INFO)
+
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+MODEL, model_kwargs =  Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
+
+
+model_opts = ['davis_DG',    'davis_gvpl',   'davis_esm', 
+            'kiba_DG',     'kiba_esm',     'kiba_gvpl',
+            'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
+            'PDBbind_gvpl_aflow']
+for model_opt in model_opts:
+    loader = None
+    for fold in range(5):
+        print(f"{model_opt}-{fold}")
+        out_csv = f"./results/platinum_predictions/{model_opt}_{fold}.csv"
+        if os.path.exists(out_csv):
+            print('\t Predictions already exists')
+            continue
+        
+        MODEL_PARAMS = TUNED_MODEL_CONFIGS[model_opt]
+        try:
+            MODEL, model_kwargs =  Loader.load_tuned_model(model_opt, fold=fold, device=DEVICE)
+        except AssertionError as e:
+            print(e)
+            continue
+        MODEL.eval()
+        print("\t Model loaded")
+
+        if loader is None: # caches loader if already created for this model_opt
+            loader = Loader.load_DataLoaders(
+                            data=cfg.DATA_OPT.platinum,
+                            datasets=['full'],
+                            pro_feature=MODEL_PARAMS['feature_opt'],
+                            edge_opt=MODEL_PARAMS['edge_opt'],
+                            ligand_feature=MODEL_PARAMS['lig_feat_opt'],
+                            ligand_edge=MODEL_PARAMS['lig_edge_opt'],
+                            )['full']
+        print("\t Dataset loaded")
+
+
+        PREDICTIONS = defaultdict(list)
+        for batch in tqdm(loader, desc="\t running inference"):    
+            PREDICTIONS['code'].extend(batch['code'])
+            PREDICTIONS['y'].extend(batch['y'].tolist())
+            y_pred = MODEL(batch['protein'].to(DEVICE), batch['ligand'].to(DEVICE))
+            PREDICTIONS['y_pred'].extend(y_pred[:,0].tolist())
+            
+            
+
+        df = pd.DataFrame.from_dict(PREDICTIONS)
+        df.set_index('code', inplace=True)
+        df.sort_index(key = lambda x: x.str.split("_").str[0].astype(int))
+        df.to_csv(out_csv)
+
+
+def platinum_model_results_raw():
+    pass
+
+# %%
