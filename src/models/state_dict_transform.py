@@ -41,6 +41,25 @@ RuntimeError: Error(s) in loading state_dict for GVPLigand_DGPro:
 ```
 """
 
+
+"""
+2nd case from kiba models:
+RuntimeError: Error(s) in loading state_dict for GVPLigand_DGPro:
+	Missing key(s) in state_dict: 
+        "dense_out.8.weight",
+        "dense_out.8.bias". 
+	Unexpected key(s) in state_dict: 
+        "gvp_ligand.layers.3.conv.message_func.0.dummy_param", 
+        "gvp_ligand.layers.3.conv.message_func.1.dummy_param", 
+        "gvp_ligand.layers.3.conv.message_func.2.dummy_param", 
+        "gvp_ligand.layers.3.dropout.0.vdropout.dummy_param", 
+        "gvp_ligand.layers.3.dropout.1.vdropout.dummy_param", 
+        "gvp_ligand.layers.3.ff_func.0.dummy_param", 
+        "gvp_ligand.layers.3.ff_func.1.dummy_param", 
+        "dense_out.9.weight", 
+        "dense_out.9.bias". 
+"""
+
 def GVPLigand_DGPro_transform(sd:dict):
     # to remove:
     remove = [
@@ -62,20 +81,26 @@ def GVPLigand_DGPro_transform(sd:dict):
         "gvp_ligand.layers.2.conv.message_func.0.dummy_param", "gvp_ligand.layers.2.conv.message_func.1.dummy_param", "gvp_ligand.layers.2.conv.message_func.2.dummy_param", 
         "gvp_ligand.layers.2.dropout.0.vdropout.dummy_param", "gvp_ligand.layers.2.dropout.1.vdropout.dummy_param", 
         "gvp_ligand.layers.2.ff_func.0.dummy_param","gvp_ligand.layers.2.ff_func.1.dummy_param", 
-        "gvp_ligand.W_out.1.dummy_param"
+        "gvp_ligand.W_out.1.dummy_param",
+        
+        "gvp_ligand.layers.3.conv.message_func.0.dummy_param", "gvp_ligand.layers.3.conv.message_func.1.dummy_param", "gvp_ligand.layers.3.conv.message_func.2.dummy_param", 
+        "gvp_ligand.layers.3.dropout.0.vdropout.dummy_param", "gvp_ligand.layers.3.dropout.1.vdropout.dummy_param", 
+        "gvp_ligand.layers.3.ff_func.0.dummy_param", "gvp_ligand.layers.3.ff_func.1.dummy_param", 
     ]
     for k in remove:
-        del sd[k]
-        
+      if k in sd: del sd[k]
+    
+    def rename(from_key, to_key):
+      if from_key not in sd:
+        return
+      sd[to_key] = sd.pop(from_key)
+    
     # renaming:
-    sd["pro_fc.0.weight"]   = sd.pop("pro_fc_g1.weight")
-    sd["pro_fc.0.bias"]     = sd.pop("pro_fc_g1.bias")
-    sd["pro_fc.3.weight"]   = sd.pop("pro_fc_g2.weight") # linear layer is the third in the sequential call
-    sd["pro_fc.3.bias"]     = sd.pop("pro_fc_g2.bias")
+    rename("pro_fc_g1.weight",  "pro_fc.0.weight")
+    rename("pro_fc_g1.bias",    "pro_fc.0.bias")
+    rename("pro_fc_g2.weight",  "pro_fc.3.weight") # linear layer is the third in the sequential call
+    rename("pro_fc_g2.bias",    "pro_fc.3.bias")
     
+    rename("dense_out.9.weight", "dense_out.8.weight")
+    rename("dense_out.9.bias", "dense_out.8.bias")
     return sd
-    
-    
-    
-    
-    
