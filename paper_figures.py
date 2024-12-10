@@ -326,11 +326,9 @@ for model_opt in model_opts:
 
         df = pd.DataFrame.from_dict(PREDICTIONS)
         df.set_index('code', inplace=True)
-        df.sort_index(key = lambda x: x.str.split("_").str[0].astype(int))
+        df.sort_index(key = lambda x: x.str.split("_").str[0].astype(int), inplace=True)
         df.to_csv(out_csv)
 
-
+print("DONE!")
 def platinum_model_results_raw():
     pass
-
-# %%
