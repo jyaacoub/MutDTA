@@ -265,70 +265,88 @@ def plot_Platinum_pkd_distribution():
 # FIG 3 - Platinum MODEL RESULTS
 ###############################
 # - Run all 5 models through platinum and save predicted pkds as platinum_preds/<model_opt>_<fold>.csv
-# def Platinum_run_inference(model:str):
-import logging
-import os
-
-import torch
-import pandas as pd
-from src.utils.loader import Loader
-from src import TUNED_MODEL_CONFIGS, cfg
-from collections import defaultdict
-from tqdm import tqdm
-logging.getLogger().setLevel(logging.INFO)
-
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-MODEL, model_kwargs =  Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
-
-
-model_opts = ['davis_DG',    'davis_gvpl',   'davis_esm', 
+def Platinum_run_inference():
+    """
+    This script runs inference on platinum for the following models:
+            ['davis_DG',    'davis_gvpl',   'davis_esm', 
             'kiba_DG',     'kiba_esm',     'kiba_gvpl',
             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
             'PDBbind_gvpl_aflow']
-for model_opt in model_opts:
-    loader = None
-    for fold in range(5):
-        print(f"{model_opt}-{fold}")
-        out_csv = f"./results/platinum_predictions/{model_opt}_{fold}.csv"
-        if os.path.exists(out_csv):
-            print('\t Predictions already exists')
-            continue
-        
-        MODEL_PARAMS = TUNED_MODEL_CONFIGS[model_opt]
-        try:
-            MODEL, model_kwargs =  Loader.load_tuned_model(model_opt, fold=fold, device=DEVICE)
-        except AssertionError as e:
-            print(e)
-            continue
-        MODEL.eval()
-        print("\t Model loaded")
+    
+    It assumes that checkpoints for these models are already present in the CHECKPOINT_SAVE_DIR location
+    as specified by the src/utils/config file.
+    
+    Also for any aflow model it also requires that aflow predictions for structures have already been generated
+    otherwise building that dataset will be impossible.
+    
+    If the dataset is already built for that model then no building of the dataset will be done so long as they
+    are in the right location as specified by DATA_ROOT in the src/utils/config file.
+    """
+    import logging
+    import os
 
-        if loader is None: # caches loader if already created for this model_opt
-            loader = Loader.load_DataLoaders(
-                            data=cfg.DATA_OPT.platinum,
-                            datasets=['full'],
-                            pro_feature=MODEL_PARAMS['feature_opt'],
-                            edge_opt=MODEL_PARAMS['edge_opt'],
-                            ligand_feature=MODEL_PARAMS['lig_feat_opt'],
-                            ligand_edge=MODEL_PARAMS['lig_edge_opt'],
-                            )['full']
-        print("\t Dataset loaded")
+    import torch
+    import pandas as pd
+    from src.utils.loader import Loader
+    from src import TUNED_MODEL_CONFIGS, cfg
+    from collections import defaultdict
+    from tqdm import tqdm
+    logging.getLogger().setLevel(logging.INFO)
+
+    DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    MODEL, model_kwargs =  Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
 
 
-        PREDICTIONS = defaultdict(list)
-        for batch in tqdm(loader, desc="\t running inference"):    
-            PREDICTIONS['code'].extend(batch['code'])
-            PREDICTIONS['y'].extend(batch['y'].tolist())
-            y_pred = MODEL(batch['protein'].to(DEVICE), batch['ligand'].to(DEVICE))
-            PREDICTIONS['y_pred'].extend(y_pred[:,0].tolist())
+    model_opts = ['davis_DG',    'davis_gvpl',   'davis_esm', 
+                'kiba_DG',     'kiba_esm',     'kiba_gvpl',
+                'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
+                'PDBbind_gvpl_aflow']
+    for model_opt in model_opts:
+        loader = None
+        for fold in range(5):
+            print(f"{model_opt}-{fold}")
+            out_csv = f"./results/platinum_predictions/{model_opt}_{fold}.csv"
+            if os.path.exists(out_csv):
+                print('\t Predictions already exists')
+                continue
             
-            
+            MODEL_PARAMS = TUNED_MODEL_CONFIGS[model_opt]
+            try:
+                MODEL, model_kwargs =  Loader.load_tuned_model(model_opt, fold=fold, device=DEVICE)
+            except AssertionError as e:
+                print(e)
+                continue
+            MODEL.eval()
+            print("\t Model loaded")
 
-        df = pd.DataFrame.from_dict(PREDICTIONS)
-        df.set_index('code', inplace=True)
-        df.sort_index(key = lambda x: x.str.split("_").str[0].astype(int), inplace=True)
-        df.to_csv(out_csv)
+            if loader is None: # caches loader if already created for this model_opt
+                loader = Loader.load_DataLoaders(
+                                data=cfg.DATA_OPT.platinum,
+                                datasets=['full'],
+                                pro_feature=MODEL_PARAMS['feature_opt'],
+                                edge_opt=MODEL_PARAMS['edge_opt'],
+                                ligand_feature=MODEL_PARAMS['lig_feat_opt'],
+                                ligand_edge=MODEL_PARAMS['lig_edge_opt'],
+                                )['full']
+            print("\t Dataset loaded")
 
-print("DONE!")
+
+            PREDICTIONS = defaultdict(list)
+            for batch in tqdm(loader, desc="\t running inference", ncols=100):    
+                PREDICTIONS['code'].extend(batch['code'])
+                PREDICTIONS['y'].extend(batch['y'].tolist())
+                y_pred = MODEL(batch['protein'].to(DEVICE), batch['ligand'].to(DEVICE))
+                PREDICTIONS['y_pred'].extend(y_pred[:,0].tolist())
+                
+                
+
+            df = pd.DataFrame.from_dict(PREDICTIONS)
+            df.set_index('code', inplace=True)
+            df.sort_index(key = lambda x: x.str.split("_").str[0].astype(int), inplace=True)
+            df.to_csv(out_csv)
+
+    print("DONE!")
+    
+    
 def platinum_model_results_raw():
     pass
