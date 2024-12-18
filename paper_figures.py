@@ -347,6 +347,14 @@ def Platinum_run_inference():
 
     print("DONE!")
     
+
+def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv", model_opt='davis_DG'):
+    all_folds = pd.read_csv(pred_csv(model_opt, 0), index_col='code')
+    for fold in range(1,5):
+        new_fold = pd.read_csv(pred_csv(model_opt, fold), index_col='code')[['y_pred']]
+        all_folds = all_folds.join(new_fold, on='code', rsuffix=f'_{fold}')
+
+    all_folds.rename(columns={'y_pred': 'y_pred_0'}, inplace=True)
+    all_folds['y_pred_avg'] = all_folds[[f'y_pred_{i}' for i in range(5)]].mean(axis=1)
+    return all_folds
     
-def platinum_model_results_raw():
-    pass
