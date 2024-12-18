@@ -1244,8 +1244,8 @@ class PlatinumDataset(BaseDataset):
         ### LOAD UP RAW CSV FILE + adjust values ###
         df_raw = pd.read_csv(self.raw_paths[0])
         # fixing pkd values for binding affinity
-        df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
-                                                      expand=False).astype(float)
+        df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'[<>=]*(.*\d+)', 
+                                                                expand=False).astype(float)
         # adjusting units for binding data from nM to pKd:
         df_raw['affin.k_mt'] = -np.log10(df_raw['affin.k_mt']*1e-9)
         df_raw['affin.k_wt'] = -np.log10(df_raw['affin.k_wt']*1e-9)
