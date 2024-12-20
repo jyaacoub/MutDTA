@@ -347,6 +347,33 @@ def Platinum_run_inference():
 
     print("DONE!")
     
+def platinum_fix_missing_pkd_vals():
+    import numpy as np
+    import pandas as pd
+    import os
+    root_dir = "/home/jean/projects/MutDTA/results/platinum_predictions"
+
+    df_raw = pd.read_csv('/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv', index_col=0)
+    # fixing pkd values for binding affinity
+    df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'[<>=]*(.*\d+)', expand=False).astype(float)
+    # adjusting units for binding data from nM to pKd:
+    df_raw['affin.k_mt'] = -np.log10(df_raw['affin.k_mt']*1e-9)
+    df_raw['affin.k_wt'] = -np.log10(df_raw['affin.k_wt']*1e-9)
+
+    for f in os.listdir(root_dir):
+        fp = os.path.join(root_dir, f)
+        df = pd.read_csv(fp, index_col=0)
+        for code in df[df['y'].isna()].index:
+            i, mt_wt = code.split('_')
+            i = int(i)
+            print(code, end=' - ')
+            if mt_wt == 'mt':
+                df.loc[code, 'y'] = df_raw.iloc[i]['affin.k_mt']
+            else:
+                df.loc[code, 'y'] = df_raw.iloc[i]['affin.k_wt']
+            print(df.loc[code]['y'])
+        df.to_csv(fp)
+    
 
 def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv", model_opt='davis_DG'):
     all_folds = pd.read_csv(pred_csv(model_opt, 0), index_col='code')
