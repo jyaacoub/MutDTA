@@ -482,7 +482,7 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
     
     return plot_data
 
-def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
+def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None, df=None) -> pd.DataFrame:
     """
     Prepares a dataframe from the model stats csv file.
 
@@ -507,10 +507,11 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
             - `batch_size`: batch size used for training
             - `overlap`: whether or not the model was trained with protein overlap 
     """
-    df = pd.read_csv(csv_p)
-    
-    if old_csv_p is not None and os.path.isfile(old_csv_p):
-        df = pd.concat([df, pd.read_csv(old_csv_p)]) # concat with old model results since we get the max value anyways...
+    if df is None:
+        df = pd.read_csv(csv_p)
+        
+        if old_csv_p is not None and os.path.isfile(old_csv_p):
+            df = pd.concat([df, pd.read_csv(old_csv_p)]) # concat with old model results since we get the max value anyways...
 
     # create data, feat, and overlap columns for easier filtering.
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
