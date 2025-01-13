@@ -311,11 +311,7 @@ def Platinum_run_inference():
                 continue
             
             MODEL_PARAMS = TUNED_MODEL_CONFIGS[model_opt]
-            try:
-                MODEL, model_kwargs =  Loader.load_tuned_model(model_opt, fold=fold, device=DEVICE)
-            except AssertionError as e:
-                print(e)
-                continue
+            MODEL, model_kwargs =  Loader.load_tuned_model(model_opt, fold=fold, device=DEVICE)
             MODEL.eval()
             print("\t Model loaded")
 
@@ -346,9 +342,14 @@ def Platinum_run_inference():
             df.to_csv(out_csv)
 
     print("DONE!")
-    
+
 def platinum_fix_missing_pkd_vals():
-    import numpy as np
+    """
+    Due to error in platinum raw csv parsing some values were dropped 
+    (see https://github.com/jyaacoub/MutDTA/pull/148/commits/5611c8146bdc4b2ff67a60ea6f5d8f527d66d9db)
+    
+    This is a data patch to fix those dropped values if we encounter them.
+    """
     import pandas as pd
     import os
     root_dir = "/home/jean/projects/MutDTA/results/platinum_predictions"
@@ -363,7 +364,9 @@ def platinum_fix_missing_pkd_vals():
     for f in os.listdir(root_dir):
         fp = os.path.join(root_dir, f)
         df = pd.read_csv(fp, index_col=0)
+        nan_found = False
         for code in df[df['y'].isna()].index:
+            nan_found = True
             i, mt_wt = code.split('_')
             i = int(i)
             print(code, end=' - ')
@@ -372,10 +375,19 @@ def platinum_fix_missing_pkd_vals():
             else:
                 df.loc[code, 'y'] = df_raw.iloc[i]['affin.k_wt']
             print(df.loc[code]['y'])
-        df.to_csv(fp)
-    
 
-def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv", model_opt='davis_DG'):
+        if nan_found: df.to_csv(fp)
+
+def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv", 
+                     model_opt='davis_DG'):
+    """
+    Gets all predictions for a model on platinum dataset returning dataframe like the following:
+                y	y_pred_0	y_pred_1	y_pred_2	y_pred_3	y_pred_4	y_pred_avg
+        code							
+        0_wt	9.000000	5.150848	5.298963	5.935942	5.260733	5.207066	5.370710
+        0_mt	8.494850	5.194075	5.409072	6.133554	5.289364	5.201524	5.445518
+        1_mt	8.886057	5.168861	5.338132	5.817824	5.299617	5.189447	5.362776
+    """
     all_folds = pd.read_csv(pred_csv(model_opt, 0), index_col='code')
     for fold in range(1,5):
         new_fold = pd.read_csv(pred_csv(model_opt, fold), index_col='code')[['y_pred']]
@@ -385,3 +397,75 @@ def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predi
     all_folds['y_pred_avg'] = all_folds[[f'y_pred_{i}' for i in range(5)]].mean(axis=1)
     return all_folds
     
+#%%
+def platinum_RAW_pkd_model_results(pred_csv=
+                               lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv",
+                               model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
+                                            'kiba_DG',     'kiba_esm',     'kiba_gvpl',
+                                            'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
+                                            'PDBbind_gvpl_aflow']):
+    """
+    RAW predictive performance on platinum
+    
+    Gets metrics for models across all 5 folds for each model
+    Creates a dataframe replicating the "results/model_media/models_stats.csv" format:
+                                                          run	  cindex	  pearson	 spearman	     mse	...	improved	batch_size	     lr	dropout	overlap
+        0	DGM_davis0D_nomsaF_binaryE_128B_0.00012LR_0.24...	0.359369	-0.280921	-0.430664	7.112641	...	   False	       128	0.00012	   0.24	  False
+        1	DGM_davis1D_nomsaF_binaryE_128B_0.00012LR_0.24...	0.426336	-0.229465	-0.225258	6.071823	...	   False	       128	0.00012	   0.24	  False
+        2	DGM_davis2D_nomsaF_binaryE_128B_0.00012LR_0.24...	0.521040	 0.098562	 0.060612	5.227944	...	   False	       128	0.00012	   0.24	  False
+    """
+    import pandas as pd
+    from src.utils.loader import Loader
+    from src import TUNED_MODEL_CONFIGS
+    from src.analysis.metrics import get_metrics
+    from src.analysis.figures import prepare_df
+
+    metrics = {
+        'run': [],
+        'cindex': [],
+        'pearson': [],
+        'spearman': [],
+        'mse': [],
+        'mae': [],
+        'rmse': []
+    }
+    for model_opt in model_opts:
+        all_folds = get_all_folds_df(pred_csv, model_opt)
+
+        for fold in range(5):
+            def reformat_kwargs(model_kwargs):
+                return {
+                    'model': model_kwargs['model'],
+                    'data': model_kwargs['dataset'],
+                    'pro_feature': model_kwargs['feature_opt'],
+                    'edge': model_kwargs['edge_opt'],
+                    'batch_size': model_kwargs['batch_size'],
+                    'lr': model_kwargs['lr'],
+                    'dropout': model_kwargs['architecture_kwargs']['dropout'],
+                    'n_epochs': model_kwargs.get('n_epochs', 2000),  # Assuming a default value for n_epochs
+                    'pro_overlap': model_kwargs.get('pro_overlap', False),  # Assuming a default or None
+                    'fold': model_kwargs.get('fold', fold),  # Assuming a default or None
+                    'ligand_feature': model_kwargs['lig_feat_opt'],
+                    'ligand_edge': model_kwargs['lig_edge_opt']
+                }
+
+            model_kwargs = reformat_kwargs(TUNED_MODEL_CONFIGS[model_opt])
+            run = Loader.get_model_key(**model_kwargs)
+            metrics['run'].append(run)
+            
+            # create metrics df for plotting results
+            cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(all_folds['y'], all_folds[f'y_pred_{fold}'])
+            metrics['cindex'].append(cindex)
+            metrics['pearson'].append(p_corr[0])
+            metrics['spearman'].append(s_corr[0])
+            metrics['mse'].append(mse)
+            metrics['mae'].append(mae)
+            metrics['rmse'].append(rmse)
+        
+    df_metrics = pd.DataFrame.from_dict(metrics)
+
+    prepare_df(df=df_metrics)
+    return df_metrics
+
+df_metrics = platinum_RAW_pkd_model_results()
+
