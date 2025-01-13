@@ -422,15 +422,7 @@ def platinum_RAW_pkd_model_results(pred_csv=
     from src.analysis.metrics import get_metrics
     from src.analysis.figures import prepare_df
 
-    metrics = {
-        'run': [],
-        'cindex': [],
-        'pearson': [],
-        'spearman': [],
-        'mse': [],
-        'mae': [],
-        'rmse': []
-    }
+    metrics = {'run': [],'cindex': [],'pearson': [],'spearman': [],'mse': [],'mae': [],'rmse': []}
     for model_opt in model_opts:
         all_folds = get_all_folds_df(pred_csv, model_opt)
 
@@ -469,5 +461,77 @@ def platinum_RAW_pkd_model_results(pred_csv=
     prepare_df(df=df_metrics)
     return df_metrics
 
-df_metrics = platinum_RAW_pkd_model_results()
+#%%
+def platinum_DELTA_pkd_model_results(pred_csv=
+                               lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv",
+                               model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
+                                            'kiba_DG',     'kiba_esm',     'kiba_gvpl',
+                                            'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
+                                            'PDBbind_gvpl_aflow']):
+    """
+    model's ability to predict the CHANGE in binding affinity
+    """
+    import pandas as pd
+    from src.utils.loader import Loader
+    from src import TUNED_MODEL_CONFIGS
+    from src.analysis.metrics import get_metrics
+    from src.analysis.figures import prepare_df
 
+    metrics = {'run': [],'cindex': [],'pearson': [],'spearman': [],'mse': [],'mae': [],'rmse': []}
+    for model_opt in model_opts:
+        all_folds = get_all_folds_df(pred_csv, model_opt)
+        all_folds['pro'] = all_folds.index.str.extract(r'(\d+)_[wm]t', expand=False)
+        all_folds_wt = all_folds[all_folds.index.str.contains('wt')]
+        
+        all_folds_reset = all_folds.reset_index() # to maintain index we reset before merge to make it a column
+        all_folds = all_folds_reset.merge(all_folds_wt, how="left", on="pro", suffixes=("_mt", "_wt"))
+        all_folds.set_index('code', inplace=True) # added back index
+        
+        # doing subtraction to get delta values:
+        mt_cols = [col for col in all_folds.columns if '_mt' in col]
+        wt_cols = [col.replace('_mt', '_wt') for col in mt_cols]
+        
+        all_folds = all_folds[wt_cols].sub(all_folds[mt_cols].values, axis=0)
+        
+        # rename back to original table since the rest of the code is the same as RAW_pkd method
+        # dropping the _mt suffix
+        all_folds.rename(columns={col: col[:-3] for col in all_folds.columns}, inplace=True)
+        
+        # dropping wt rows since those will be all zeros
+        all_folds = all_folds[all_folds.index.str.contains('_mt')]
+        
+        for fold in range(5):
+            def reformat_kwargs(model_kwargs):
+                return {
+                    'model': model_kwargs['model'],
+                    'data': model_kwargs['dataset'],
+                    'pro_feature': model_kwargs['feature_opt'],
+                    'edge': model_kwargs['edge_opt'],
+                    'batch_size': model_kwargs['batch_size'],
+                    'lr': model_kwargs['lr'],
+                    'dropout': model_kwargs['architecture_kwargs']['dropout'],
+                    'n_epochs': model_kwargs.get('n_epochs', 2000),  # Assuming a default value for n_epochs
+                    'pro_overlap': model_kwargs.get('pro_overlap', False),  # Assuming a default or None
+                    'fold': model_kwargs.get('fold', fold),  # Assuming a default or None
+                    'ligand_feature': model_kwargs['lig_feat_opt'],
+                    'ligand_edge': model_kwargs['lig_edge_opt']
+                }
+
+            model_kwargs = reformat_kwargs(TUNED_MODEL_CONFIGS[model_opt])
+            run = Loader.get_model_key(**model_kwargs)
+            metrics['run'].append(run)
+            
+            # create metrics df for plotting results
+            cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(all_folds['y'], all_folds[f'y_pred_{fold}'])
+            metrics['cindex'].append(cindex)
+            metrics['pearson'].append(p_corr[0])
+            metrics['spearman'].append(s_corr[0])
+            metrics['mse'].append(mse)
+            metrics['mae'].append(mae)
+            metrics['rmse'].append(rmse)
+        
+    df_metrics = pd.DataFrame.from_dict(metrics)
+    prepare_df(df=df_metrics)
+    return df_metrics
+
+#%%
