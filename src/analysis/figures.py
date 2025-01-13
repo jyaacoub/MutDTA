@@ -527,7 +527,7 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None, df=None) -> pd
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
     df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False).astype(int)
     
-    df['lr'] = df['run'].str.extract(r'_(\d+\.?\d*)LR_', expand=False).astype(float)
+    df['lr'] = df['run'].str.extract(r'_(\d+\.?\d*[e-]*\d*)LR_', expand=False).astype(float)
     df['dropout'] = df['run'].str.extract(r'_(\d+\.?\d*)D_', expand=False).astype(float)
     
     # ESM models
