@@ -405,8 +405,11 @@ def platinum_RAW_pkd_model_results(pred_csv=
                                model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
                                             'kiba_DG',     'kiba_esm',     'kiba_gvpl',
                                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
-                                            'PDBbind_gvpl_aflow']):
+                                            'PDBbind_gvpl_aflow'],
+                               normalized=True,
+                               platinum_filter=None): # platinum filtering for getting results for "only mutations in pocket" or other filters
     """
+    NOTE: CINDEX AND PEARSON WILL NOT BE IMPACTED BY NORMALIZATION
     RAW predictive performance on platinum
     
     Gets metrics for models across all 5 folds for each model
@@ -425,6 +428,10 @@ def platinum_RAW_pkd_model_results(pred_csv=
     metrics = {'run': [],'cindex': [],'pearson': [],'spearman': [],'mse': [],'mae': [],'rmse': []}
     for model_opt in model_opts:
         all_folds = get_all_folds_df(pred_csv, model_opt)
+        # normalize
+        if normalized:
+            #z-score norm
+            all_folds = (all_folds - np.mean(all_folds, axis=0)) / np.std(all_folds, axis=0)
 
         for fold in range(5):
             def reformat_kwargs(model_kwargs):
@@ -467,8 +474,11 @@ def platinum_DELTA_pkd_model_results(pred_csv=
                                model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
                                             'kiba_DG',     'kiba_esm',     'kiba_gvpl',
                                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
-                                            'PDBbind_gvpl_aflow']):
+                                            'PDBbind_gvpl_aflow'],
+                               normalized=True,
+                               stratified=None):
     """
+    NOTE: CINDEX AND PEARSON WILL NOT BE IMPACTED BY NORMALIZATION
     model's ability to predict the CHANGE in binding affinity
     """
     import pandas as pd
@@ -480,6 +490,12 @@ def platinum_DELTA_pkd_model_results(pred_csv=
     metrics = {'run': [],'cindex': [],'pearson': [],'spearman': [],'mse': [],'mae': [],'rmse': []}
     for model_opt in model_opts:
         all_folds = get_all_folds_df(pred_csv, model_opt)
+        # normalize
+        if normalized:
+            #z-score norm
+            all_folds = (all_folds - np.mean(all_folds, axis=0)) / np.std(all_folds, axis=0)
+        
+        # Calculate DELTA_pkd >>>>
         all_folds['pro'] = all_folds.index.str.extract(r'(\d+)_[wm]t', expand=False)
         all_folds_wt = all_folds[all_folds.index.str.contains('wt')]
         
@@ -499,6 +515,7 @@ def platinum_DELTA_pkd_model_results(pred_csv=
         
         # dropping wt rows since those will be all zeros
         all_folds = all_folds[all_folds.index.str.contains('_mt')]
+        # <<<<
         
         for fold in range(5):
             def reformat_kwargs(model_kwargs):
@@ -535,3 +552,9 @@ def platinum_DELTA_pkd_model_results(pred_csv=
     return df_metrics
 
 #%%
+print(platinum_DELTA_pkd_model_results(normalized=True).sort_values('cindex', ascending=False).head())
+platinum_DELTA_pkd_model_results(normalized=False).sort_values('cindex', ascending=False).head()
+
+# %%
+print(platinum_RAW_pkd_model_results(normalized=True).sort_values('cindex', ascending=False).head())
+platinum_RAW_pkd_model_results(normalized=False).sort_values('cindex', ascending=False).head()
