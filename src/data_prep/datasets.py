@@ -319,11 +319,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             - pid,  matching_code - has the correct number of conf files but is not the correct sequence.
             - None, matching_code - correct seq, # of confs, but under a different file name
         """
-        pid, seq, af_conf_dir, is_pdbbind, files = args
+        pid, seq, af_conf_dir, is_pdbbind_aflow, files = args
         MIN_MODEL_COUNT = 5
         
         af_confs = []
-        if is_pdbbind:
+        if is_pdbbind_aflow: # aflow models will only have 1 pdb and should be tied to the pid
             fp = os.path.join(af_conf_dir, f'{pid}.pdb')
             if os.path.exists(fp):
                 af_confs = [os.path.join(af_conf_dir, f'{pid}.pdb')]
@@ -347,18 +347,18 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return None, None
             
     @staticmethod
-    def check_missing_confs(df_unique:pd.DataFrame, af_conf_dir:str, is_pdbbind=False):
+    def check_missing_confs(df_unique:pd.DataFrame, af_conf_dir:str, is_pdbbind_aflow=False):
         logging.debug(f'Getting af_confs from {af_conf_dir}')
 
         missing = set()
         mismatched = {}
         # total of 3728 unique proteins with alphaflow confs (named by pdb ID)
         files = None
-        if not is_pdbbind:
+        if not is_pdbbind_aflow:
             files = [f for f in os.listdir(af_conf_dir) if f.endswith('.pdb')]
 
         with Pool(processes=cpu_count()) as pool:
-            tasks = [(pid, seq, af_conf_dir, is_pdbbind, files) \
+            tasks = [(pid, seq, af_conf_dir, is_pdbbind_aflow, files) \
                             for _, (pid, seq) in df_unique[['prot_id', 'prot_seq']].iterrows()]
 
             for pid, correct_seq in tqdm(pool.imap_unordered(BaseDataset.process_protein_multiprocessing, tasks), 
@@ -394,7 +394,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         missing = set()
         mismatched = {}
         if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
-            missing, mismatched = self.check_missing_confs(df_unique, self.af_conf_dir, self.__class__ is PDBbindDataset)
+            missing, mismatched = self.check_missing_confs(df_unique, self.af_conf_dir, (self.__class__ is PDBbindDataset or 
+                                                                                         "aflow" in self.pro_edge_opt))
         
         if len(missing) > 0:
             filtered_df = df[~df.prot_id.isin(missing)]

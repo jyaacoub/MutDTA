@@ -1,4 +1,24 @@
 #%%
+from src.data_prep.datasets import PlatinumDataset
+from src import cfg
+import logging
+logging.getLogger().setLevel(logging.DEBUG)
+
+#%%
+dataset = PlatinumDataset(
+        save_root=  f'/home/jean/projects/data/PlatinumDataset/',
+        data_root=  f'/home/jean/projects/data/PlatinumDataset/raw',
+        af_conf_dir=f'/home/jean/projects/data/PlatinumDataset/raw/alphaflow_io/out_pdb_MD-distilled/',
+        aln_dir=None,
+        cmap_threshold=8.0,
+        
+        feature_opt=cfg.PRO_FEAT_OPT.nomsa,
+        edge_opt=cfg.PRO_EDGE_OPT.aflow,
+        ligand_feature=cfg.LIG_FEAT_OPT.gvp,
+        ligand_edge=cfg.LIG_EDGE_OPT.binary,
+        subset=None)
+
+#%%
 import logging
 from matplotlib import pyplot as plt
 
