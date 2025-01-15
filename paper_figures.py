@@ -1,8 +1,11 @@
 #%%
+import random
+from typing import Callable, Dict, List
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 #%% FIG 1 - TABLE FOR DATASET COUNTS 
 def get_USED_dataset_counts(SPLITS_CSVS="./splits/"):
@@ -466,8 +469,15 @@ def platinum_pkd_model_results(pred_csv=
             
         
         # taking subset if any
-        if subset: 
-            all_folds = all_folds[all_folds.index.isin(subset)]
+        if subset:
+            try:
+                all_folds = all_folds.loc[subset]
+            except KeyError as e:
+                err_str = "DataFrame failed to retrieve elements from subset."
+                if DELTA:
+                    err_str += " NOTE: wt with DELTA is not allowed since that would just result in zeros"
+                raise KeyError(err_str) from e
+                
         
         for fold in range(5):
             def reformat_kwargs(model_kwargs):
@@ -503,12 +513,18 @@ def platinum_pkd_model_results(pred_csv=
     prepare_df(df=df_metrics)
     return df_metrics
 
-def platinum_RAW_pkd_model_results(*args, **kwargs): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
+def platinum_RAW_pkd_model_results(*args, **kwargs) -> pd.DataFrame:
+    """
+    Returns pandas dataframe for df input to `custom_fig` and similar figures methods
+    """
     return platinum_pkd_model_results(*args, **kwargs, DELTA=False)
 
 #%%
-def platinum_DELTA_pkd_model_results(*args, **kwargs):
-    return platinum_pkd_model_results(*args, **kwargs, DELTA=False)
+def platinum_DELTA_pkd_model_results(*args, **kwargs) -> pd.DataFrame:
+    """
+    Returns pandas dataframe for df input to `custom_fig` and similar figures methods
+    """
+    return platinum_pkd_model_results(*args, **kwargs, DELTA=True)
 
 #%%
 def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv'):
@@ -537,16 +553,84 @@ def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDat
             
     return wt, in_pocket, out_pocket
 
+
+def resampling(
+    subset_groups: Dict[str, List],
+    callable_pkd_model_results: Callable[[List], pd.DataFrame],
+    num_samples: int = 10,
+) -> Dict[str, pd.DataFrame]:
+    """
+    Calculate averaged results over multiple random samples for multiple groups.
+    
+    Args:
+        subset_groups: Dictionary where keys are group names and values are lists of indices.
+        callable_pkd_model_results: Callable that computes metrics for a given subset.
+        num_samples: Number of random samples to average over.
+
+    Returns:
+        Dictionary with averaged metrics for each group.
+    """
+
+    random.seed(42)
+
+    # Determine the maximum resampling size (smallest group size)
+    max_size = min(len(subset) for subset in subset_groups.values())
+    all_metrics = {group: [] for group in subset_groups}
+
+    # Generate multiple samples and compute metrics
+    for _ in tqdm(range(num_samples), desc="Resampling"):
+        for group_name, subset in subset_groups.items():
+            # if max_size == len(subset) and len(all_metrics[group_name]) > 0:
+            #     # only need to do this once since there is only one possible sampling
+            #     continue
+            # Resample
+            sampled_subset = random.sample(subset, max_size)
+
+            # Compute metrics for the current sample
+            metrics = callable_pkd_model_results(subset=sampled_subset)
+            all_metrics[group_name].append(metrics)
+
+    # Average the metrics across all samples for each group
+    averaged_metrics = {}
+    columns_to_average = ['cindex', 'pearson', 'spearman', 'mse', 'mae', 'rmse']
+
+    for group_name, metrics_list in all_metrics.items():
+        # Concatenate metrics for the current group
+        df_concat = pd.concat(metrics_list)
+
+        # Average only the selected columns
+        numeric_avg = df_concat[columns_to_average].groupby(level=0).mean(numeric_only=True)
+
+        # For all other columns, just pick the first value
+        non_averaged_columns = df_concat.columns.difference(columns_to_average)
+        non_numeric_first = df_concat[non_averaged_columns].groupby(level=0).first()
+
+        # Combine the averaged and non-averaged columns back together
+        averaged_metrics[group_name] = pd.concat([non_numeric_first, numeric_avg], axis=1)
+
+    return averaged_metrics
+
+# mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
+# size of the dataset doesnt impact metrics
 wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
+
+subset_groups = {
+    "wt": wt,
+    "mt_in": mt_in,
+    "mt_out": mt_out
+}
+
 # %%
-print("DELTA - mt_in")
-platinum_DELTA_pkd_model_results(subset=mt_in).sort_values('cindex', ascending=False).head()
-#%%
-print("DELTA - mt_out")
-platinum_DELTA_pkd_model_results(subset=mt_out).sort_values('cindex', ascending=False).head()
+averaged_results = resampling(
+    subset_groups={k:v for k,v in subset_groups.items() if k != 'wt'},
+    callable_pkd_model_results=platinum_DELTA_pkd_model_results,
+    num_samples=10
+)
+
 # %%
-print("RAW - mt_in")
-platinum_RAW_pkd_model_results(subset=mt_in).sort_values('cindex', ascending=False).head()
-#%%
-print("RAW - mt_out")
-platinum_RAW_pkd_model_results(subset=mt_out).sort_values('cindex', ascending=False).head()
+averaged_results = resampling(
+    subset_groups=subset_groups,
+    callable_pkd_model_results=platinum_RAW_pkd_model_results,
+    num_samples=10
+)
+# %%
