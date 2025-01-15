@@ -400,17 +400,21 @@ def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predi
     return all_folds
     
 #%%
-def platinum_RAW_pkd_model_results(pred_csv=
+def platinum_pkd_model_results(pred_csv=
                                lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv",
                                model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
                                             'kiba_DG',     'kiba_esm',     'kiba_gvpl',
                                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
                                             'PDBbind_gvpl_aflow'],
                                normalized=True,
-                               subset=[]): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
+                               subset:list[str]=[],
+                               DELTA=False): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
     """
     NOTE: CINDEX AND PEARSON WILL NOT BE IMPACTED BY NORMALIZATION
-    RAW predictive performance on platinum
+    
+    If DELTA is set to True then this gets the "model's ability to predict the CHANGE in binding affinity"
+    
+    OTHERWISE it gets the "RAW predictive performance on platinum"
     
     Gets metrics for models across all 5 folds for each model
     Creates a dataframe replicating the "results/model_media/models_stats.csv" format:
@@ -433,8 +437,34 @@ def platinum_RAW_pkd_model_results(pred_csv=
             #z-score norm
             all_folds = (all_folds - np.mean(all_folds, axis=0)) / np.std(all_folds, axis=0)
         
-        assert len(all_folds) == 1962, f"Missing rows in pred csv, {len(all_folds)}/1962 for {model_opt}"
-
+        if DELTA:
+            # Calculate DELTA_pkd >>>>
+            all_folds['pro'] = all_folds.index.str.extract(r'(\d+)_[wm]t', expand=False)
+            all_folds_wt = all_folds[all_folds.index.str.contains('wt')]
+            
+            all_folds_reset = all_folds.reset_index() # to maintain index we reset before merge to make it a column
+            all_folds = all_folds_reset.merge(all_folds_wt, how="left", on="pro", suffixes=("_mt", "_wt"))
+            all_folds.set_index('code', inplace=True) # added back index
+            
+            # doing subtraction to get delta values:
+            mt_cols = [col for col in all_folds.columns if '_mt' in col]
+            wt_cols = [col.replace('_mt', '_wt') for col in mt_cols]
+            
+            all_folds = all_folds[wt_cols].sub(all_folds[mt_cols].values, axis=0)
+            
+            # rename back to original table since the rest of the code is the same as RAW_pkd method
+            # dropping the _mt suffix
+            all_folds.rename(columns={col: col[:-3] for col in all_folds.columns}, inplace=True)
+            
+            assert len(all_folds) == 1962, f"Missing rows in pred csv, {len(all_folds)}/1962 for {model_opt}"
+            
+            # dropping wt rows since those will be all zeros
+            all_folds = all_folds[all_folds.index.str.contains('_mt')]
+            # <<<<
+        else:
+            assert len(all_folds) == 1962, f"Missing rows in pred csv, {len(all_folds)}/1962 for {model_opt}"
+            
+        
         # taking subset if any
         if subset: 
             all_folds = all_folds[all_folds.index.isin(subset)]
@@ -470,99 +500,15 @@ def platinum_RAW_pkd_model_results(pred_csv=
             metrics['rmse'].append(rmse)
         
     df_metrics = pd.DataFrame.from_dict(metrics)
-
     prepare_df(df=df_metrics)
     return df_metrics
+
+def platinum_RAW_pkd_model_results(*args, **kwargs): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
+    return platinum_pkd_model_results(*args, **kwargs, DELTA=False)
 
 #%%
-def platinum_DELTA_pkd_model_results(pred_csv=
-                               lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv",
-                               model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
-                                            'kiba_DG',     'kiba_esm',     'kiba_gvpl',
-                                            'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
-                                            'PDBbind_gvpl_aflow'],
-                               normalized=True,
-                               subset:list[str]=[]): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
-    """
-    NOTE: CINDEX AND PEARSON WILL NOT BE IMPACTED BY NORMALIZATION
-    model's ability to predict the CHANGE in binding affinity
-    """
-    import pandas as pd
-    from src.utils.loader import Loader
-    from src import TUNED_MODEL_CONFIGS
-    from src.analysis.metrics import get_metrics
-    from src.analysis.figures import prepare_df
-
-    metrics = {'run': [],'cindex': [],'pearson': [],'spearman': [],'mse': [],'mae': [],'rmse': []}
-    for model_opt in model_opts:
-        all_folds = get_all_folds_df(pred_csv, model_opt)
-        # normalize
-        if normalized:
-            #z-score norm
-            all_folds = (all_folds - np.mean(all_folds, axis=0)) / np.std(all_folds, axis=0)
-        
-        # Calculate DELTA_pkd >>>>
-        all_folds['pro'] = all_folds.index.str.extract(r'(\d+)_[wm]t', expand=False)
-        all_folds_wt = all_folds[all_folds.index.str.contains('wt')]
-        
-        all_folds_reset = all_folds.reset_index() # to maintain index we reset before merge to make it a column
-        all_folds = all_folds_reset.merge(all_folds_wt, how="left", on="pro", suffixes=("_mt", "_wt"))
-        all_folds.set_index('code', inplace=True) # added back index
-        
-        # doing subtraction to get delta values:
-        mt_cols = [col for col in all_folds.columns if '_mt' in col]
-        wt_cols = [col.replace('_mt', '_wt') for col in mt_cols]
-        
-        all_folds = all_folds[wt_cols].sub(all_folds[mt_cols].values, axis=0)
-        
-        # rename back to original table since the rest of the code is the same as RAW_pkd method
-        # dropping the _mt suffix
-        all_folds.rename(columns={col: col[:-3] for col in all_folds.columns}, inplace=True)
-        
-        # 1893 for GVPL models since 
-        assert len(all_folds) == 1962, f"Missing rows in pred csv, {len(all_folds)}/1962 for {model_opt}"
-        
-        # dropping wt rows since those will be all zeros
-        all_folds = all_folds[all_folds.index.str.contains('_mt')]
-        # <<<<
-        
-        # taking subset if any
-        if subset: 
-            all_folds = all_folds[all_folds.index.isin(subset)]
-        
-        for fold in range(5):
-            def reformat_kwargs(model_kwargs):
-                return {
-                    'model': model_kwargs['model'],
-                    'data': model_kwargs['dataset'],
-                    'pro_feature': model_kwargs['feature_opt'],
-                    'edge': model_kwargs['edge_opt'],
-                    'batch_size': model_kwargs['batch_size'],
-                    'lr': model_kwargs['lr'],
-                    'dropout': model_kwargs['architecture_kwargs']['dropout'],
-                    'n_epochs': model_kwargs.get('n_epochs', 2000),  # Assuming a default value for n_epochs
-                    'pro_overlap': model_kwargs.get('pro_overlap', False),  # Assuming a default or None
-                    'fold': model_kwargs.get('fold', fold),  # Assuming a default or None
-                    'ligand_feature': model_kwargs['lig_feat_opt'],
-                    'ligand_edge': model_kwargs['lig_edge_opt']
-                }
-
-            model_kwargs = reformat_kwargs(TUNED_MODEL_CONFIGS[model_opt])
-            run = Loader.get_model_key(**model_kwargs)
-            metrics['run'].append(run)
-            
-            # create metrics df for plotting results
-            cindex, p_corr, s_corr, mse, mae, rmse = get_metrics(all_folds['y'], all_folds[f'y_pred_{fold}'])
-            metrics['cindex'].append(cindex)
-            metrics['pearson'].append(p_corr[0])
-            metrics['spearman'].append(s_corr[0])
-            metrics['mse'].append(mse)
-            metrics['mae'].append(mae)
-            metrics['rmse'].append(rmse)
-        
-    df_metrics = pd.DataFrame.from_dict(metrics)
-    prepare_df(df=df_metrics)
-    return df_metrics
+def platinum_DELTA_pkd_model_results(*args, **kwargs):
+    return platinum_pkd_model_results(*args, **kwargs, DELTA=False)
 
 #%%
 def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv'):
