@@ -302,10 +302,11 @@ def Platinum_run_inference():
     MODEL, model_kwargs =  Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
 
 
-    model_opts = ['davis_DG',    'davis_gvpl',   'davis_esm', 
-                'kiba_DG',     'kiba_esm',     'kiba_gvpl',
-                'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
-                'PDBbind_gvpl_aflow']
+    model_opts = [
+                    'davis_DG',    'davis_esm',    'davis_gvpl',   'davis_aflow',   'davis_gvpl_aflow', 
+                    'kiba_DG',     'kiba_esm',     'kiba_gvpl',    'kiba_aflow',    'kiba_gvpl_aflow',
+                    'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 'PDBbind_aflow', 'PDBbind_gvpl_aflow'
+                ]
     for model_opt in model_opts:
         loader = None
         for fold in range(5):
@@ -519,7 +520,6 @@ def platinum_RAW_pkd_model_results(*args, **kwargs) -> pd.DataFrame:
     """
     return platinum_pkd_model_results(*args, **kwargs, DELTA=False)
 
-#%%
 def platinum_DELTA_pkd_model_results(*args, **kwargs) -> pd.DataFrame:
     """
     Returns pandas dataframe for df input to `custom_fig` and similar figures methods
@@ -552,7 +552,6 @@ def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDat
             out_pocket.append(f'{i}_mt')
             
     return wt, in_pocket, out_pocket
-
 
 def resampling(
     subset_groups: Dict[str, List],
@@ -610,6 +609,7 @@ def resampling(
 
     return averaged_metrics
 
+#%%
 # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
 # size of the dataset doesnt impact metrics
 wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
