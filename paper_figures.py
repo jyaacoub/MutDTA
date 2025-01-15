@@ -7,6 +7,13 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+# FINAL LIST OF MODELS THAT WILL SHOW UP IN PAPER:
+MODEL_OPTS = [
+                'davis_DG',    'davis_esm',    'davis_gvpl',   'davis_aflow',   'davis_gvpl_aflow', 
+                'kiba_DG',     'kiba_esm',     'kiba_gvpl',    'kiba_aflow',    'kiba_gvpl_aflow',
+                'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 'PDBbind_aflow', 'PDBbind_gvpl_aflow'
+            ]
+
 #%% FIG 1 - TABLE FOR DATASET COUNTS 
 def get_USED_dataset_counts(SPLITS_CSVS="./splits/"):
     """Due to memory limitations a couple records were excluded from our runs this is the full count that were actually used"""
@@ -302,11 +309,7 @@ def Platinum_run_inference():
     MODEL, model_kwargs =  Loader.load_tuned_model('davis_esm', fold=0, device=DEVICE)
 
 
-    model_opts = [
-                    'davis_DG',    'davis_esm',    'davis_gvpl',   'davis_aflow',   'davis_gvpl_aflow', 
-                    'kiba_DG',     'kiba_esm',     'kiba_gvpl',    'kiba_aflow',    'kiba_gvpl_aflow',
-                    'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 'PDBbind_aflow', 'PDBbind_gvpl_aflow'
-                ]
+    model_opts = MODEL_OPTS
     for model_opt in model_opts:
         loader = None
         for fold in range(5):
@@ -406,10 +409,7 @@ def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predi
 #%%
 def platinum_pkd_model_results(pred_csv=
                                lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv",
-                               model_opts =['davis_DG',    'davis_gvpl',   'davis_esm', 
-                                            'kiba_DG',     'kiba_esm',     'kiba_gvpl',
-                                            'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
-                                            'PDBbind_gvpl_aflow'],
+                               model_opts = MODEL_OPTS,
                                normalized=True,
                                subset:list[str]=[],
                                DELTA=False): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
@@ -617,20 +617,54 @@ wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
 subset_groups = {
     "wt": wt,
     "mt_in": mt_in,
-    "mt_out": mt_out
+    "mt_out": mt_out,
+    "full_mt": list(set(mt_in + mt_out)),
+    "full": list(set(mt_in + mt_out + wt)),
 }
 
-# %%
-averaged_results = resampling(
-    subset_groups={k:v for k,v in subset_groups.items() if k != 'wt'},
+# gets metrics for ALL MODELS:
+averaged_results_delta = resampling(
+    subset_groups={k:v for k,v in subset_groups.items() if 'mt' in k},
     callable_pkd_model_results=platinum_DELTA_pkd_model_results,
     num_samples=10
 )
-
-# %%
-averaged_results = resampling(
+averaged_results_raw = resampling(
     subset_groups=subset_groups,
     callable_pkd_model_results=platinum_RAW_pkd_model_results,
     num_samples=10
 )
-# %%
+#%% Non stratified results
+import logging
+from matplotlib import pyplot as plt
+
+from src.analysis.figures import prepare_df, fig_combined, custom_fig
+
+df = averaged_results_raw['full']
+
+models = {
+    'DG': ('nomsa', 'binary', 'original', 'binary'),
+    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+    'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+}
+
+fig, axes = fig_combined(df, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig,
+            models=models, metrics=['cindex', 'mse'],
+            fig_scale=(10,5), add_stats=True, title_postfix=" Platinum dataset performance", box=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
