@@ -407,7 +407,7 @@ def platinum_RAW_pkd_model_results(pred_csv=
                                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
                                             'PDBbind_gvpl_aflow'],
                                normalized=True,
-                               platinum_filter=None): # platinum filtering for getting results for "only mutations in pocket" or other filters
+                               subset=[]): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
     """
     NOTE: CINDEX AND PEARSON WILL NOT BE IMPACTED BY NORMALIZATION
     RAW predictive performance on platinum
@@ -432,7 +432,13 @@ def platinum_RAW_pkd_model_results(pred_csv=
         if normalized:
             #z-score norm
             all_folds = (all_folds - np.mean(all_folds, axis=0)) / np.std(all_folds, axis=0)
+        
+        assert len(all_folds) == 1962, f"Missing rows in pred csv, {len(all_folds)}/1962 for {model_opt}"
 
+        # taking subset if any
+        if subset: 
+            all_folds = all_folds[all_folds.index.isin(subset)]
+        
         for fold in range(5):
             def reformat_kwargs(model_kwargs):
                 return {
@@ -476,7 +482,7 @@ def platinum_DELTA_pkd_model_results(pred_csv=
                                             'PDBbind_DG',  'PDBbind_esm',  'PDBbind_gvpl', 
                                             'PDBbind_gvpl_aflow'],
                                normalized=True,
-                               stratified=None):
+                               subset:list[str]=[]): # subset of platinum indicies to apply metrics to (useful for stratified results like "in or out of pocket" mutations)
     """
     NOTE: CINDEX AND PEARSON WILL NOT BE IMPACTED BY NORMALIZATION
     model's ability to predict the CHANGE in binding affinity
@@ -513,9 +519,16 @@ def platinum_DELTA_pkd_model_results(pred_csv=
         # dropping the _mt suffix
         all_folds.rename(columns={col: col[:-3] for col in all_folds.columns}, inplace=True)
         
+        # 1893 for GVPL models since 
+        assert len(all_folds) == 1962, f"Missing rows in pred csv, {len(all_folds)}/1962 for {model_opt}"
+        
         # dropping wt rows since those will be all zeros
         all_folds = all_folds[all_folds.index.str.contains('_mt')]
         # <<<<
+        
+        # taking subset if any
+        if subset: 
+            all_folds = all_folds[all_folds.index.isin(subset)]
         
         for fold in range(5):
             def reformat_kwargs(model_kwargs):
@@ -552,9 +565,42 @@ def platinum_DELTA_pkd_model_results(pred_csv=
     return df_metrics
 
 #%%
-print(platinum_DELTA_pkd_model_results(normalized=True).sort_values('cindex', ascending=False).head())
-platinum_DELTA_pkd_model_results(normalized=False).sort_values('cindex', ascending=False).head()
+def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv'):
+    """
+    df_raw['mut.in_binding_site'].value_counts()
+        YES    725
+        NO     256
+        Name: mut.in_binding_site, dtype: int64
+    
+    returns 3 lists corresponding to the following
+        0. wildtype rows
+        1. in pocket
+        2. outside of pocket
+    """
+    wt = []
+    in_pocket = []
+    out_pocket = []
+    df_raw = pd.read_csv(raw_csv, index_col=0)
+    for i, row in df_raw.iterrows():
+        wt.append(f'{i}_wt')
+        
+        if row['mut.in_binding_site'] == 'YES':
+            in_pocket.append(f'{i}_mt')
+        else:
+            out_pocket.append(f'{i}_mt')
+            
+    return wt, in_pocket, out_pocket
 
+wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
 # %%
-print(platinum_RAW_pkd_model_results(normalized=True).sort_values('cindex', ascending=False).head())
-platinum_RAW_pkd_model_results(normalized=False).sort_values('cindex', ascending=False).head()
+print("DELTA - mt_in")
+platinum_DELTA_pkd_model_results(subset=mt_in).sort_values('cindex', ascending=False).head()
+#%%
+print("DELTA - mt_out")
+platinum_DELTA_pkd_model_results(subset=mt_out).sort_values('cindex', ascending=False).head()
+# %%
+print("RAW - mt_in")
+platinum_RAW_pkd_model_results(subset=mt_in).sort_values('cindex', ascending=False).head()
+#%%
+print("RAW - mt_out")
+platinum_RAW_pkd_model_results(subset=mt_out).sort_values('cindex', ascending=False).head()
