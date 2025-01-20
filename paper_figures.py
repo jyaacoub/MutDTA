@@ -610,61 +610,128 @@ def resampling(
     return averaged_metrics
 
 #%%
-# mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
-# size of the dataset doesnt impact metrics
-wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
+def PLATINUM_RAW_PRED_FIGURE_MTvsWT():
+    # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
+    # size of the dataset doesnt impact metrics
+    wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
 
-subset_groups = {
-    "wt": wt,
-    "mt_in": mt_in,
-    "mt_out": mt_out,
-    "full_mt": list(set(mt_in + mt_out)),
-    "full": list(set(mt_in + mt_out + wt)),
-}
+    subset_groups = {
+        "wt": wt,
+        "mt_in": mt_in,
+        "mt_out": mt_out,
+        "full_mt": list(set(mt_in + mt_out)),
+        "full": list(set(mt_in + mt_out + wt)),
+    }
+    averaged_results_raw = resampling(
+        subset_groups=subset_groups,
+        callable_pkd_model_results=platinum_RAW_pkd_model_results,
+        num_samples=10
+    )
 
-# gets metrics for ALL MODELS:
-averaged_results_delta = resampling(
-    subset_groups={k:v for k,v in subset_groups.items() if 'mt' in k},
-    callable_pkd_model_results=platinum_DELTA_pkd_model_results,
-    num_samples=10
-)
-averaged_results_raw = resampling(
-    subset_groups=subset_groups,
-    callable_pkd_model_results=platinum_RAW_pkd_model_results,
-    num_samples=10
-)
-#%% Non stratified results
-import logging
-from matplotlib import pyplot as plt
+    from src.analysis.figures import fig_combined, custom_fig_stratified
 
-from src.analysis.figures import prepare_df, fig_combined, custom_fig
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+    }
 
-df = averaged_results_raw['full']
+    averaged_results_raw['All'] = averaged_results_raw['full']
+    averaged_results_raw['Only Mutated'] = averaged_results_raw['full_mt']
+    averaged_results_raw['Only Wildtypes'] = averaged_results_raw['wt']
 
-models = {
-    'DG': ('nomsa', 'binary', 'original', 'binary'),
-    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
-    'aflow': ('nomsa', 'aflow', 'original', 'binary'),
-    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
-    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
-}
+    fig, axes = fig_combined(averaged_results_raw, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, box=True,
+                suptitle="RAW predictive performance on Platinum", sharey='row',
+                selected_keys=['All', 'Only Mutated', 'Only Wildtypes']
+                )
+    
+def PLATINUM_RAW_PRED_FIGURE_POCKETS():
+    # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
+    # size of the dataset doesnt impact metrics
+    wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
 
-fig, axes = fig_combined(df, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig,
-            models=models, metrics=['cindex', 'mse'],
-            fig_scale=(10,5), add_stats=True, title_postfix=" Platinum dataset performance", box=True)
+    subset_groups = {
+        "wt": wt,
+        "mt_in": mt_in,
+        "mt_out": mt_out,
+        "full_mt": list(set(mt_in + mt_out)),
+        "full": list(set(mt_in + mt_out + wt)),
+    }
+    averaged_results_raw = resampling(
+        subset_groups=subset_groups,
+        callable_pkd_model_results=platinum_RAW_pkd_model_results,
+        num_samples=10
+    )
 
+    from src.analysis.figures import fig_combined, custom_fig_stratified
 
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+    }
 
+    averaged_results_raw['All'] = averaged_results_raw['full']
+    averaged_results_raw['In Pocket'] = averaged_results_raw['mt_in']
+    averaged_results_raw['Out of Pocket'] = averaged_results_raw['mt_in']
+    averaged_results_raw['Only Wildtypes'] = averaged_results_raw['wt']
 
+    fig, axes = fig_combined(averaged_results_raw, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, box=True,
+                suptitle="RAW predictive performance on Platinum", sharey='row',
+                selected_keys=['All','In Pocket','Out of Pocket','Only Wildtypes']
+                )
 
+def PLATINUM_DELTA_PRED_FIGURE_POCKETS():
+    # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
+    # size of the dataset doesnt impact metrics
+    from src.analysis.figures import fig_combined, custom_fig_stratified
+    
+    wt, mt_in, mt_out = platinum_mt_in_pocket_indicies()
 
+    subset_groups = {
+        "wt": wt,
+        "mt_in": mt_in,
+        "mt_out": mt_out,
+        "full_mt": list(set(mt_in + mt_out)),
+        "full": list(set(mt_in + mt_out + wt)),
+    }
 
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+    }
+    
+    # gets metrics for ALL MODELS:
+    averaged_results_delta = resampling(
+        subset_groups={k:v for k,v in subset_groups.items() if 'mt' in k},
+        callable_pkd_model_results=platinum_DELTA_pkd_model_results,
+        num_samples=10
+    )
+    averaged_results_delta['All Mutated'] = averaged_results_delta['full_mt']
+    averaged_results_delta['In pocket'] = averaged_results_delta['mt_in']
+    averaged_results_delta['Out of pocket'] = averaged_results_delta['mt_out']
 
+    fig, axes = fig_combined(averaged_results_delta, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, suptitle="DELTA predictive performance on Platinum", box=True,
+                selected_keys=['All Mutated', 'In pocket', 'Out of pocket'])
 
+#%%
+PLATINUM_RAW_PRED_FIGURE_POCKETS()
+#%%
+PLATINUM_DELTA_PRED_FIGURE_POCKETS()
 
-
-
-
-
-
-
+#%%
+PLATINUM_RAW_PRED_FIGURE_MTvsWT()
+# %%
