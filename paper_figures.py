@@ -189,7 +189,6 @@ def plot_Platinum_mutations_dist():
     plt.ylabel("Frequency")
     plt.tight_layout()
 
-#%%
 def plot_Platinum_delta_pkd_distribution_by_mutation_count():
     df = get_Platinum_dataset_counts().df
     df['pdb_id'] = df.prot_id.str.split("_").str[0]
@@ -237,7 +236,6 @@ def plot_Platinum_delta_pkd_distribution_by_mutation_count():
     plt.tight_layout()
     plt.show()
 
-#%%
 def plot_Platinum_pkd_distribution():
     df = get_Platinum_dataset_counts().df
     df['pdb_id'] = df.prot_id.str.split("_").str[0]
@@ -273,8 +271,7 @@ def plot_Platinum_pkd_distribution():
     plt.tight_layout()
     plt.show()
 
-#%%
-# FIG 3 - Platinum MODEL RESULTS
+#%% FIG 3 - Platinum MODEL RESULTS
 ###############################
 # - Run all 5 models through platinum and save predicted pkds as platinum_preds/<model_opt>_<fold>.csv
 def Platinum_run_inference():
@@ -406,7 +403,6 @@ def get_all_folds_df(pred_csv=lambda model_opt, fold: f"./results/platinum_predi
     all_folds['y_pred_avg'] = all_folds[[f'y_pred_{i}' for i in range(5)]].mean(axis=1)
     return all_folds
     
-#%%
 def platinum_pkd_model_results(pred_csv=
                                lambda model_opt, fold: f"./results/platinum_predictions/{model_opt}_{fold}.csv",
                                model_opts = MODEL_OPTS,
@@ -526,7 +522,6 @@ def platinum_DELTA_pkd_model_results(*args, **kwargs) -> pd.DataFrame:
     """
     return platinum_pkd_model_results(*args, **kwargs, DELTA=True)
 
-#%%
 def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv'):
     """
     df_raw['mut.in_binding_site'].value_counts()
@@ -640,7 +635,6 @@ def resampling(
 
     return averaged_metrics
 
-#%%
 def PLATINUM_RAW_PRED_FIGURE_MTvsWT():
     # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
     # size of the dataset doesnt impact metrics
@@ -679,7 +673,7 @@ def PLATINUM_RAW_PRED_FIGURE_MTvsWT():
                 selected_keys=['All', 'Only Mutated', 'Only Wildtypes']
                 )
 
-#%% In/ out of pocket stratification
+# In/ out of pocket stratification
 def PLATINUM_RAW_PRED_FIGURE_POCKETS():
     # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
     # size of the dataset doesnt impact metrics
@@ -756,7 +750,7 @@ def PLATINUM_DELTA_PRED_FIGURE_POCKETS():
                 fig_scale=(10,5), add_stats=True, suptitle="DELTA predictive performance on Platinum", box=True,
                 selected_keys=['All Mutated', 'In pocket', 'Out of pocket'])
 
-#%% MUT COUNT STRATIFICATION
+# MUT COUNT STRATIFICATION
 def PLATINUM_RAW_PRED_FIGURE_mutcount():
     from src.analysis.figures import fig_combined, custom_fig_stratified
     
@@ -827,7 +821,6 @@ def PLATINUM_DELTA_PRED_FIGURE_mutcount():
                 models=models, metrics=['cindex', 'mse'],
                 fig_scale=(10,5), add_stats=True, suptitle="DELTA predictive performance on Platinum", box=True,
                 selected_keys=['All Mutated', 'Single Mutation', '2+ Mutations'])
-
 
 #%%
 print("RAW PRED FIGURE MT vs WT")
