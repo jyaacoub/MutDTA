@@ -556,7 +556,7 @@ def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDat
 def resampling(
     subset_groups: Dict[str, List],
     callable_pkd_model_results: Callable[[List], pd.DataFrame],
-    num_samples: int = 10,
+    num_samples: int = 20,
 ) -> Dict[str, pd.DataFrame]:
     """
     Calculate averaged results over multiple random samples for multiple groups.
@@ -624,8 +624,7 @@ def PLATINUM_RAW_PRED_FIGURE_MTvsWT():
     }
     averaged_results_raw = resampling(
         subset_groups=subset_groups,
-        callable_pkd_model_results=platinum_RAW_pkd_model_results,
-        num_samples=10
+        callable_pkd_model_results=platinum_RAW_pkd_model_results
     )
 
     from src.analysis.figures import fig_combined, custom_fig_stratified
@@ -663,8 +662,7 @@ def PLATINUM_RAW_PRED_FIGURE_POCKETS():
     }
     averaged_results_raw = resampling(
         subset_groups=subset_groups,
-        callable_pkd_model_results=platinum_RAW_pkd_model_results,
-        num_samples=10
+        callable_pkd_model_results=platinum_RAW_pkd_model_results
     )
 
     from src.analysis.figures import fig_combined, custom_fig_stratified
@@ -715,8 +713,7 @@ def PLATINUM_DELTA_PRED_FIGURE_POCKETS():
     # gets metrics for ALL MODELS:
     averaged_results_delta = resampling(
         subset_groups={k:v for k,v in subset_groups.items() if 'mt' in k},
-        callable_pkd_model_results=platinum_DELTA_pkd_model_results,
-        num_samples=10
+        callable_pkd_model_results=platinum_DELTA_pkd_model_results
     )
     averaged_results_delta['All Mutated'] = averaged_results_delta['full_mt']
     averaged_results_delta['In pocket'] = averaged_results_delta['mt_in']
@@ -731,7 +728,6 @@ def PLATINUM_DELTA_PRED_FIGURE_POCKETS():
 PLATINUM_RAW_PRED_FIGURE_POCKETS()
 #%%
 PLATINUM_DELTA_PRED_FIGURE_POCKETS()
-
 #%%
 PLATINUM_RAW_PRED_FIGURE_MTvsWT()
-# %%
+
