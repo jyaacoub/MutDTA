@@ -553,6 +553,37 @@ def platinum_mt_in_pocket_indicies(raw_csv='/home/jean/projects/data/PlatinumDat
             
     return wt, in_pocket, out_pocket
 
+def platinum_012mutations_indicies(raw_csv='/home/jean/projects/data/PlatinumDataset/raw/platinum_flat_file.csv'):
+    """
+    df['mutation'].str.split("/").str.len().value_counts()
+        1    772
+        2    154
+        3     30
+        4     12
+        5      7
+        6      6
+        Name: mutation, dtype: int64
+    
+    returns 3 lists corresponding to the following
+        0. wildtype
+        1. single point mutation
+        2. 2 or more mutations
+    """
+    wt = []
+    single_mt = []
+    multi_mt = []
+    df_raw = pd.read_csv(raw_csv, index_col=0)
+    df_raw['n_mut'] = df_raw['mutation'].str.split("/").str.len()
+    for i, row in df_raw.iterrows():
+        wt.append(f'{i}_wt')
+        
+        if row['n_mut'] == 1:
+            single_mt.append(f'{i}_mt')
+        else:
+            multi_mt.append(f'{i}_mt')
+            
+    return wt, single_mt, multi_mt
+
 def resampling(
     subset_groups: Dict[str, List],
     callable_pkd_model_results: Callable[[List], pd.DataFrame],
@@ -647,7 +678,8 @@ def PLATINUM_RAW_PRED_FIGURE_MTvsWT():
                 suptitle="RAW predictive performance on Platinum", sharey='row',
                 selected_keys=['All', 'Only Mutated', 'Only Wildtypes']
                 )
-    
+
+#%% In/ out of pocket stratification
 def PLATINUM_RAW_PRED_FIGURE_POCKETS():
     # mt_in is a larger subset than mt_out so we need to do some resampling to ensure that the 
     # size of the dataset doesnt impact metrics
@@ -724,10 +756,81 @@ def PLATINUM_DELTA_PRED_FIGURE_POCKETS():
                 fig_scale=(10,5), add_stats=True, suptitle="DELTA predictive performance on Platinum", box=True,
                 selected_keys=['All Mutated', 'In pocket', 'Out of pocket'])
 
-#%%
-PLATINUM_RAW_PRED_FIGURE_POCKETS()
-#%%
-PLATINUM_DELTA_PRED_FIGURE_POCKETS()
-#%%
-PLATINUM_RAW_PRED_FIGURE_MTvsWT()
+#%% MUT COUNT STRATIFICATION
+def PLATINUM_RAW_PRED_FIGURE_mutcount():
+    from src.analysis.figures import fig_combined, custom_fig_stratified
+    
+    wt, single_mt, multi_mt = platinum_012mutations_indicies()
 
+    subset_groups = {
+        "wt": wt,
+        "single_mt": single_mt,
+        "multi_mt": multi_mt,
+        "full_mt": list(set(single_mt + multi_mt)),
+        "full": list(set(wt + single_mt + multi_mt)),
+    }
+
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+    }
+    
+    # gets metrics for ALL MODELS:
+    averaged_results_raw = resampling(
+        subset_groups=subset_groups,
+        callable_pkd_model_results=platinum_RAW_pkd_model_results
+    )
+    averaged_results_raw['Wildtype'] = averaged_results_raw['wt']
+    averaged_results_raw['All Mutated'] = averaged_results_raw['full_mt']
+    averaged_results_raw['Single Mutation'] = averaged_results_raw['single_mt']
+    averaged_results_raw['2+ Mutations'] = averaged_results_raw['multi_mt']
+
+    fig, axes = fig_combined(averaged_results_raw, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, suptitle="RAW predictive performance on Platinum", box=True,
+                selected_keys=['All Mutated', 'Wildtype', 'Single Mutation', '2+ Mutations'])
+    
+def PLATINUM_DELTA_PRED_FIGURE_mutcount():
+    from src.analysis.figures import fig_combined, custom_fig_stratified
+    
+    wt, single_mt, multi_mt = platinum_012mutations_indicies()
+
+    subset_groups = {
+        "wt": wt,
+        "single_mt": single_mt,
+        "multi_mt": multi_mt,
+        "full_mt": list(set(single_mt + multi_mt)),
+        "full": list(set(wt + single_mt + multi_mt)),
+    }
+
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+    }
+    
+    # gets metrics for ALL MODELS:
+    averaged_results_delta = resampling(
+        subset_groups={k:v for k,v in subset_groups.items() if 'mt' in k},
+        callable_pkd_model_results=platinum_DELTA_pkd_model_results
+    )
+    averaged_results_delta['All Mutated'] = averaged_results_delta['full_mt']
+    averaged_results_delta['Single Mutation'] = averaged_results_delta['single_mt']
+    averaged_results_delta['2+ Mutations'] = averaged_results_delta['multi_mt']
+
+    fig, axes = fig_combined(averaged_results_delta, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, suptitle="DELTA predictive performance on Platinum", box=True,
+                selected_keys=['All Mutated', 'Single Mutation', '2+ Mutations'])
+
+    
+#%%
+PLATINUM_RAW_PRED_FIGURE_mutcount()
+
+#%%
+PLATINUM_DELTA_PRED_FIGURE_mutcount()
