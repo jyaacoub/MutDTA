@@ -587,7 +587,7 @@ def platinum_012mutations_indicies(raw_csv='/home/jean/projects/data/PlatinumDat
 def resampling(
     subset_groups: Dict[str, List],
     callable_pkd_model_results: Callable[[List], pd.DataFrame],
-    num_samples: int = 20,
+    num_samples: int = 100,
 ) -> Dict[str, pd.DataFrame]:
     """
     Calculate averaged results over multiple random samples for multiple groups.
@@ -828,9 +828,19 @@ def PLATINUM_DELTA_PRED_FIGURE_mutcount():
                 fig_scale=(10,5), add_stats=True, suptitle="DELTA predictive performance on Platinum", box=True,
                 selected_keys=['All Mutated', 'Single Mutation', '2+ Mutations'])
 
-    
-#%%
-PLATINUM_RAW_PRED_FIGURE_mutcount()
 
+#%%
+print("RAW PRED FIGURE MT vs WT")
+PLATINUM_RAW_PRED_FIGURE_MTvsWT()
+
+#%%
+print("IN/OUT POCKET FIGURES:")
+PLATINUM_RAW_PRED_FIGURE_POCKETS()
+#%%
+PLATINUM_DELTA_PRED_FIGURE_POCKETS()
+
+#%%
+print("MUT COUNT FIGURES:")
+PLATINUM_RAW_PRED_FIGURE_mutcount()
 #%%
 PLATINUM_DELTA_PRED_FIGURE_mutcount()
