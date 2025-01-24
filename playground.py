@@ -1,56 +1,31 @@
 #%%
-from src.data_prep.datasets import PlatinumDataset
-from src import cfg
-import logging
-logging.getLogger().setLevel(logging.DEBUG)
-
-#%%
-dataset = PlatinumDataset(
-        save_root=  f'/home/jean/projects/data/PlatinumDataset/',
-        data_root=  f'/home/jean/projects/data/PlatinumDataset/raw',
-        af_conf_dir=f'/home/jean/projects/data/PlatinumDataset/raw/alphaflow_io/out_pdb_MD-distilled/',
-        aln_dir=None,
-        cmap_threshold=8.0,
-        
-        feature_opt=cfg.PRO_FEAT_OPT.nomsa,
-        edge_opt=cfg.PRO_EDGE_OPT.aflow,
-        ligand_feature=cfg.LIG_FEAT_OPT.gvp,
-        ligand_edge=cfg.LIG_EDGE_OPT.binary,
-        subset=None)
-
-#%%
 import logging
 from matplotlib import pyplot as plt
 
-from src.analysis.figures import prepare_df, fig_combined, custom_fig
+from src.analysis.figures import prepare_df,  custom_fig
 
-dft = prepare_df('./v103/results/model_media/model_stats.csv')
-dfv = prepare_df('./v103/results/model_media/model_stats_val.csv')
+
+from src.analysis.figures import fig_combined, custom_fig_stratified
+
 
 models = {
     'DG': ('nomsa', 'binary', 'original', 'binary'),
-    # 'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
     'aflow': ('nomsa', 'aflow', 'original', 'binary'),
-    # 'gvpP': ('gvp', 'binary', 'original', 'binary'),
-    # 'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
-    # 'aflow_ring3': ('nomsa', 'aflow_ring3', 'original', 'binary'),
-    # 'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
-    # 'gvpl_esm':('ESM', 'binary', 'gvp', 'binary'),
-    # 'gvpL_aflow_rng3': ('nomsa', 'aflow_ring3', 'gvp', 'binary'),
-    #GVPL_ESMM_davis3D_nomsaF_aflowE_48B_0.00010636872718329864LR_0.23282479481785903D_2000E_gvpLF_binaryLE
-    # 'gvpl_esm_aflow': ('ESM', 'aflow', 'gvp', 'binary'),
+    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
 }
 
-fig, axes = fig_combined(dft, datasets=['PDBbind'], fig_callable=custom_fig,
+results = {
+    'Full Protein': prepare_df('./results/model_media/model_stats.csv'),
+    'Pocket': prepare_df('./results/v103/model_media/model_stats.csv')
+}
+
+fig, axes = fig_combined(results, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
             models=models, metrics=['cindex', 'mse'],
-            fig_scale=(10,5), add_stats=True, title_postfix=" test set performance", box=True)
-plt.xticks(rotation=45)
-
-# fig, axes = fig_combined(dfv, datasets=['davis'], fig_callable=custom_fig,
-#             models=models, metrics=['cindex', 'mse'],
-#             fig_scale=(10,5), add_stats=True, title_postfix=" validation set performance", box=True, fold_labels=True)
-# plt.xticks(rotation=45)
-
+            fig_scale=(10,5), add_stats=True, box=True,
+            suptitle="Predictive performance on pocket representation vs full representation",
+            selected_keys=['Full Protein', 'Pocket'])
 
 #%%
 import os

@@ -147,6 +147,33 @@ def plot_model_results(stats_csv="./results/model_media/model_stats.csv", title_
         axes[i][0].yaxis.get_label().set_size(axis_label_size)
     plt.tight_layout(pad=2)
 
+def plot_model_results_pocket_rep():
+    # see issue #103
+    from src.analysis.figures import fig_combined, custom_fig_stratified
+
+
+    models = {
+        'DG': ('nomsa', 'binary', 'original', 'binary'),
+        # 'esm': ('ESM', 'binary', 'original', 'binary'), # no esm model for pocket rep
+        'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+        # 'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+        # 'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # these too also dont have pocket rep
+    }
+
+    results = {
+        'Full Protein': prepare_df('./results/model_media/model_stats.csv'),
+        'Pocket': prepare_df('./results/v103/model_media/model_stats.csv')
+    }
+
+    fig, axes = fig_combined(results, datasets=['davis', 'kiba'],#,'PDBbind'],  # no PDBbind pocket data unfortunately
+                fig_callable=custom_fig_stratified,
+                models=models, metrics=['cindex', 'mse'],
+                fig_scale=(10,5), add_stats=True, box=True,
+                suptitle="Predictive performance on pocket representation vs full representation",
+                selected_keys=['Full Protein', 'Pocket'])
+
+plot_model_results_pocket_rep()
+
 
 ##########################################################
 #%% FIG 3 - PLATINUM DATASET - RESULTS
