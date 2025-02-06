@@ -53,7 +53,8 @@ def make_restraints(mdl1, aln):
                 spline_on_site=True)
 
 
-def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_fp:str=None, overwrite=False):
+def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_fp:str=None, overwrite=False, 
+                 n_attempts=5):
     """
     Takes in the model path (excluding .pdb extension) and the residue index to 
     change and the new residue. Outputs to same dir as "{modelname}-{respos}_restype.pdb"
@@ -64,6 +65,7 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_fp:st
         restyp (str): 3 letter residue name for what to change into
         chain (str): Single character chain identifier.
         out_path (str): output path for pdb file to override default of "{modelname}-{respos}_restype.pdb".
+        n_attempts (int): number of attempts to try for aleviating steric clashes
     """
     modelname = modelname.split('.pdb')[0]
     if out_fp and modelname == out_fp.split('.pdb')[0]:
@@ -79,105 +81,113 @@ def run_modeller(modelname:str, respos:int|str, restyp:str, chain:str, out_fp:st
     OUT_FILE_PATH = out_fp or f"{modelname}-{restyp}_{respos}.pdb"
     
     # Set a different value for rand_seed to get a different final model
-    env = Environ(rand_seed=-49837)
+    while n_attempts > 0:
+        env = Environ(rand_seed=-49837+n_attempts)
 
-    env.io.hetatm = True
-    #soft sphere potential
-    env.edat.dynamic_sphere=False
-    #lennard-jones potential (more accurate)
-    env.edat.dynamic_lennard=True
-    env.edat.contact_shell = 4.0
-    env.edat.update_dynamic = 0.39
+        env.io.hetatm = True
+        #soft sphere potential
+        env.edat.dynamic_sphere=False
+        #lennard-jones potential (more accurate)
+        env.edat.dynamic_lennard=True
+        env.edat.contact_shell = 4.0
+        env.edat.update_dynamic = 0.39
 
-    # Read customized topology file with phosphoserines (or standard one)
-    env.libs.topology.read(file='$(LIB)/top_heav.lib')
+        # Read customized topology file with phosphoserines (or standard one)
+        env.libs.topology.read(file='$(LIB)/top_heav.lib')
 
-    # Read customized CHARMM parameter library with phosphoserines (or standard one)
-    env.libs.parameters.read(file='$(LIB)/par.lib')
-
-
-    # Read the original PDB file and copy its sequence to the alignment array:
-    mdl1 = Model(env, file=modelname)
-    ali = Alignment(env)
-    ali.append_model(mdl1, atom_files=modelname, align_codes=modelname)
-
-    #set up the mutate residue selection segment
-    s = Selection(mdl1.chains[chain].residues[respos])
-
-    #perform the mutate residue operation
-    s.mutate(residue_type=restyp)
-    #get two copies of the sequence.  A modeller trick to get things set up
-    ali.append_model(mdl1, align_codes=modelname)
-
-    # Generate molecular topology for mutant
-    mdl1.clear_topology()
-    mdl1.generate_topology(ali[-1])
+        # Read customized CHARMM parameter library with phosphoserines (or standard one)
+        env.libs.parameters.read(file='$(LIB)/par.lib')
 
 
-    # Transfer all the coordinates you can from the template native structure
-    # to the mutant (this works even if the order of atoms in the native PDB
-    # file is not standard):
-    #here we are generating the model by reading the template coordinates
-    mdl1.transfer_xyz(ali)
+        # Read the original PDB file and copy its sequence to the alignment array:
+        mdl1 = Model(env, file=modelname)
+        ali = Alignment(env)
+        ali.append_model(mdl1, atom_files=modelname, align_codes=modelname)
 
-    # Build the remaining unknown coordinates
-    mdl1.build(initialize_xyz=False, build_method='INTERNAL_COORDINATES')
+        #set up the mutate residue selection segment
+        s = Selection(mdl1.chains[chain].residues[respos])
 
-    #yes model2 is the same file as model1.  It's a modeller trick.
-    mdl2 = Model(env, file=modelname)
+        #perform the mutate residue operation
+        s.mutate(residue_type=restyp)
+        #get two copies of the sequence.  A modeller trick to get things set up
+        ali.append_model(mdl1, align_codes=modelname)
 
-    #required to do a transfer_res_numb
-    #ali.append_model(mdl2, atom_files=modelname, align_codes=modelname)
-    #transfers from "model 2" to "model 1"
-    mdl1.res_num_from(mdl2,ali)
+        # Generate molecular topology for mutant
+        mdl1.clear_topology()
+        mdl1.generate_topology(ali[-1])
 
-    #It is usually necessary to write the mutated sequence out and read it in
-    #before proceeding, because not all sequence related information about MODEL
-    #is changed by this command (e.g., internal coordinates, charges, and atom
-    #types and radii are not updated).
-    mdl1.write(file=TMP_FILE_PATH)
-    mdl1.read(file=TMP_FILE_PATH)
 
-    #set up restraints before computing energy
-    #we do this a second time because the model has been written out and read in,
-    #clearing the previously set restraints
-    make_restraints(mdl1, ali)
+        # Transfer all the coordinates you can from the template native structure
+        # to the mutant (this works even if the order of atoms in the native PDB
+        # file is not standard):
+        #here we are generating the model by reading the template coordinates
+        mdl1.transfer_xyz(ali)
 
-    #a non-bonded pair has to have at least as many selected atoms
-    mdl1.env.edat.nonbonded_sel_atoms=1
+        # Build the remaining unknown coordinates
+        mdl1.build(initialize_xyz=False, build_method='INTERNAL_COORDINATES')
 
-    sched = autosched.loop.make_for_model(mdl1)
+        #yes model2 is the same file as model1.  It's a modeller trick.
+        mdl2 = Model(env, file=modelname)
 
-    #only optimize the selected residue (in first pass, just atoms in selected
-    #residue, in second pass, include nonbonded neighboring atoms)
-    #set up the mutate residue selection segment
-    s = Selection(mdl1.chains[chain].residues[respos])
+        #required to do a transfer_res_numb
+        #ali.append_model(mdl2, atom_files=modelname, align_codes=modelname)
+        #transfers from "model 2" to "model 1"
+        mdl1.res_num_from(mdl2,ali)
 
-    mdl1.restraints.unpick_all()
-    mdl1.restraints.pick(s)
+        #It is usually necessary to write the mutated sequence out and read it in
+        #before proceeding, because not all sequence related information about MODEL
+        #is changed by this command (e.g., internal coordinates, charges, and atom
+        #types and radii are not updated).
+        mdl1.write(file=TMP_FILE_PATH)
+        mdl1.read(file=TMP_FILE_PATH)
 
-    s.energy()
+        #set up restraints before computing energy
+        #we do this a second time because the model has been written out and read in,
+        #clearing the previously set restraints
+        make_restraints(mdl1, ali)
 
-    s.randomize_xyz(deviation=4.0)
+        #a non-bonded pair has to have at least as many selected atoms
+        mdl1.env.edat.nonbonded_sel_atoms=1
 
-    mdl1.env.edat.nonbonded_sel_atoms=2
-    optimize(s, sched)
+        sched = autosched.loop.make_for_model(mdl1)
 
-    #feels environment (energy computed on pairs that have at least one member
-    #in the selected)
-    mdl1.env.edat.nonbonded_sel_atoms=1
-    optimize(s, sched)
+        #only optimize the selected residue (in first pass, just atoms in selected
+        #residue, in second pass, include nonbonded neighboring atoms)
+        #set up the mutate residue selection segment
+        s = Selection(mdl1.chains[chain].residues[respos])
 
-    s.energy()
+        mdl1.restraints.unpick_all()
+        mdl1.restraints.pick(s)
 
-    #give a proper name
-    mdl1.write(file=OUT_FILE_PATH)
+        s.energy()
 
-    #delete the temporary file
-    os.remove(TMP_FILE_PATH)
-    return OUT_FILE_PATH
+        s.randomize_xyz(deviation=4.0)
 
-def run_modeller_multiple(modelname, mutations, chain="A", out_fp=None, check_refmatch=True):
+        mdl1.env.edat.nonbonded_sel_atoms=2
+        try:
+            optimize(s, sched)
+        except OverflowError as e: # failed once
+            if n_attempts == 0:
+                raise e
+            print("Overflow error - trying again")
+            n_attempts -= 1
+            continue
+
+        #feels environment (energy computed on pairs that have at least one member
+        #in the selected)
+        mdl1.env.edat.nonbonded_sel_atoms=1
+        optimize(s, sched)
+
+        s.energy()
+
+        #give a proper name
+        mdl1.write(file=OUT_FILE_PATH)
+
+        #delete the temporary file
+        os.remove(TMP_FILE_PATH)
+        return OUT_FILE_PATH
+
+def run_modeller_multiple(modelname, mutations, chain="A", out_fp=None, check_refmatch=True, **kwargs):
     """
     Runs Modeller on a PDB file multiple times to apply all specified mutations and output a final PDB file.
 
@@ -224,6 +234,7 @@ def run_modeller_multiple(modelname, mutations, chain="A", out_fp=None, check_re
                         restyp=ResInfo.code_to_pep[mut], 
                         chain=chain, 
                         out_fp=out_fp,
-                        overwrite=True)
+                        overwrite=True,
+                        **kwargs)
             modelname = out_fp
     return out_fp

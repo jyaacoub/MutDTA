@@ -319,11 +319,11 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
             - pid,  matching_code - has the correct number of conf files but is not the correct sequence.
             - None, matching_code - correct seq, # of confs, but under a different file name
         """
-        pid, seq, af_conf_dir, is_pdbbind, files = args
+        pid, seq, af_conf_dir, is_pdbbind_aflow, files = args
         MIN_MODEL_COUNT = 5
         
         af_confs = []
-        if is_pdbbind:
+        if is_pdbbind_aflow: # aflow models will only have 1 pdb and should be tied to the pid
             fp = os.path.join(af_conf_dir, f'{pid}.pdb')
             if os.path.exists(fp):
                 af_confs = [os.path.join(af_conf_dir, f'{pid}.pdb')]
@@ -347,18 +347,18 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         return None, None
             
     @staticmethod
-    def check_missing_confs(df_unique:pd.DataFrame, af_conf_dir:str, is_pdbbind=False):
+    def check_missing_confs(df_unique:pd.DataFrame, af_conf_dir:str, is_pdbbind_aflow=False):
         logging.debug(f'Getting af_confs from {af_conf_dir}')
 
         missing = set()
         mismatched = {}
         # total of 3728 unique proteins with alphaflow confs (named by pdb ID)
         files = None
-        if not is_pdbbind:
+        if not is_pdbbind_aflow:
             files = [f for f in os.listdir(af_conf_dir) if f.endswith('.pdb')]
 
         with Pool(processes=cpu_count()) as pool:
-            tasks = [(pid, seq, af_conf_dir, is_pdbbind, files) \
+            tasks = [(pid, seq, af_conf_dir, is_pdbbind_aflow, files) \
                             for _, (pid, seq) in df_unique[['prot_id', 'prot_seq']].iterrows()]
 
             for pid, correct_seq in tqdm(pool.imap_unordered(BaseDataset.process_protein_multiprocessing, tasks), 
@@ -394,7 +394,8 @@ class BaseDataset(torchg.data.InMemoryDataset, abc.ABC):
         missing = set()
         mismatched = {}
         if self.pro_edge_opt in cfg.OPT_REQUIRES_CONF:
-            missing, mismatched = self.check_missing_confs(df_unique, self.af_conf_dir, self.__class__ is PDBbindDataset)
+            missing, mismatched = self.check_missing_confs(df_unique, self.af_conf_dir, (self.__class__ is PDBbindDataset or 
+                                                                                         "aflow" in self.pro_edge_opt))
         
         if len(missing) > 0:
             filtered_df = df[~df.prot_id.isin(missing)]
@@ -1093,7 +1094,8 @@ class PlatinumDataset(BaseDataset):
         # in order of download/creation:
         return ['platinum_flat_file.csv',# downloaded from website
                 'platinum_pdb',
-                'platinum_sdf']
+                'platinum_sdf',
+                'done_downloading.json']
     
     def download(self):
         """Download the raw data for the dataset."""
@@ -1130,6 +1132,7 @@ class PlatinumDataset(BaseDataset):
             raise ValueError('Error downloading pdb files from PLATINUM website:\n' + str(e))
         
         # validate that all files are there and download any missing pdbs:
+        downloaded = {'pdbs': {}, 'sdfs': {}}
         for i, row in tqdm(df_raw.iterrows(), 
                            desc='Checking pdb files and downloading missing',
                            total=len(df_raw)):
@@ -1142,16 +1145,18 @@ class PlatinumDataset(BaseDataset):
             assert not (missing_mt and missing_wt), f'missing pdbs for both mt and wt on idx {i}'
             
             # Download if file doesnt exist:
-            if not missing_wt and (not os.path.isfile(self.pdb_p(pdb_wt))):
-                Downloader.download_PDBs([pdb_wt], save_dir=self.raw_paths[1], tqdm_disable=True)
-            if not missing_mt and (not os.path.isfile(self.pdb_p(pdb_mt))):
-                Downloader.download_PDBs([pdb_mt], save_dir=self.raw_paths[1], tqdm_disable=True)
+            if not missing_wt and (self.pdb_p(pdb_wt, id_is_pdb=True) is None): # returns None if file doesnt exist
+                id_status = Downloader.download_PDBs([pdb_wt], save_dir=self.raw_paths[1], tqdm_disable=True)
+                downloaded['pdbs'][pdb_wt] = id_status[pdb_wt]
+            if not missing_mt and (self.pdb_p(pdb_mt, id_is_pdb=True) is None):
+                id_status = Downloader.download_PDBs([pdb_mt], save_dir=self.raw_paths[1], tqdm_disable=True)
+                downloaded['pdbs'][pdb_mt] = id_status[pdb_mt]
             
         # Download corrected SMILEs since the ones provided in the csv file have issues 
         # (see https://github.com/jyaacoub/MutDTA/issues/27)
         os.makedirs(self.raw_paths[2], exist_ok=True)
-        print('Downloading SDF files for ligands.')
-        Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
+        print(f'Downloading SDF files for ligands to {self.raw_paths[2]}')
+        downloaded['sdfs'] = Downloader.download_SDFs(ligand_ids=df_raw['affin.lig_id'].unique(),
                                 save_dir=self.raw_paths[2])
         
         # Fixing smiles in csv file using downloaded sdf files        
@@ -1159,6 +1164,10 @@ class PlatinumDataset(BaseDataset):
                             lambda x: os.path.join(self.raw_paths[2], f'{x}.sdf'))
         df_raw['smiles'] = df_raw['affin.lig_id'].map(smiles_dict)
         df_raw.to_csv(self.raw_paths[0])
+        
+        # write to done_downloading.txt
+        with open(self.raw_paths[3], 'w') as f: 
+            f.write(json.dumps(downloaded, indent=4))
     
     def _get_prot_structure(self, muts, pdb_wt, pdb_mt, t_chain):
         # Check if PDBs available (need at least 1 for sequence info)
@@ -1236,8 +1245,8 @@ class PlatinumDataset(BaseDataset):
         ### LOAD UP RAW CSV FILE + adjust values ###
         df_raw = pd.read_csv(self.raw_paths[0])
         # fixing pkd values for binding affinity
-        df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'(\d+\.*\d+)', 
-                                                      expand=False).astype(float)
+        df_raw['affin.k_mt'] = df_raw['affin.k_mt'].str.extract(r'[<>=]*(.*\d+)', 
+                                                                expand=False).astype(float)
         # adjusting units for binding data from nM to pKd:
         df_raw['affin.k_mt'] = -np.log10(df_raw['affin.k_mt']*1e-9)
         df_raw['affin.k_wt'] = -np.log10(df_raw['affin.k_wt']*1e-9)

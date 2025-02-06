@@ -1,4 +1,33 @@
 #%%
+import logging
+from matplotlib import pyplot as plt
+
+from src.analysis.figures import prepare_df,  custom_fig
+
+
+from src.analysis.figures import fig_combined, custom_fig_stratified
+
+
+models = {
+    'DG': ('nomsa', 'binary', 'original', 'binary'),
+    'esm': ('ESM', 'binary', 'original', 'binary'), # esm model
+    'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+    'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+    'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'), # works best with PDBbind
+}
+
+results = {
+    'Full Protein': prepare_df('./results/model_media/model_stats.csv'),
+    'Pocket': prepare_df('./results/v103/model_media/model_stats.csv')
+}
+
+fig, axes = fig_combined(results, datasets=['davis', 'kiba','PDBbind'], fig_callable=custom_fig_stratified,
+            models=models, metrics=['cindex', 'mse'],
+            fig_scale=(10,5), add_stats=True, box=True,
+            suptitle="Predictive performance on pocket representation vs full representation",
+            selected_keys=['Full Protein', 'Pocket'])
+
+#%%
 import os
 print("os.env.TRANSFORMERS_CACHE - ", os.environ.get('TRANSFORMERS_CACHE'))
 print("           os.env.HF_HOME - ", os.environ.get('HF_HOME'))
@@ -297,3 +326,6 @@ from src.train_test.training import train
 
 logs = train(model, loaders['train'], loaders['val'], device, 
             epochs=NUM_EPOCHS, lr_0=LEARNING_RATE)
+
+
+

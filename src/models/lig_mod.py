@@ -13,7 +13,6 @@ class ChemDTA(DGraphDTA):
     def __init__(self, mol_output_dim=128, dropout=0.2, *args, **kwargs):
         super(ChemDTA, self).__init__(dropout=dropout, edge_weight_opt='binary', *args, **kwargs)
 
-        print('DGraphDTA Loaded')
         num_features_mol = 128
         
         #### ChemGPT ####
@@ -66,7 +65,6 @@ class ChemEsmDTA(EsmDTA):
     def __init__(self, mol_output_dim=128, dropout=0.2, *args, **kwargs):
         super(ChemEsmDTA, self).__init__(dropout=dropout, edge_weight_opt='binary', *args, **kwargs)
 
-        print('DGraphDTA Loaded')
         num_features_mol = 128
         
         #### ChemGPT ####

@@ -341,50 +341,6 @@ def fig6_protein_appearance(datasets=['kiba', 'PDBbind'], show=False):
     
     if show: plt.show()
     
-    
-def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], 
-                  fig_callable=fig4_pro_feat_violin, fig_scale=(5,4),
-                  show=False, title_postfix='', **kwargs):    
-    # Create subplots with datasets as columns and metrics as rows
-    fig, axes = plt.subplots(len(metrics), len(datasets), 
-                             figsize=(fig_scale[0]*len(datasets), 
-                                      fig_scale[1]*len(metrics)))
-    for i, dataset in enumerate(datasets):
-        for j, metric in enumerate(metrics):
-            # Set current subplot                
-            if len(datasets) == 1 and len(metrics) == 1:
-                ax = axes
-            elif len(datasets) == 1:
-                ax = axes[j]
-            elif len(metrics) == 1:
-                ax = axes[i]
-            else:
-                ax = axes[j, i]
-
-            fig_callable(df, sel_col=metric, sel_dataset=dataset, show=False, 
-                         ax=ax, **kwargs)
-                        
-            # Add titles only to the top row and left column
-            if j == 0:
-                ax.set_title(f'{dataset}{title_postfix}')
-                ax.set_xlabel('')
-                ax.set_xticklabels([])
-            elif j < len(metrics)-1: # middle row
-                ax.set_xlabel('')
-                ax.set_xticklabels([])
-                ax.set_title('')
-            else: # bottom row
-                ax.set_title('')
-            
-            if i == 0:
-                ax.set_ylabel(metric)
-            else:
-                ax.set_ylabel('')
-                
-    plt.tight_layout() # Adjust layout to prevent clipping of titles
-    if show: plt.show()
-    return fig, axes
-
 def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cindex', 
                    verbose=False, show=False, add_stats=True, ax=None, box=False, 
                    fold_points=True, fold_labels=False, alpha=0.7):
@@ -482,7 +438,117 @@ def custom_fig(df, models:OrderedDict=None, sel_dataset='PDBbind', sel_col='cind
     
     return plot_data
 
-def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFrame:
+def custom_fig_stratified(
+                        df_dict:dict[pd.DataFrame], 
+                        selected_keys=['full', 'mt_in', 'mt_out'], 
+                        models = {
+                            'DG': ('nomsa', 'binary', 'original', 'binary'),
+                            'esm': ('ESM', 'binary', 'original', 'binary'),
+                            'aflow': ('nomsa', 'aflow', 'original', 'binary'),
+                            'gvpL': ('nomsa', 'binary', 'gvp', 'binary'),
+                            'gvpL_aflow': ('nomsa', 'aflow', 'gvp', 'binary'),
+                        },
+                        sel_dataset:str='PDBbind',
+                        sel_col:str='cindex',
+                        alpha:float=0.7,
+                        ax=None,
+                        show=False, **kwargs):
+
+    # Combine data for all selected keys
+    plot_data = []
+    for key in selected_keys:
+        key_df = df_dict[key]
+        filtered_df = key_df[(key_df['data'] == sel_dataset) & (key_df['fold'] != '') & (~key_df['overlap'])]
+
+        def matched(df, tuple):
+            return (df['feat'] == tuple[0]) & (df['edge'] == tuple[1]) & \
+                (df['lig_feat'] == tuple[2]) & (df['lig_edge'] == tuple[3])
+
+        filter_conditions = [matched(filtered_df, v) for v in models.values()]
+        filtered_df = filtered_df[sum(filter_conditions) > 0]
+
+        for model, feat in models.items():
+            model_data = filtered_df[matched(filtered_df, feat)][[sel_col, 'fold']]
+            if len(model_data) != 5:
+                logging.warning(f'Expected 5 results for {model} on {sel_dataset}, got {len(model_data)}')
+            model_data['group'] = key  # Add the group (e.g., 'full', 'mt_in', 'mt_out')
+            model_data['model'] = model  # Add the model name
+            plot_data.append(model_data)
+
+    # Combine all groups into a single DataFrame
+    plot_data_combined = pd.concat(plot_data)
+
+    # Create the grouped box plot
+    plt.figure(figsize=(10, 6))
+    ax = sns.boxplot(data=plot_data_combined, ax=ax, 
+                    x='model', y=sel_col, hue='group',
+                    boxprops=dict(alpha=alpha))
+
+    # Add jittered strip plot for individual data points
+
+    ax = sns.stripplot(data=plot_data_combined, ax=ax, 
+                    x='model', y=sel_col, hue='group', 
+                    dodge=True, alpha=0.5, linewidth=0.8)
+    
+    # Adjust the legend and labels
+    handles, labels = ax.get_legend_handles_labels()
+    # remove strpplot-added legend labels
+    ax.legend(handles[:-(len(selected_keys))], labels[:-len(selected_keys)], 
+              title='Group')
+    
+    ax.set_ylabel(sel_col)
+    ax.set_xlabel('Model Type')
+    ax.set_title(f'{sel_col} for {sel_dataset}')
+    plt.tight_layout()
+    
+    if show:
+        plt.show()
+        
+def fig_combined(df, datasets=['PDBbind','davis', 'kiba'], metrics=['cindex', 'mse'], 
+                  fig_callable=custom_fig, fig_scale=(5,4),
+                  show=False, title_postfix='', suptitle='superTitle', sharey='row', **kwargs):    
+    # Create subplots with datasets as columns and metrics as rows
+    fig, axes = plt.subplots(len(metrics), len(datasets), 
+                             figsize=(fig_scale[0]*len(datasets), 
+                                      fig_scale[1]*len(metrics)),
+                             sharey=sharey,
+                             sharex='col')
+    for i, dataset in enumerate(datasets):
+        for j, metric in enumerate(metrics):
+            # Set current subplot                
+            if len(datasets) == 1 and len(metrics) == 1:
+                ax = axes
+            elif len(datasets) == 1:
+                ax = axes[j]
+            elif len(metrics) == 1:
+                ax = axes[i]
+            else:
+                ax = axes[j, i]
+
+            fig_callable(df, sel_col=metric, sel_dataset=dataset, show=False, 
+                         ax=ax, **kwargs)
+                        
+            # Add titles only to the top row and left column
+            if j == 0:
+                ax.set_title(f'{dataset}{title_postfix}')
+            elif j < len(metrics)-1: # middle row
+                ax.set_title('')
+            else: # bottom row
+                ax.set_title('')
+            
+            if j < len(metrics) - 1:
+                ax.set_xlabel('')
+                ax.set_xticklabels([])
+            if i == 0:
+                ax.set_ylabel(metric)
+            else:
+                ax.set_ylabel('')
+    fig.suptitle(suptitle)
+    fig.tight_layout() # Adjust layout to prevent clipping of titles
+    if show: plt.show()
+    return fig, axes
+
+def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None, df=None) -> pd.DataFrame:
     """
     Prepares a dataframe from the model stats csv file.
 
@@ -507,10 +573,11 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
             - `batch_size`: batch size used for training
             - `overlap`: whether or not the model was trained with protein overlap 
     """
-    df = pd.read_csv(csv_p)
-    
-    if old_csv_p is not None and os.path.isfile(old_csv_p):
-        df = pd.concat([df, pd.read_csv(old_csv_p)]) # concat with old model results since we get the max value anyways...
+    if df is None:
+        df = pd.read_csv(csv_p)
+        
+        if old_csv_p is not None and os.path.isfile(old_csv_p):
+            df = pd.concat([df, pd.read_csv(old_csv_p)]) # concat with old model results since we get the max value anyways...
 
     # create data, feat, and overlap columns for easier filtering.
     df['data'] = df['run'].str.extract(r'_(davis|kiba|PDBbind)', expand=False)
@@ -526,7 +593,7 @@ def prepare_df(csv_p:str=cfg.MODEL_STATS_CSV, old_csv_p:str=None) -> pd.DataFram
     df['improved'] = df['run'].str.contains('IM_') # postfix of model name will include I if "improved"
     df['batch_size'] = df['run'].str.extract(r'_(\d+)B_', expand=False).astype(int)
     
-    df['lr'] = df['run'].str.extract(r'_(\d+\.?\d*)LR_', expand=False).astype(float)
+    df['lr'] = df['run'].str.extract(r'_(\d+\.?\d*[e-]*\d*)LR_', expand=False).astype(float)
     df['dropout'] = df['run'].str.extract(r'_(\d+\.?\d*)D_', expand=False).astype(float)
     
     # ESM models
