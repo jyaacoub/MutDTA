@@ -14,7 +14,10 @@ Nonetheless, all the important stuff we would need, like model checkpoints, shou
 
 [Training splits](https://github.com/jyaacoub/MutDTA/tree/main/splits) can be found on the GitHub page as well as all my most recent code.
 
-# 
+# Training on new datasets or new models
+1. For training on existing data you would use the train_folds.sh script, depending on your comfort with editing the existing python scripts it might be a bit difficult to set up. But you just need to define a new "model_opt" in src/utils/loader.py, and add that model key to the list of options in src/utils/config.py.
+2. If you make any changes to the input model features this would make things a lot harder since this is essentially building a new dataset with those features and would need to add instructions on how to set that up for protein features, protein edges, and ligand features.
+3. For new datasets this is more challenging since you basically need to build a new Dataset subclass (inherited from the BaseDataset class) - see PlatinumDataset for a good example on this (it is the cleanest of the 3 dataset classes I have).
 
 # GitHub issues
 
